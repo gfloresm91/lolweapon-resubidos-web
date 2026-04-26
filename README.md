@@ -10,6 +10,7 @@ La aplicacion permite:
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
+- administrar categorias globales de tags desde la interfaz admin
 - guardar los cambios sobre un dataset base o sobre un dataset local opcional
 - subir miniaturas a `public/imagenes`
 
@@ -146,6 +147,7 @@ app/
     lives/route.js
     login/route.js
     logout/route.js
+    tags/route.js
     twitch/
       eventsub/
         route.js
@@ -182,6 +184,7 @@ lib/
   auth.js
   data.js
   lives.js
+  tagSettings.js
   tags.js
   twitch.js
   twitchArchive.js
@@ -192,6 +195,8 @@ data/
   data.local.json
   animes.json
   animes.local.json
+  tag-settings.json
+  tag-settings.local.json
 
 public/
   imagenes/
@@ -236,6 +241,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 - muestra estadisticas generales
 - renderiza cards con informacion, tags y links
 - agrupa tags en categorias automaticas como Anime, Juegos, Tiers, Charlas, Peliculas y Otros
+- carga categorias personalizadas y movimientos manuales desde `/api/tags`
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
 
 `/viendo`:
@@ -281,6 +287,8 @@ El admin permite:
 - subir miniaturas
 - editar tags mediante un input tipo chips
 - validar campos antes de guardar
+- crear categorias personalizadas para tags
+- mover tags entre categorias desde un modal amplio
 
 El acceso admin:
 
@@ -324,6 +332,22 @@ Comportamiento:
 - si no existe, la app usa `data/animes.json`
 
 La resolución de lectura y escritura vive en `lib/animeData.js`.
+
+Las categorias personalizadas de tags y los movimientos manuales entre categorias se guardan en:
+
+```text
+data/tag-settings.json
+data/tag-settings.local.json
+```
+
+Comportamiento:
+
+- si existe `data/tag-settings.local.json`, la app lee y escribe ahí
+- si no existe, la app usa `data/tag-settings.json`
+- `GET /api/tags` es publico para que todos los usuarios vean la misma organizacion
+- `POST /api/tags` esta protegido y solo permite cambios con sesion admin
+
+La resolución de lectura, escritura y normalización vive en `lib/tagSettings.js`.
 
 ## Formato esperado del dataset
 
@@ -380,7 +404,7 @@ Cada registro de `Viendo` sigue esta forma:
 
 ## Tags y categorias
 
-El panel de tags agrupa automaticamente los tags del rastreador con reglas en `lib/tags.js`.
+El panel de tags agrupa automaticamente los tags del rastreador con reglas en `lib/tags.js` y ajustes persistidos en `data/tag-settings.json`.
 
 Categorias actuales:
 
@@ -395,9 +419,22 @@ La clasificacion usa:
 
 - coincidencias exactas para tags concretos
 - keywords parciales para familias de tags
-- overrides manuales en `localStorage` cuando un admin mueve un tag desde el panel
+- categorias personalizadas creadas por admins
+- overrides manuales en `data/tag-settings.json` cuando un admin mueve un tag desde el panel
 
-Si muchos tags caen en `Otros`, agrega keywords o coincidencias exactas en `lib/tags.js`.
+Desde el panel de tags:
+
+- cualquier usuario puede ver las categorias y filtrar por tag
+- solo admins ven los controles para crear categorias o mover tags
+- al crear una categoria se pide `Nombre` e `Icono`
+- `Icono` espera un valor corto, normalmente un emoji como `🎭`, `🎵`, `📺` o `🔥`
+- si se deja el icono vacio, se usa `🏷️`
+- los cambios admin se guardan vía `POST /api/tags` y quedan visibles para todos los usuarios
+
+Si muchos tags caen en `Otros`, hay dos opciones:
+
+- mover esos tags desde el panel admin hacia una categoria existente o personalizada
+- agregar keywords o coincidencias exactas en `lib/tags.js` si quieres que la clasificacion automatica lo haga sin overrides manuales
 
 ## API interna
 
@@ -425,6 +462,58 @@ Respuesta exitosa:
 ### `GET /api/animes`
 
 - devuelve el dataset normalizado de la pagina `Viendo`
+
+### `GET /api/tags`
+
+- devuelve categorias personalizadas y movimientos manuales de tags
+- es publico para que todos los usuarios vean la misma agrupacion
+
+Respuesta:
+
+```json
+{
+  "success": true,
+  "categories": [
+    {
+      "key": "custom-reacciones",
+      "label": "Reacciones",
+      "icon": "🎭",
+      "keywords": [],
+      "custom": true
+    }
+  ],
+  "overrides": {
+    "worldtrigger": "anime"
+  }
+}
+```
+
+### `POST /api/tags`
+
+Endpoint protegido.
+
+- guarda categorias personalizadas
+- guarda overrides manuales de tags
+- normaliza los datos antes de escribir `data/tag-settings.json` o `data/tag-settings.local.json`
+
+Ejemplo:
+
+```json
+{
+  "categories": [
+    {
+      "key": "custom-reacciones",
+      "label": "Reacciones",
+      "icon": "🎭",
+      "keywords": [],
+      "custom": true
+    }
+  ],
+  "overrides": {
+    "reaccionvideos": "custom-reacciones"
+  }
+}
+```
 
 ### `POST /api/animes`
 
@@ -603,12 +692,13 @@ Importante:
 
 ## Flujo de trabajo recomendado
 
-1. Haz backup de `data/data.json` y `data/animes.json`
+1. Haz backup de `data/data.json`, `data/animes.json` y `data/tag-settings.json`
 2. Si no quieres tocar el dataset versionado, crea una copia local:
 
 ```bash
 cp data/data.json data/data.local.json
 cp data/animes.json data/animes.local.json
+cp data/tag-settings.json data/tag-settings.local.json
 ```
 
 3. Ejecuta `npm run dev`
@@ -622,6 +712,8 @@ data/data.local.json
 data/data.json
 data/animes.local.json
 data/animes.json
+data/tag-settings.local.json
+data/tag-settings.json
 ```
 
 ## Notas sobre rendimiento
@@ -664,6 +756,16 @@ Revisa:
 - que exista y sea escribible el archivo de datos activo
 - que no haya errores de validación en el modal
 - que no estes esperando persistencia de archivos locales en un entorno serverless
+
+### Las categorias de tags no cambian para otros usuarios
+
+Revisa:
+
+- que el cambio se haya hecho logueado como admin
+- que `POST /api/tags` no devuelva `401`
+- que `data/tag-settings.json` o `data/tag-settings.local.json` sea escribible
+- que no estés probando contra otra instancia o entorno con otro archivo de datos
+- que el usuario público haya refrescado la pagina para volver a consultar `/api/tags`
 
 ### No suben imágenes
 
@@ -713,7 +815,7 @@ Ideas naturales para seguir mejorándolo:
 - auditoría o historial de cambios
 - import/export de dataset desde panel admin
 - confirmaciones más detalladas para cambios destructivos
-- tests para `lib/lives.js`, `lib/data.js`, `lib/animes.js` y `lib/animeData.js`
+- tests para `lib/lives.js`, `lib/data.js`, `lib/animes.js`, `lib/animeData.js` y `lib/tagSettings.js`
 
 ## Licencia
 

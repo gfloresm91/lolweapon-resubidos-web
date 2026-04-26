@@ -1,0 +1,15 @@
+{
+  "categories": [
+    {
+      "key": "custom-test",
+      "label": "test",
+      "icon": "🏷️",
+      "keywords": [],
+      "custom": true
+    }
+  ],
+  "overrides": {
+    "3nengumiginpachisensei": "anime",
+    "zatzutabithatsjourney": "custom-test"
+  }
+}
