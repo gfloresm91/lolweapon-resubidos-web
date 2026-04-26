@@ -7,10 +7,12 @@ import { Toaster, toast } from "sonner";
 import AdminModal from "@/components/AdminModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
+import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
+import WatchingPage from "@/components/WatchingPage";
 
 function getAllTags(lives) {
   return Array.from(
@@ -51,10 +53,33 @@ function buildId() {
 
 const INITIAL_VISIBLE_COUNT = 80;
 const LOAD_MORE_COUNT = 80;
+const VIEW_LABELS = {
+  home: "Inicio",
+  tracker: "Rastreador de directos",
+  watching: "Viendo",
+};
 
-export default function HomePage({ initialLives, isAdmin }) {
+const VIEW_PATHS = {
+  home: "/inicio",
+  tracker: "/rastreador",
+  watching: "/viendo",
+};
+
+export default function HomePage({
+  activeView = "home",
+  initialLives = [],
+  initialAnimes = [],
+  initialYoutubeVideos = [],
+  initialTwitchStream = null,
+  initialTwitchProfile = null,
+  initialTwitchChannelInfo = null,
+  initialTwitchGame = null,
+  twitchLogin,
+  isAdmin,
+}) {
   const router = useRouter();
   const [lives, setLives] = useState(initialLives);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [filters, setFilters] = useState({ search: "", year: "all", status: "all" });
   const [selectedTag, setSelectedTag] = useState("");
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
@@ -114,6 +139,19 @@ export default function HomePage({ initialLives, isAdmin }) {
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [deferredSearch, filters.status, filters.year, selectedTag]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 901px)");
+
+    function syncSidebarState(event) {
+      setIsSidebarOpen(event.matches);
+    }
+
+    setIsSidebarOpen(mediaQuery.matches);
+    mediaQuery.addEventListener("change", syncSidebarState);
+
+    return () => mediaQuery.removeEventListener("change", syncSidebarState);
+  }, []);
 
   useEffect(() => {
     if (!hasMoreLives || !loadMoreRef.current) {
@@ -244,6 +282,23 @@ export default function HomePage({ initialLives, isAdmin }) {
     router.refresh();
   }
 
+  function selectView(view) {
+    router.push(VIEW_PATHS[view] || "/inicio");
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      setIsSidebarOpen(false);
+    }
+  }
+
+  function toggleSidebar() {
+    setIsSidebarOpen((current) => {
+      if (current === null) {
+        return !window.matchMedia("(min-width: 901px)").matches;
+      }
+
+      return !current;
+    });
+  }
+
   return (
     <>
       <Toaster position="top-right" richColors closeButton />
@@ -251,20 +306,111 @@ export default function HomePage({ initialLives, isAdmin }) {
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
 
-      <div className="app-wrapper">
-        <div id="btn-login-top" className="login-top-button">
-          {isAdmin ? (
-            <button type="button" className="btn-floating btn-small" onClick={logout}>
-              🔑 Salir
-            </button>
-          ) : (
-            <a href="/login" className="btn-floating btn-small">
-              🔑 Admin
-            </a>
-          )}
-        </div>
+      <div className={`app-shell ${isSidebarOpen === false ? "is-sidebar-closed" : ""}`}>
+        <button
+          type="button"
+          className={`hamburger-button ${isSidebarOpen ? "is-open" : ""}`}
+          aria-label={isSidebarOpen === false ? "Abrir menu" : "Cerrar menu"}
+          aria-expanded={isSidebarOpen !== false}
+          aria-controls="main-sidebar"
+          onClick={toggleSidebar}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
 
-        <header className="main-header">
+        {isSidebarOpen ? (
+          <button
+            type="button"
+            className="sidebar-overlay"
+            aria-label="Cerrar menu"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        ) : null}
+
+        <aside
+          id="main-sidebar"
+          className={`sidebar ${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
+          aria-label="Menu principal"
+        >
+          <button
+            type="button"
+            className="sidebar-brand sidebar-brand-button"
+            aria-label="Ir al inicio"
+            onClick={() => selectView("home")}
+          >
+            <span className="sidebar-brand-mark">LW</span>
+            <span className="sidebar-brand-text">Resubidos</span>
+          </button>
+
+          <nav className="sidebar-nav">
+            <button
+              type="button"
+              className={`sidebar-link sidebar-link-button ${activeView === "home" ? "is-active" : ""}`}
+              onClick={() => selectView("home")}
+            >
+              <span className="sidebar-icon">IN</span>
+              <span>Inicio</span>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-link sidebar-link-button ${activeView === "tracker" ? "is-active" : ""}`}
+              onClick={() => selectView("tracker")}
+            >
+              <span className="sidebar-icon">RD</span>
+              <span>Rastreador de directos</span>
+            </button>
+            <button
+              type="button"
+              className={`sidebar-link sidebar-link-button ${activeView === "watching" ? "is-active" : ""}`}
+              onClick={() => selectView("watching")}
+            >
+              <span className="sidebar-icon">VI</span>
+              <span>Viendo</span>
+            </button>
+          </nav>
+        </aside>
+
+        <div className="content-shell">
+          <header className="topbar" aria-label="Barra superior">
+            <div className="topbar-title">
+              <span className="topbar-kicker">Archivo VODs</span>
+              <span className="topbar-page">{VIEW_LABELS[activeView]}</span>
+            </div>
+
+            {isAdmin ? (
+              <div className="topbar-actions">
+                <button type="button" id="btn-logout" className="admin-icon-button is-logged" onClick={logout}>
+                  <span className="admin-icon" aria-hidden="true">A</span>
+                  <span>Salir</span>
+                </button>
+              </div>
+            ) : (
+              <a href="/login" id="btn-login-top" className="admin-icon-button" aria-label="Iniciar sesion de admin">
+                <span className="admin-icon" aria-hidden="true">A</span>
+                <span>Admin</span>
+              </a>
+            )}
+          </header>
+
+          <div className="app-wrapper">
+            {activeView === "home" ? (
+              <HomeDashboard
+                lives={lives}
+                youtubeVideos={initialYoutubeVideos}
+                twitchStream={initialTwitchStream}
+                twitchProfile={initialTwitchProfile}
+                twitchChannelInfo={initialTwitchChannelInfo}
+                twitchGame={initialTwitchGame}
+                twitchLogin={twitchLogin}
+                onTrackerOpen={() => selectView("tracker")}
+              />
+            ) : null}
+
+            {activeView === "tracker" ? (
+              <>
+        <header id="inicio" className="main-header">
           <div className="header-badge" id="btn-show-lore" onClick={() => setIsLoreOpen(true)}>
             🚀 ARCHIVO HISTORICO
           </div>
@@ -293,6 +439,19 @@ export default function HomePage({ initialLives, isAdmin }) {
         </div>
 
         <StatsBar stats={stats} />
+
+        {isAdmin ? (
+          <section className="tracker-actions" aria-label="Acciones del rastreador">
+            <div>
+              <span className="tracker-actions-label">Administración</span>
+              <p className="tracker-actions-copy">Gestiona los registros del archivo.</p>
+            </div>
+            <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
+              <span className="tracker-action-icon">+</span>
+              Nuevo directo
+            </button>
+          </section>
+        ) : null}
 
         <FiltersBar
           filters={filters}
@@ -348,18 +507,15 @@ export default function HomePage({ initialLives, isAdmin }) {
         </main>
 
         <footer className="site-footer">Archivo VODs · Desarrollado para mantener la historia</footer>
-      </div>
+              </>
+            ) : null}
 
-      {isAdmin ? (
-        <div id="admin-controls" className="admin-controls">
-          <button type="button" id="btn-add-live" className="btn-floating" onClick={() => setEditingLive({})}>
-            ➕ Nuevo
-          </button>
-          <button type="button" id="btn-logout" className="btn-floating btn-danger" onClick={logout}>
-            🔑 Salir
-          </button>
+            {activeView === "watching" ? (
+              <WatchingPage initialAnimes={initialAnimes} isAdmin={isAdmin} />
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      </div>
 
       <AdminModal
         live={editingLive && editingLive.id ? editingLive : null}

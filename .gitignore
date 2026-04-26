@@ -1,9 +1,20 @@
+# Dependencies
 node_modules/
+
+# Next / build outputs
 .next/
 out/
 dist/
 build/
 coverage/
+
+# Vercel / tool caches
+.vercel/
+.turbo/
+.swc/
+.cache/
+.parcel-cache/
+.eslintcache
 
 # Environment files
 .env
@@ -14,6 +25,7 @@ coverage/
 
 # Local runtime data
 data/data.local.json
+data/animes.local.json
 
 # Logs
 *.log
@@ -24,9 +36,32 @@ pnpm-debug.log*
 
 # OS / editor
 .DS_Store
+**/.DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
 # TypeScript / tooling
 *.tsbuildinfo
+
+# Local tunnels
+.cloudflared/
+.ngrok2/
+
+# Ignorar por defecto todo lo que se agregue a imagenes
+public/imagenes/*
+
+# Pero permitir la carpeta
+!public/imagenes/
+
+# Imagenes permitidas/versionables
+!public/imagenes/ALDNOAH ZERO.png
+!public/imagenes/ARABARU.png
+!public/imagenes/background.png
+!public/imagenes/4b569f15-88f9-4d55-9b17-d97de17a7fde.png
+!public/imagenes/86.png
+
+# Mantener ignoradas carpetas de subidas temporales/locales
+public/imagenes/uploads/
+public/imagenes/tmp/
+

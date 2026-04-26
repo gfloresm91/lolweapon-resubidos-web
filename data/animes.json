@@ -1,0 +1,30 @@
+[
+  {
+    "id": "anime_86",
+    "name": "86",
+    "current_episode": "22",
+    "purchased": "0",
+    "image": "/imagenes/86.png"
+  },
+  {
+    "id": "anime_aldnoah_zero",
+    "name": "ALDNOAH ZERO",
+    "current_episode": "23",
+    "purchased": "0",
+    "image": "/imagenes/ALDNOAH ZERO.png"
+  },
+  {
+    "id": "anime_arabaru",
+    "name": "ARABARU",
+    "current_episode": "1",
+    "purchased": "ENTERA",
+    "image": "/imagenes/ARABARU.png"
+  },
+  {
+    "id": "anime_dragon_ball",
+    "name": "DRAGON BALL",
+    "current_episode": "14",
+    "purchased": "0",
+    "image": "/imagenes/4b569f15-88f9-4d55-9b17-d97de17a7fde.png"
+  }
+]

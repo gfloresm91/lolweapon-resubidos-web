@@ -4,7 +4,9 @@ Archivo historico de directos y VODs migrado a Next.js full stack.
 
 La aplicacion permite:
 
+- mostrar un inicio con player/chat de Twitch, metadata del canal, ultimos directos y ultimos videos de YouTube
 - explorar el archivo historico por busqueda, año, estado y tags
+- seguir la lista de animes en la pagina `Viendo`
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - administrar el archivo desde una interfaz protegida por login
 - guardar los cambios sobre un dataset base o sobre un dataset local opcional
@@ -51,19 +53,21 @@ Sugerencia para generar `ADMIN_SESSION_TOKEN`:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-4. Coloca tu dataset real en:
+4. Coloca tus datasets base en:
 
 ```text
 data/data.json
+data/animes.json
 ```
 
-Opcional, si quieres trabajar sin modificar el archivo versionado:
+Opcional, si quieres trabajar sin modificar los archivos versionados:
 
 ```bash
 cp data/data.json data/data.local.json
+cp data/animes.json data/animes.local.json
 ```
 
-Si `data/data.local.json` existe, la app lo usará en lugar de `data/data.json` para leer y guardar cambios.
+Si existe un archivo `.local.json`, la app lo usará en lugar del archivo base equivalente para leer y guardar cambios.
 
 5. Levanta el entorno de desarrollo:
 
@@ -100,6 +104,30 @@ El proyecto usa estas variables:
   Contraseña del panel admin.
 - `ADMIN_SESSION_TOKEN`
   Token secreto usado para validar la cookie de sesión.
+- `RESUBIDOS_HOST`
+  Host que debe cargar `/rastreador` cuando se visita la raíz. Ejemplo QA: `resubidos-qa.lolweapon.com`.
+- `VIENDO_HOST`
+  Host que debe cargar `/viendo` cuando se visita la raíz. Ejemplo QA: `viendo-qa.lolweapon.com`.
+- `TWITCH_CLIENT_ID`
+  Client ID de la aplicación de Twitch.
+- `TWITCH_CLIENT_SECRET`
+  Client secret de la aplicación de Twitch.
+- `TWITCH_BROADCASTER_LOGIN`
+  Login del streamer en Twitch, usado cuando el evento no incluye user id.
+- `TWITCH_EVENTSUB_SECRET`
+  Secreto para verificar los webhooks de Twitch EventSub.
+- `TWITCH_EVENTSUB_CALLBACK_URL`
+  URL publica HTTPS del listener, por ejemplo `https://tu-dominio.com/api/twitch/eventsub`.
+- `TWITCH_ARCHIVE_TIME_ZONE`
+  Zona horaria para guardar la fecha del directo. Por defecto: `America/Santiago`.
+- `TWITCH_REQUIRE_ACTIVE_STREAM`
+  Si vale `true`, la app solo crea registro cuando Twitch confirma que el canal está online.
+- `YOUTUBE_API_KEY`
+  API key de YouTube Data API para cargar videos recientes en Inicio.
+- `YOUTUBE_CHANNEL_ID`
+  ID del canal de YouTube. La app lo usa para resolver la playlist de subidas si no defines `YOUTUBE_UPLOADS_PLAYLIST_ID`.
+- `YOUTUBE_UPLOADS_PLAYLIST_ID`
+  Playlist de subidas del canal. Si la tienes, es la forma más directa para listar los últimos videos.
 
 Notas:
 
@@ -111,51 +139,104 @@ Notas:
 ```text
 app/
   api/
+    animes/route.js
     lives/route.js
     login/route.js
     logout/route.js
+    twitch/
+      eventsub/
+        route.js
+        subscribe/route.js
+      status/route.js
     update/route.js
     upload/route.js
+    youtube/
+      videos/route.js
+  inicio/page.js
   login/page.js
-  page.js
   layout.js
+  page.js
+  rastreador/page.js
+  viendo/page.js
   globals.css
 
 components/
   AdminModal.js
   ConfirmModal.js
   FiltersBar.js
+  HomeDashboard.js
   HomePage.js
   LiveCard.js
   LoreModal.js
   StatsBar.js
   TagPanel.js
   TagsInput.js
+  WatchingPage.js
 
 lib/
+  animeData.js
+  animes.js
   auth.js
   data.js
   lives.js
   tags.js
+  twitch.js
+  twitchArchive.js
+  youtube.js
 
 data/
   data.json
+  data.local.json
+  animes.json
+  animes.local.json
 
 public/
   imagenes/
+
+middleware.js
 ```
 
 ## Como funciona la app
 
+### Rutas y dominios
+
+Rutas internas:
+
+- `/inicio`: hub principal con Twitch, últimos directos y YouTube.
+- `/rastreador`: archivo de directos/resubidos.
+- `/viendo`: seguimiento de animes.
+
+En producción, el middleware reescribe la raíz según el dominio:
+
+- `${RESUBIDOS_HOST}/` carga `/rastreador`.
+- `${VIENDO_HOST}/` carga `/viendo`.
+
 ### Frontend publico
 
-La portada:
+`/inicio`:
+
+- muestra el player y chat de Twitch
+- consulta `/api/twitch/status` para mostrar si el canal esta online
+- muestra metadata del canal aunque el streamer este offline
+- muestra avatar del streamer, titulo actual, categoria e imagen de categoria
+- incluye boton de apoyo hacia Streamlabs/PayPal
+- muestra los 10 registros mas recientes del rastreador
+- muestra los 10 videos mas recientes de YouTube
+
+`/rastreador`:
 
 - carga el dataset inicial desde servidor
 - aplica filtros por texto, año, estado y tag
 - muestra estadisticas generales
 - renderiza cards con informacion, tags y links
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
+
+`/viendo`:
+
+- carga el dataset de animes
+- muestra estadisticas de animes, temporadas enteras, capitulos comprados y pendientes
+- permite buscar y filtrar por estado de compra
+- si hay sesion admin, permite crear, editar, borrar y subir poster de animes
 
 ### Panel admin
 
@@ -176,7 +257,7 @@ El acceso admin:
 
 ## Persistencia de datos
 
-La app puede usar dos archivos:
+El rastreador de directos puede usar dos archivos:
 
 ```text
 data/data.json
@@ -197,9 +278,23 @@ Al leer y guardar, el proyecto normaliza los datos con `lib/lives.js` para toler
 - links vacios
 - registros incompletos o heredados del archivo historico
 
+La pagina `Viendo` usa la misma estrategia con:
+
+```text
+data/animes.json
+data/animes.local.json
+```
+
+Comportamiento:
+
+- si existe `data/animes.local.json`, la app lee y escribe ahí
+- si no existe, la app usa `data/animes.json`
+
+La resolución de lectura y escritura vive en `lib/animeData.js`.
+
 ## Formato esperado del dataset
 
-Cada registro sigue esta forma:
+Cada registro del rastreador sigue esta forma:
 
 ```json
 {
@@ -229,6 +324,25 @@ Cada registro sigue esta forma:
 - `image` puede estar vacio
 - `additional_info` es opcional
 
+Cada registro de `Viendo` sigue esta forma:
+
+```json
+{
+  "id": "shoujo-ramune",
+  "name": "Shoujo Ramune",
+  "current_episode": "0",
+  "purchased": "ENTERA",
+  "image": "/imagenes/shoujo-ramune.png"
+}
+```
+
+### Reglas practicas para animes
+
+- `name` es obligatorio
+- `current_episode` puede ser numero o string
+- `purchased` puede ser un numero o `ENTERA`
+- `image` puede apuntar a una imagen versionada en `public/imagenes`
+
 ## API interna
 
 ### `POST /api/login`
@@ -251,6 +365,32 @@ Respuesta exitosa:
 ### `GET /api/lives`
 
 - devuelve el dataset normalizado
+
+### `GET /api/animes`
+
+- devuelve el dataset normalizado de la pagina `Viendo`
+
+### `POST /api/animes`
+
+Endpoint protegido.
+
+Acciones soportadas:
+
+- `replace`
+- `upsert`
+- `delete`
+
+Ejemplo `upsert`:
+
+```json
+{
+  "action": "upsert",
+  "anime": {
+    "id": "anime_123",
+    "name": "Nuevo anime"
+  }
+}
+```
 
 ### `POST /api/update`
 
@@ -282,6 +422,109 @@ Endpoint protegido.
 - guarda archivos en `public/imagenes`
 - devuelve la ruta publica resultante
 
+### `GET /api/twitch/status`
+
+- devuelve el estado online/offline del canal
+- devuelve perfil del broadcaster
+- devuelve metadata actual del canal, incluyendo titulo y categoria aunque este offline
+- devuelve metadata de la categoria cuando Twitch entrega `game_id`
+
+### `POST /api/twitch/eventsub`
+
+Endpoint público para Twitch EventSub.
+
+- valida la firma HMAC de Twitch con `TWITCH_EVENTSUB_SECRET`
+- responde el challenge de verificación
+- procesa eventos `stream.online`
+- crea o actualiza un registro con metadata disponible de Twitch
+
+Callback sugerido para EventSub:
+
+```text
+https://tu-dominio.com/api/twitch/eventsub
+```
+
+### `POST /api/twitch/eventsub/subscribe`
+
+Endpoint protegido por sesión admin para registrar la suscripción `stream.online` en Twitch.
+
+Requisitos:
+
+- iniciar sesión como admin en la web
+- configurar `TWITCH_CLIENT_ID`
+- configurar `TWITCH_CLIENT_SECRET`
+- configurar `TWITCH_BROADCASTER_LOGIN`
+- configurar `TWITCH_EVENTSUB_SECRET`
+- configurar `TWITCH_EVENTSUB_CALLBACK_URL`
+
+Cuando se crea un registro automático:
+
+- `title`: título actual del directo en Twitch
+- `date` y `year`: fecha del inicio
+- `status`: `En directo`
+- `tags`: `Twitch` y la categoría si existe
+- `image`: thumbnail de Twitch
+- `additional_info`: URL del canal y datos disponibles
+
+### `GET /api/youtube/videos`
+
+- devuelve hasta 10 videos recientes del canal configurado
+- usa `YOUTUBE_UPLOADS_PLAYLIST_ID` si existe
+- si no existe, intenta resolver la playlist de subidas desde `YOUTUBE_CHANNEL_ID`
+
+## Imagenes y archivos versionados
+
+Las imagenes base usadas por `data/animes.json` pueden vivir en:
+
+```text
+public/imagenes/
+```
+
+Si quieres permitir solo ciertas imagenes en Git, usa una allowlist en `.gitignore`:
+
+```gitignore
+public/imagenes/*
+!public/imagenes/
+!public/imagenes/imagen-permitida.png
+```
+
+Notas:
+
+- las imagenes ya versionadas deben quedar como excepciones con `!`
+- las imagenes nuevas que no esten en la allowlist quedaran ignoradas
+- si una imagen ignorada ya estaba trackeada, hay que quitarla del index con `git rm --cached`
+- actualmente `/api/upload` guarda en `public/imagenes`; si usas allowlist, agrega una excepcion para cada imagen que quieras versionar
+- si prefieres que las subidas del admin no aparezcan en Git, mueve ese flujo a `public/imagenes/uploads/` o `public/imagenes/tmp/`
+
+## Twitch EventSub
+
+Para que Twitch cree registros automaticamente al iniciar directo:
+
+1. Configura las variables `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `TWITCH_BROADCASTER_LOGIN`, `TWITCH_EVENTSUB_SECRET` y `TWITCH_EVENTSUB_CALLBACK_URL`.
+2. En local, expone `http://localhost:3000` con una herramienta como `cloudflared` o `ngrok`.
+3. Usa una callback HTTPS con puerto estandar:
+
+```text
+https://tu-dominio-publico.com/api/twitch/eventsub
+```
+
+4. Inicia sesion como admin.
+5. Ejecuta el registro de la suscripcion contra `POST /api/twitch/eventsub/subscribe`.
+
+Twitch validara el webhook enviando un challenge al endpoint `/api/twitch/eventsub`.
+
+## YouTube
+
+La seccion de videos recientes de `/inicio` usa YouTube Data API.
+
+Variables disponibles:
+
+- `YOUTUBE_API_KEY`: API key de YouTube Data API.
+- `YOUTUBE_CHANNEL_ID`: ID del canal.
+- `YOUTUBE_UPLOADS_PLAYLIST_ID`: playlist de subidas. Es opcional, pero recomendable.
+
+Si tienes la playlist de subidas, define `YOUTUBE_UPLOADS_PLAYLIST_ID` porque evita una consulta extra para resolverla desde el canal.
+
 ## Auth y seguridad
 
 La autenticacion actual es simple y funcional para uso privado o de comunidad pequeña:
@@ -296,21 +539,30 @@ Importante:
 - no subas `.env`
 - cambia siempre `ADMIN_PASSWORD` y `ADMIN_SESSION_TOKEN` antes de usarlo fuera de local
 - la persistencia actual escribe el archivo JSON completo en cada operación
+- en plataformas serverless, los cambios escritos en archivos locales pueden no persistir; para produccion con escritura real conviene usar base de datos o storage persistente
 
 ## Flujo de trabajo recomendado
 
-1. Haz backup de `data/data.json`
+1. Haz backup de `data/data.json` y `data/animes.json`
 2. Si no quieres tocar el dataset versionado, crea una copia local:
 
 ```bash
 cp data/data.json data/data.local.json
+cp data/animes.json data/animes.local.json
 ```
 
 3. Ejecuta `npm run dev`
 4. Entra a `/login`
 5. Crea o edita registros
 6. Verifica cambios en la UI
-7. Revisa el diff de `data/data.local.json` o `data/data.json`, según el archivo activo
+7. Revisa el diff del archivo activo:
+
+```text
+data/data.local.json
+data/data.json
+data/animes.local.json
+data/animes.json
+```
 
 ## Notas sobre rendimiento
 
@@ -351,6 +603,7 @@ Revisa:
 - que la sesión admin siga vigente
 - que exista y sea escribible el archivo de datos activo
 - que no haya errores de validación en el modal
+- que no estes esperando persistencia de archivos locales en un entorno serverless
 
 ### No suben imágenes
 
@@ -359,6 +612,23 @@ Revisa:
 - que estés logueado
 - que el archivo sea válido
 - que exista permiso de escritura en `public/imagenes`
+- que el `.gitignore` no este ocultando una imagen que si querias versionar
+
+### No aparece metadata de Twitch
+
+Revisa:
+
+- que `TWITCH_CLIENT_ID` y `TWITCH_CLIENT_SECRET` existan
+- que `TWITCH_BROADCASTER_LOGIN` tenga el login correcto
+- que reiniciaste el servidor despues de cambiar `.env`
+
+### No aparecen videos de YouTube
+
+Revisa:
+
+- que `YOUTUBE_API_KEY` exista
+- que `YOUTUBE_CHANNEL_ID` o `YOUTUBE_UPLOADS_PLAYLIST_ID` esten configurados
+- que la API key tenga habilitada YouTube Data API v3
 
 ## Desarrollo futuro sugerido
 
@@ -368,7 +638,7 @@ Ideas naturales para seguir mejorándolo:
 - auditoría o historial de cambios
 - import/export de dataset desde panel admin
 - confirmaciones más detalladas para cambios destructivos
-- tests para `lib/lives.js` y `lib/data.js`
+- tests para `lib/lives.js`, `lib/data.js`, `lib/animes.js` y `lib/animeData.js`
 
 ## Licencia
 

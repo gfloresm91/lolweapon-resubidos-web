@@ -6,19 +6,12 @@ import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page() {
+export default async function TrackerPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const isAdmin = validateSessionToken(token);
   const lives = await readLives();
-  const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
 
-  return (
-    <HomePage
-      activeView="home"
-      initialLives={lives}
-      twitchLogin={twitchLogin}
-      isAdmin={isAdmin}
-    />
-  );
+  return <HomePage activeView="tracker" initialLives={lives} isAdmin={isAdmin} />;
 }
+
