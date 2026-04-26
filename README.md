@@ -13,7 +13,7 @@ La aplicacion permite:
 - administrar el archivo desde una interfaz protegida por login
 - administrar categorias globales de tags desde la interfaz admin
 - guardar los cambios sobre un dataset base o sobre un dataset local opcional
-- subir miniaturas a `public/imagenes`
+- subir miniaturas desde la interfaz admin
 
 ## Stack
 
@@ -133,6 +133,8 @@ El proyecto usa estas variables:
   URL publica del canal de YouTube para el boton `Ir al canal` en Inicio. Es opcional; si no existe, la app usa `YOUTUBE_CHANNEL_ID` o un fallback local.
 - `YOUTUBE_UPLOADS_PLAYLIST_ID`
   Playlist de subidas del canal. Si la tienes, es la forma más directa para listar los últimos videos.
+- `UPLOAD_DIR`
+  Carpeta donde se guardan las imagenes subidas desde el admin. Por defecto: `public/imagenes`.
 - `NEXT_PUBLIC_ENABLE_SPACEDRUM`
   Feature flag para mostrar la sección `/spacedrum` y su item de menú. Por defecto debe quedar en `false` hasta que la página esté lista para producción.
 
@@ -634,8 +636,14 @@ Ejemplo `upsert`:
 Endpoint protegido.
 
 - recibe `multipart/form-data`
-- guarda archivos en `public/imagenes`
-- devuelve la ruta publica resultante
+- guarda archivos en `UPLOAD_DIR`, por defecto `public/imagenes`
+- devuelve una ruta publica servida por la app, por ejemplo `/imagenes/archivo.png`
+
+### `GET /imagenes/[filename]`
+
+- sirve las imagenes subidas desde `UPLOAD_DIR`
+- requiere que el servidor de produccion tenga almacenamiento persistente
+- funciona como respaldo cuando el archivo existe en el servidor pero no fue servido como asset estatico
 
 ### `GET /api/twitch/status`
 
@@ -717,8 +725,9 @@ Notas:
 - las imagenes ya versionadas deben quedar como excepciones con `!`
 - las imagenes nuevas que no esten en la allowlist quedaran ignoradas
 - si una imagen ignorada ya estaba trackeada, hay que quitarla del index con `git rm --cached`
-- actualmente `/api/upload` guarda en `public/imagenes`; si usas allowlist, agrega una excepcion para cada imagen que quieras versionar
-- si prefieres que las subidas del admin no aparezcan en Git, mueve ese flujo a `public/imagenes/uploads/` o `public/imagenes/tmp/`
+- `/api/upload` guarda las subidas del admin en `UPLOAD_DIR`
+- las subidas del admin quedan como datos de runtime y no deberian versionarse en Git
+- si despliegas en un entorno serverless sin disco persistente, usa almacenamiento externo para las subidas
 
 ## Twitch EventSub
 
@@ -854,8 +863,15 @@ Revisa:
 
 - que estés logueado
 - que el archivo sea válido
-- que exista permiso de escritura en `public/imagenes`
-- que el `.gitignore` no este ocultando una imagen que si querias versionar
+- que `UPLOAD_DIR` exista o pueda crearse automaticamente
+- que exista permiso de escritura en `UPLOAD_DIR`
+- que en producción `UPLOAD_DIR` apunte a un disco persistente
+
+### Una imagen subida devuelve 404 en producción
+
+Las imagenes en `public/imagenes` se sirven como archivos estaticos. Ese directorio sirve bien para imagenes que ya estaban presentes al construir la app, pero una subida hecha en runtime puede quedar guardada en un path distinto al que está sirviendo el proceso o proxy de producción.
+
+Las nuevas subidas se guardan en `UPLOAD_DIR` y se sirven desde `/imagenes/[filename]`. Si el servidor se redeploya, reinicia o corre en un entorno serverless sin almacenamiento persistente, esas imagenes pueden desaparecer y volver a dar `404`.
 
 ### No aparece metadata de Twitch
 

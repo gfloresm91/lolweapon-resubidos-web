@@ -1,9 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-
 import { NextResponse } from "next/server";
 
 import { ensureAuthorized } from "@/lib/auth";
+import { saveUploadFile } from "@/lib/uploads";
+
+export const runtime = "nodejs";
 
 export async function POST(request) {
   const unauthorizedResponse = await ensureAuthorized(request);
@@ -18,17 +18,10 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: "Archivo invalido" }, { status: 400 });
   }
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-  const uploadDir = path.join(process.cwd(), "public", "imagenes");
-
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, safeName), buffer);
+  const savedFile = await saveUploadFile(file);
 
   return NextResponse.json({
     success: true,
-    path: `/imagenes/${safeName}`,
+    path: savedFile.path,
   });
 }
-
