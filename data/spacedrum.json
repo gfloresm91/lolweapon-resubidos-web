@@ -1,0 +1,55 @@
+{
+  "title": "SpaceDrum",
+  "subtitle": "Manga de ciencia ficción musical",
+  "status": "Demo",
+  "coverImage": "https://placehold.co/900x1300/111827/f8fafc.png?text=SpaceDrum",
+  "heroImage": "https://placehold.co/1600x900/0f172a/f8fafc.png?text=SpaceDrum+Preview",
+  "description": "Un baterista perdido entre estaciones orbitales descubre que cada ritmo puede abrir una ruta distinta por el espacio. Esta es data de prueba para visualizar cómo quedaría la sección dentro de la web.",
+  "meta": [
+    { "label": "Género", "value": "Sci-fi / Música" },
+    { "label": "Formato", "value": "Manga web" },
+    { "label": "Estado", "value": "En preparación" }
+  ],
+  "links": [
+    { "label": "Sitio actual", "url": "https://www.mangaspacedrum.com/" },
+    { "label": "Comprar tomo", "url": "https://www.mangaspacedrum.com/" }
+  ],
+  "chapters": [
+    {
+      "id": "capitulo-01",
+      "title": "Capítulo 01: Primer pulso",
+      "releaseDate": "2026-01-12",
+      "summary": "Demo de capítulo para probar el lector vertical, navegación y selección de páginas.",
+      "pages": [
+        {
+          "image": "https://placehold.co/1000x1500/111827/f8fafc.png?text=SpaceDrum+01-01",
+          "alt": "Página 1 del capítulo demo"
+        },
+        {
+          "image": "https://placehold.co/1000x1500/1f2937/f8fafc.png?text=SpaceDrum+01-02",
+          "alt": "Página 2 del capítulo demo"
+        },
+        {
+          "image": "https://placehold.co/1000x1500/312e81/f8fafc.png?text=SpaceDrum+01-03",
+          "alt": "Página 3 del capítulo demo"
+        }
+      ]
+    },
+    {
+      "id": "capitulo-02",
+      "title": "Capítulo 02: Órbita rota",
+      "releaseDate": "2026-02-02",
+      "summary": "Segundo capítulo de prueba para revisar cómo se siente cambiar entre capítulos.",
+      "pages": [
+        {
+          "image": "https://placehold.co/1000x1500/18181b/f8fafc.png?text=SpaceDrum+02-01",
+          "alt": "Página 1 del capítulo demo 2"
+        },
+        {
+          "image": "https://placehold.co/1000x1500/3f3f46/f8fafc.png?text=SpaceDrum+02-02",
+          "alt": "Página 2 del capítulo demo 2"
+        }
+      ]
+    }
+  ]
+}
