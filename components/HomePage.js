@@ -68,6 +68,10 @@ const VIEW_PATHS = {
   spacedrum: "/spacedrum",
 };
 
+function getViewFromPath(pathname) {
+  return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
+}
+
 export default function HomePage({
   activeView = "home",
   initialLives = [],
@@ -86,6 +90,8 @@ export default function HomePage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
+  const [animes, setAnimes] = useState(initialAnimes);
+  const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [filters, setFilters] = useState({ search: "", year: "all", status: "all" });
   const [selectedTag, setSelectedTag] = useState("");
@@ -145,7 +151,16 @@ export default function HomePage({
   const allTags = useMemo(() => getAllTags(lives), [lives]);
 
   useEffect(() => {
-    if (activeView !== "tracker") {
+    function handlePopState() {
+      setCurrentView(getViewFromPath(window.location.pathname));
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (currentView !== "tracker") {
       return;
     }
 
@@ -166,7 +181,30 @@ export default function HomePage({
     if (queryTag !== null) {
       setSelectedTag(queryTag);
     }
-  }, [activeView, searchParams]);
+  }, [currentView, searchParams]);
+
+  useEffect(() => {
+    if (currentView !== "watching" || animes.length) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadAnimes() {
+      const response = await fetch("/api/animes", { cache: "no-store" });
+      const data = await response.json();
+
+      if (isMounted && response.ok) {
+        setAnimes(data.animes || []);
+      }
+    }
+
+    loadAnimes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [animes.length, currentView]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
@@ -373,7 +411,11 @@ export default function HomePage({
   }
 
   function selectView(view) {
-    router.push(VIEW_PATHS[view] || "/inicio");
+    const nextPath = VIEW_PATHS[view] || "/inicio";
+    setCurrentView(view);
+    window.history.pushState(null, "", nextPath);
+    window.scrollTo({ top: 0, behavior: "instant" });
+
     if (window.matchMedia("(max-width: 900px)").matches) {
       setIsSidebarOpen(false);
     }
@@ -437,7 +479,7 @@ export default function HomePage({
           <nav className="sidebar-nav">
             <button
               type="button"
-              className={`sidebar-link sidebar-link-button ${activeView === "home" ? "is-active" : ""}`}
+              className={`sidebar-link sidebar-link-button ${currentView === "home" ? "is-active" : ""}`}
               onClick={() => selectView("home")}
             >
               <span className="sidebar-icon">IN</span>
@@ -445,7 +487,7 @@ export default function HomePage({
             </button>
             <button
               type="button"
-              className={`sidebar-link sidebar-link-button ${activeView === "tracker" ? "is-active" : ""}`}
+              className={`sidebar-link sidebar-link-button ${currentView === "tracker" ? "is-active" : ""}`}
               onClick={() => selectView("tracker")}
             >
               <span className="sidebar-icon">RD</span>
@@ -453,7 +495,7 @@ export default function HomePage({
             </button>
             <button
               type="button"
-              className={`sidebar-link sidebar-link-button ${activeView === "watching" ? "is-active" : ""}`}
+              className={`sidebar-link sidebar-link-button ${currentView === "watching" ? "is-active" : ""}`}
               onClick={() => selectView("watching")}
             >
               <span className="sidebar-icon">VI</span>
@@ -462,7 +504,7 @@ export default function HomePage({
             {isSpaceDrumEnabled ? (
               <button
                 type="button"
-                className={`sidebar-link sidebar-link-button ${activeView === "spacedrum" ? "is-active" : ""}`}
+                className={`sidebar-link sidebar-link-button ${currentView === "spacedrum" ? "is-active" : ""}`}
                 onClick={() => selectView("spacedrum")}
               >
                 <span className="sidebar-icon">SD</span>
@@ -476,7 +518,7 @@ export default function HomePage({
           <header className="topbar" aria-label="Barra superior">
             <div className="topbar-title">
               <span className="topbar-kicker">Archivo VODs</span>
-              <span className="topbar-page">{VIEW_LABELS[activeView]}</span>
+              <span className="topbar-page">{VIEW_LABELS[currentView]}</span>
             </div>
 
             {isAdmin ? (
@@ -495,21 +537,20 @@ export default function HomePage({
           </header>
 
           <div className="app-wrapper">
-            {activeView === "home" ? (
-              <HomeDashboard
-                lives={lives}
-                youtubeVideos={initialYoutubeVideos}
-                twitchStream={initialTwitchStream}
-                twitchProfile={initialTwitchProfile}
-                twitchChannelInfo={initialTwitchChannelInfo}
-                twitchGame={initialTwitchGame}
-                twitchLogin={twitchLogin}
-                youtubeChannelUrl={youtubeChannelUrl}
-                onTrackerOpen={() => selectView("tracker")}
-              />
-            ) : null}
+            <HomeDashboard
+              lives={lives}
+              youtubeVideos={initialYoutubeVideos}
+              twitchStream={initialTwitchStream}
+              twitchProfile={initialTwitchProfile}
+              twitchChannelInfo={initialTwitchChannelInfo}
+              twitchGame={initialTwitchGame}
+              twitchLogin={twitchLogin}
+              youtubeChannelUrl={youtubeChannelUrl}
+              onTrackerOpen={() => selectView("tracker")}
+              mode={currentView === "home" ? "full" : "mini"}
+            />
 
-            {activeView === "tracker" ? (
+            {currentView === "tracker" ? (
               <>
         <header id="inicio" className="main-header">
           <div className="header-badge" id="btn-show-lore" onClick={() => setIsLoreOpen(true)}>
@@ -627,11 +668,11 @@ export default function HomePage({
               </>
             ) : null}
 
-            {activeView === "watching" ? (
-              <WatchingPage initialAnimes={initialAnimes} isAdmin={isAdmin} />
+            {currentView === "watching" ? (
+              <WatchingPage initialAnimes={animes} isAdmin={isAdmin} />
             ) : null}
 
-            {isSpaceDrumEnabled && activeView === "spacedrum" ? (
+            {isSpaceDrumEnabled && currentView === "spacedrum" ? (
               <SpaceDrumPage data={initialSpaceDrum} />
             ) : null}
           </div>

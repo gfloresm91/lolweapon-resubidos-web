@@ -180,6 +180,10 @@ export default function WatchingPage({ initialAnimes, isAdmin }) {
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
+  useEffect(() => {
+    setAnimes(initialAnimes);
+  }, [initialAnimes]);
+
   const stats = useMemo(() => {
     const fullSeasons = animes.filter((anime) => isFullSeason(anime)).length;
     const purchasedEpisodes = animes

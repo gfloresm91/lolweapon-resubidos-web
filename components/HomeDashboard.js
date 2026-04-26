@@ -115,6 +115,7 @@ export default function HomeDashboard({
   twitchLogin,
   youtubeChannelUrl,
   onTrackerOpen,
+  mode = "full",
 }) {
   const [currentStream, setCurrentStream] = useState(twitchStream);
   const [currentProfile, setCurrentProfile] = useState(twitchProfile);
@@ -124,15 +125,23 @@ export default function HomeDashboard({
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
+  const [isMiniDismissed, setIsMiniDismissed] = useState(false);
   const playerContainerRef = useRef(null);
   const twitchPlayerRef = useRef(null);
   const twitchChannel = twitchLogin || "kalathraslolweapon";
   const isOnline = Boolean(currentStream);
+  const isMiniMode = mode === "mini";
   const playerKey = currentStream?.id ? `online-${currentStream.id}` : "offline";
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
   }, []);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setIsMiniDismissed(false);
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     if (!twitchParent || !playerContainerRef.current) {
@@ -273,9 +282,20 @@ export default function HomeDashboard({
     ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
     : "";
   const streamStatusClass = isTwitchLoading ? "is-loading" : isOnline ? "is-online" : "is-offline";
+  const dashboardClassName = [
+    "home-dashboard",
+    isMiniMode ? "is-mini-player" : "",
+    isMiniDismissed ? "is-mini-dismissed" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (isMiniMode && (!isOnline || isMiniDismissed)) {
+    return null;
+  }
 
   return (
-    <main className="home-dashboard">
+    <main className={dashboardClassName}>
       <section className="home-hero">
         <div>
           <span className={`stream-status-pill ${streamStatusClass}`}>
@@ -297,10 +317,15 @@ export default function HomeDashboard({
         </a>
       </section>
 
-      <section className="home-section">
+      <section className="home-section home-stream-section">
         <div className="stream-block">
           <div className="stream-layout">
             <div className="stream-main-column">
+              {isMiniMode ? (
+                <button type="button" className="mini-player-close" onClick={() => setIsMiniDismissed(true)}>
+                  Cerrar
+                </button>
+              ) : null}
               <div className="stream-frame stream-player">
                 {twitchParent ? (
                   <div
