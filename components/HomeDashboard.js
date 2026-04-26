@@ -27,6 +27,10 @@ const LIVE_LINK_PLATFORMS = [
 ];
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
+const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
+const MINI_PLAYER_DEFAULT_WIDTH = 380;
+const MINI_PLAYER_MIN_WIDTH = 380;
+const MINI_PLAYER_MAX_WIDTH = 720;
 
 function loadTwitchEmbedScript() {
   if (window.Twitch?.Player) {
@@ -47,6 +51,10 @@ function loadTwitchEmbedScript() {
   });
 
   return window.__twitchEmbedScriptPromise;
+}
+
+function clampMiniPlayerWidth(value) {
+  return Math.min(MINI_PLAYER_MAX_WIDTH, Math.max(MINI_PLAYER_MIN_WIDTH, value));
 }
 
 function buildLiveLinks(links) {
@@ -126,8 +134,11 @@ export default function HomeDashboard({
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
   const [isMiniDismissed, setIsMiniDismissed] = useState(false);
+  const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
   const playerContainerRef = useRef(null);
   const twitchPlayerRef = useRef(null);
+  const miniResizeStateRef = useRef(null);
+  const miniResizeFrameRef = useRef(null);
   const twitchChannel = twitchLogin || "kalathraslolweapon";
   const isOnline = Boolean(currentStream);
   const isMiniMode = mode === "mini";
@@ -135,6 +146,12 @@ export default function HomeDashboard({
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
+
+    const savedWidth = Number(window.localStorage.getItem(MINI_PLAYER_SIZE_STORAGE_KEY));
+
+    if (Number.isFinite(savedWidth)) {
+      setMiniPlayerWidth(clampMiniPlayerWidth(savedWidth));
+    }
   }, []);
 
   useEffect(() => {
@@ -144,12 +161,32 @@ export default function HomeDashboard({
   }, [isOnline]);
 
   useEffect(() => {
+    if (!isMiniMode) {
+      setIsMiniDismissed(false);
+    }
+  }, [isMiniMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MINI_PLAYER_SIZE_STORAGE_KEY, String(miniPlayerWidth));
+  }, [miniPlayerWidth]);
+
+  useEffect(() => {
+    return () => {
+      if (miniResizeFrameRef.current) {
+        window.cancelAnimationFrame(miniResizeFrameRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!twitchParent || !playerContainerRef.current) {
       return undefined;
     }
 
     let isCancelled = false;
     const container = playerContainerRef.current;
+    container.style.opacity = "";
+    container.style.pointerEvents = "";
     container.innerHTML = "";
     twitchPlayerRef.current = null;
 
@@ -206,7 +243,7 @@ export default function HomeDashboard({
       twitchPlayerRef.current = null;
       container.innerHTML = "";
     };
-  }, [isOnline, playerKey, twitchChannel, twitchParent]);
+  }, [playerKey, twitchChannel, twitchParent]);
 
   useEffect(() => {
     let isMounted = true;
@@ -285,17 +322,58 @@ export default function HomeDashboard({
   const dashboardClassName = [
     "home-dashboard",
     isMiniMode ? "is-mini-player" : "",
+    isMiniMode && (!isOnline || isMiniDismissed) ? "is-mini-hidden" : "",
     isMiniDismissed ? "is-mini-dismissed" : "",
   ]
     .filter(Boolean)
     .join(" ");
+  const miniPlayerStyle = isMiniMode
+    ? { "--mini-player-width": `${miniPlayerWidth}px` }
+    : undefined;
 
-  if (isMiniMode && (!isOnline || isMiniDismissed)) {
-    return null;
+  function startMiniResize(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    miniResizeStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: miniPlayerWidth,
+    };
+  }
+
+  function resizeMiniPlayer(event) {
+    const resizeState = miniResizeStateRef.current;
+
+    if (!resizeState || resizeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextWidth = clampMiniPlayerWidth(resizeState.startWidth + (resizeState.startX - event.clientX));
+
+    if (miniResizeFrameRef.current) {
+      window.cancelAnimationFrame(miniResizeFrameRef.current);
+    }
+
+    miniResizeFrameRef.current = window.requestAnimationFrame(() => {
+      setMiniPlayerWidth(nextWidth);
+      miniResizeFrameRef.current = null;
+    });
+  }
+
+  function stopMiniResize(event) {
+    if (miniResizeStateRef.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    miniResizeStateRef.current = null;
   }
 
   return (
-    <main className={dashboardClassName}>
+    <main className={dashboardClassName} style={miniPlayerStyle}>
       <section className="home-hero">
         <div>
           <span className={`stream-status-pill ${streamStatusClass}`}>
@@ -322,9 +400,20 @@ export default function HomeDashboard({
           <div className="stream-layout">
             <div className="stream-main-column">
               {isMiniMode ? (
-                <button type="button" className="mini-player-close" onClick={() => setIsMiniDismissed(true)}>
-                  Cerrar
-                </button>
+                <>
+                  <button type="button" className="mini-player-close" onClick={() => setIsMiniDismissed(true)}>
+                    Cerrar
+                  </button>
+                  <button
+                    type="button"
+                    className="mini-player-resize"
+                    aria-label="Redimensionar mini player"
+                    onPointerDown={startMiniResize}
+                    onPointerMove={resizeMiniPlayer}
+                    onPointerUp={stopMiniResize}
+                    onPointerCancel={stopMiniResize}
+                  />
+                </>
               ) : null}
               <div className="stream-frame stream-player">
                 {twitchParent ? (
