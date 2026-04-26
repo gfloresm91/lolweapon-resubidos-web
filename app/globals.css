@@ -665,6 +665,9 @@ body::before {
 .stream-player {
   aspect-ratio: 16 / 9;
   min-height: 560px;
+  backface-visibility: hidden;
+  contain: layout paint;
+  transform: translateZ(0);
 }
 
 .stream-chat {

@@ -182,6 +182,13 @@ export default function HomeDashboard({
 
     return () => {
       isCancelled = true;
+      container.style.opacity = "0";
+      container.style.pointerEvents = "none";
+
+      try {
+        twitchPlayerRef.current?.setMuted?.(true);
+        twitchPlayerRef.current?.pause?.();
+      } catch {}
 
       if (typeof twitchPlayerRef.current?.destroy === "function") {
         twitchPlayerRef.current.destroy();
