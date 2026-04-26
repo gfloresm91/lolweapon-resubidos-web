@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function parseDate(value) {
   const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
@@ -25,6 +25,29 @@ const LIVE_LINK_PLATFORMS = [
   { key: "piero", label: "Piero" },
   { key: "patreon", label: "Patreon" },
 ];
+
+const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
+
+function loadTwitchEmbedScript() {
+  if (window.Twitch?.Player) {
+    return Promise.resolve();
+  }
+
+  if (window.__twitchEmbedScriptPromise) {
+    return window.__twitchEmbedScriptPromise;
+  }
+
+  window.__twitchEmbedScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = TWITCH_EMBED_SCRIPT_URL;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+
+  return window.__twitchEmbedScriptPromise;
+}
 
 function buildLiveLinks(links) {
   return LIVE_LINK_PLATFORMS.flatMap((platform) => {
@@ -101,10 +124,73 @@ export default function HomeDashboard({
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
+  const playerContainerRef = useRef(null);
+  const twitchPlayerRef = useRef(null);
+  const twitchChannel = twitchLogin || "kalathraslolweapon";
+  const isOnline = Boolean(currentStream);
+  const playerKey = currentStream?.id ? `online-${currentStream.id}` : "offline";
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
   }, []);
+
+  useEffect(() => {
+    if (!twitchParent || !playerContainerRef.current) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const container = playerContainerRef.current;
+    container.innerHTML = "";
+    twitchPlayerRef.current = null;
+
+    function tryMutedAutoplay(player) {
+      try {
+        player.setMuted(true);
+      } catch {}
+
+      try {
+        const playResult = player.play();
+        playResult?.catch?.(() => {});
+      } catch {}
+    }
+
+    loadTwitchEmbedScript()
+      .then(() => {
+        if (isCancelled || !window.Twitch?.Player) {
+          return;
+        }
+
+        const player = new window.Twitch.Player("twitch-player-embed", {
+          channel: twitchChannel,
+          parent: [twitchParent],
+          width: "100%",
+          height: "100%",
+          muted: true,
+          autoplay: true,
+        });
+
+        twitchPlayerRef.current = player;
+        player.addEventListener(window.Twitch.Player.READY, () => tryMutedAutoplay(player));
+        player.addEventListener(window.Twitch.Player.ONLINE, () => tryMutedAutoplay(player));
+
+        if (isOnline) {
+          window.setTimeout(() => tryMutedAutoplay(player), 400);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+
+      if (typeof twitchPlayerRef.current?.destroy === "function") {
+        twitchPlayerRef.current.destroy();
+      }
+
+      twitchPlayerRef.current = null;
+      container.innerHTML = "";
+    };
+  }, [isOnline, playerKey, twitchChannel, twitchParent]);
 
   useEffect(() => {
     let isMounted = true;
@@ -169,8 +255,6 @@ export default function HomeDashboard({
       .sort((left, right) => parseDate(right.date).localeCompare(parseDate(left.date)))
       .slice(0, 10);
   }, [lives]);
-  const twitchChannel = twitchLogin || "kalathraslolweapon";
-  const isOnline = Boolean(currentStream);
   const channelName = currentProfile?.display_name || twitchChannel;
   const channelDescription = currentProfile?.description || "";
   const currentTitle = currentStream?.title || currentChannelInfo?.title || "Sin título configurado";
@@ -178,13 +262,9 @@ export default function HomeDashboard({
   const categoryImage = currentGame?.box_art_url
     ? currentGame.box_art_url.replace("{width}", "96").replace("{height}", "128")
     : "";
-  const twitchPlayerUrl = twitchParent
-    ? `https://player.twitch.tv/?channel=${encodeURIComponent(twitchChannel)}&parent=${encodeURIComponent(twitchParent)}&muted=true`
-    : "";
   const twitchChatUrl = twitchParent
     ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
     : "";
-  const playerKey = currentStream?.id ? `online-${currentStream.id}` : "offline";
   const streamStatusClass = isTwitchLoading ? "is-loading" : isOnline ? "is-online" : "is-offline";
 
   return (
@@ -215,12 +295,13 @@ export default function HomeDashboard({
           <div className="stream-layout">
             <div className="stream-main-column">
               <div className="stream-frame stream-player">
-                {twitchPlayerUrl ? (
-                  <iframe
+                {twitchParent ? (
+                  <div
                     key={`${playerKey}-${twitchParent}`}
-                    src={twitchPlayerUrl}
-                    title="Directo de Twitch"
-                    allowFullScreen
+                    id="twitch-player-embed"
+                    ref={playerContainerRef}
+                    className="twitch-player-embed"
+                    aria-label="Directo de Twitch"
                   />
                 ) : null}
               </div>

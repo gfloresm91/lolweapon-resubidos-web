@@ -7,6 +7,7 @@ La aplicacion permite:
 - mostrar un inicio con player/chat de Twitch, metadata del canal, ultimos directos y ultimos videos de YouTube
 - explorar el archivo historico por busqueda, año, estado y tags
 - seguir la lista de animes en la pagina `Viendo`
+- publicar una sección de manga `SpaceDrum` con ficha y lector
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
@@ -132,6 +133,8 @@ El proyecto usa estas variables:
   URL publica del canal de YouTube para el boton `Ir al canal` en Inicio. Es opcional; si no existe, la app usa `YOUTUBE_CHANNEL_ID` o un fallback local.
 - `YOUTUBE_UPLOADS_PLAYLIST_ID`
   Playlist de subidas del canal. Si la tienes, es la forma más directa para listar los últimos videos.
+- `NEXT_PUBLIC_ENABLE_SPACEDRUM`
+  Feature flag para mostrar la sección `/spacedrum` y su item de menú. Por defecto debe quedar en `false` hasta que la página esté lista para producción.
 
 Notas:
 
@@ -149,6 +152,7 @@ app/
     logout/route.js
     tags/route.js
     twitch/
+      archive/route.js
       eventsub/
         route.js
         subscribe/route.js
@@ -162,6 +166,7 @@ app/
   layout.js
   page.js
   rastreador/page.js
+  spacedrum/page.js
   viendo/page.js
   globals.css
 
@@ -173,6 +178,7 @@ components/
   HomePage.js
   LiveCard.js
   LoreModal.js
+  SpaceDrumPage.js
   StatsBar.js
   TagPanel.js
   TagsInput.js
@@ -184,6 +190,7 @@ lib/
   auth.js
   data.js
   lives.js
+  spacedrum.js
   tagSettings.js
   tags.js
   twitch.js
@@ -195,6 +202,8 @@ data/
   data.local.json
   animes.json
   animes.local.json
+  spacedrum.json
+  spacedrum.local.json
   tag-settings.json
   tag-settings.local.json
 
@@ -212,6 +221,7 @@ Rutas internas:
 
 - `/inicio`: hub principal con Twitch, últimos directos y YouTube.
 - `/rastreador`: archivo de directos/resubidos.
+- `/spacedrum`: ficha y lector del manga SpaceDrum.
 - `/viendo`: seguimiento de animes.
 
 En producción, el middleware reescribe la raíz según el dominio:
@@ -224,6 +234,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 `/inicio`:
 
 - muestra el player y chat de Twitch
+- el player usa el SDK oficial de Twitch para intentar autoplay muteado al cargar y cuando detecta estado online
 - consulta `/api/twitch/status` para mostrar si el canal esta online
 - muestra metadata del canal aunque el streamer este offline
 - muestra avatar del streamer, titulo actual, categoria e imagen de categoria
@@ -252,6 +263,14 @@ En producción, el middleware reescribe la raíz según el dominio:
 - muestra un boton `Ver resubidos` por anime que abre el rastreador en una pestaña nueva
 - si hay sesion admin, permite crear, editar, borrar y subir poster de animes
 - si hay sesion admin, permite guardar una URL personalizada hacia el rastreador por anime
+
+`/spacedrum`:
+
+- carga una ficha del manga desde `data/spacedrum.json`
+- muestra portada, imagen hero, descripción, metadata y links externos
+- incluye un lector vertical por capítulos
+- está preparado para datos de prueba y para reemplazar imágenes/metadata por contenido real
+- solo se muestra si `NEXT_PUBLIC_ENABLE_SPACEDRUM=true`; si no, la ruta devuelve 404 y no aparece en el menú
 
 Footer:
 
@@ -289,6 +308,8 @@ El admin permite:
 - validar campos antes de guardar
 - crear categorias personalizadas para tags
 - mover tags entre categorias desde un modal amplio
+- crear o actualizar manualmente un card desde el directo actual de Twitch
+- registrar la suscripción EventSub para creación automática al iniciar directo
 
 El acceso admin:
 
@@ -332,6 +353,22 @@ Comportamiento:
 - si no existe, la app usa `data/animes.json`
 
 La resolución de lectura y escritura vive en `lib/animeData.js`.
+
+La pagina `SpaceDrum` usa:
+
+```text
+data/spacedrum.json
+data/spacedrum.local.json
+```
+
+Comportamiento:
+
+- si existe `data/spacedrum.local.json`, la app lee ahí
+- si no existe, la app usa `data/spacedrum.json`
+- por ahora es una sección de lectura pública con data de prueba
+- en producción se recomienda mantener `NEXT_PUBLIC_ENABLE_SPACEDRUM=false` hasta publicar el contenido real
+
+La resolución de lectura y normalización vive en `lib/spacedrum.js`.
 
 Las categorias personalizadas de tags y los movimientos manuales entre categorias se guardan en:
 
@@ -401,6 +438,39 @@ Cada registro de `Viendo` sigue esta forma:
 - `purchased` puede ser un numero o `ENTERA`
 - `image` puede apuntar a una imagen versionada en `public/imagenes`
 - `tracker_url` es opcional; si no existe, el boton `Ver resubidos` usa `/rastreador?search=<nombre-del-anime>`
+
+El archivo `data/spacedrum.json` sigue esta forma:
+
+```json
+{
+  "title": "SpaceDrum",
+  "subtitle": "Manga de ciencia ficción musical",
+  "status": "Demo",
+  "coverImage": "https://placehold.co/900x1300/111827/f8fafc.png?text=SpaceDrum",
+  "heroImage": "https://placehold.co/1600x900/0f172a/f8fafc.png?text=SpaceDrum+Preview",
+  "description": "Descripción corta del manga.",
+  "meta": [
+    { "label": "Género", "value": "Sci-fi / Música" }
+  ],
+  "links": [
+    { "label": "Sitio actual", "url": "https://www.mangaspacedrum.com/" }
+  ],
+  "chapters": [
+    {
+      "id": "capitulo-01",
+      "title": "Capítulo 01",
+      "releaseDate": "2026-01-12",
+      "summary": "Resumen del capítulo.",
+      "pages": [
+        {
+          "image": "https://placehold.co/1000x1500/111827/f8fafc.png?text=SpaceDrum+01-01",
+          "alt": "Página 1"
+        }
+      ]
+    }
+  ]
+}
+```
 
 ## Tags y categorias
 
@@ -574,6 +644,15 @@ Endpoint protegido.
 - devuelve metadata actual del canal, incluyendo titulo y categoria aunque este offline
 - devuelve metadata de la categoria cuando Twitch entrega `game_id`
 
+### `POST /api/twitch/archive`
+
+Endpoint protegido.
+
+- consulta el directo actual en Twitch
+- si el canal esta online, crea o actualiza un registro en el rastreador
+- si el canal esta offline, devuelve `404`
+- sirve como acción manual de recuperación si EventSub no fue registrado o falló
+
 ### `POST /api/twitch/eventsub`
 
 Endpoint público para Twitch EventSub.
@@ -654,9 +733,11 @@ https://tu-dominio-publico.com/api/twitch/eventsub
 ```
 
 4. Inicia sesion como admin.
-5. Ejecuta el registro de la suscripcion contra `POST /api/twitch/eventsub/subscribe`.
+5. En `/rastreador`, usa el boton admin `Registrar EventSub` o ejecuta el registro contra `POST /api/twitch/eventsub/subscribe`.
 
 Twitch validara el webhook enviando un challenge al endpoint `/api/twitch/eventsub`.
+
+Si el directo ya empezó y EventSub no creó el registro, usa el boton admin `Crear card desde Twitch` en `/rastreador`. Esa acción llama a `POST /api/twitch/archive` y crea o actualiza el card con la metadata actual.
 
 ## YouTube
 
@@ -783,6 +864,28 @@ Revisa:
 - que `TWITCH_CLIENT_ID` y `TWITCH_CLIENT_SECRET` existan
 - que `TWITCH_BROADCASTER_LOGIN` tenga el login correcto
 - que reiniciaste el servidor despues de cambiar `.env`
+
+### El player de Twitch no hace autoplay
+
+La app intenta iniciar el stream automáticamente usando el SDK oficial de Twitch con el player muteado. Aun así, algunos navegadores, extensiones o preferencias del usuario pueden bloquear autoplay dentro de iframes.
+
+Revisa:
+
+- que el navegador no tenga autoplay bloqueado para el dominio
+- que el player esté muteado al inicializar
+- que el dominio actual esté llegando como `parent` válido para Twitch
+- que no haya extensiones bloqueando scripts o iframes de Twitch
+
+### Twitch no crea un card al iniciar directo
+
+Revisa:
+
+- que `TWITCH_EVENTSUB_CALLBACK_URL` apunte al dominio publico correcto y termine en `/api/twitch/eventsub`
+- que la URL callback sea HTTPS y accesible desde internet
+- que `TWITCH_EVENTSUB_SECRET` sea el mismo al registrar y al recibir eventos
+- que hayas registrado la suscripción con el boton admin `Registrar EventSub`
+- que el servidor pueda escribir en `data/data.json` o `data/data.local.json`
+- si el directo ya está online, usa `Crear card desde Twitch` para crear el registro manualmente
 
 ### No aparecen videos de YouTube
 

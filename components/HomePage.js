@@ -12,6 +12,7 @@ import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
+import SpaceDrumPage from "@/components/SpaceDrumPage";
 import WatchingPage from "@/components/WatchingPage";
 
 function getAllTags(lives) {
@@ -57,18 +58,21 @@ const VIEW_LABELS = {
   home: "Inicio",
   tracker: "Rastreador de directos",
   watching: "Viendo",
+  spacedrum: "SpaceDrum",
 };
 
 const VIEW_PATHS = {
   home: "/inicio",
   tracker: "/rastreador",
   watching: "/viendo",
+  spacedrum: "/spacedrum",
 };
 
 export default function HomePage({
   activeView = "home",
   initialLives = [],
   initialAnimes = [],
+  initialSpaceDrum = null,
   initialYoutubeVideos = [],
   initialTwitchStream = null,
   initialTwitchProfile = null,
@@ -78,6 +82,7 @@ export default function HomePage({
   youtubeChannelUrl,
   isAdmin,
 }) {
+  const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
@@ -88,6 +93,7 @@ export default function HomePage({
   const [isLoreOpen, setIsLoreOpen] = useState(false);
   const [editingLive, setEditingLive] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [isPending, startTransition] = useTransition();
@@ -303,6 +309,64 @@ export default function HomePage({
     }
   }
 
+  async function refreshLivesFromServer() {
+    const response = await fetch("/api/lives", { cache: "no-store" });
+    const data = await response.json();
+
+    if (response.ok) {
+      setLives(data.lives || []);
+    }
+  }
+
+  async function archiveCurrentTwitchLive() {
+    setIsTwitchActionLoading(true);
+
+    try {
+      const response = await fetch("/api/twitch/archive", { method: "POST" });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        redirectToLoginWithMessage("No autorizado para crear el card desde Twitch. Vuelve a iniciar sesion.");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo crear el card desde Twitch");
+      }
+
+      await refreshLivesFromServer();
+      toast.success("Card de Twitch creado o actualizado.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsTwitchActionLoading(false);
+    }
+  }
+
+  async function registerTwitchEventSub() {
+    setIsTwitchActionLoading(true);
+
+    try {
+      const response = await fetch("/api/twitch/eventsub/subscribe", { method: "POST" });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        redirectToLoginWithMessage("No autorizado para registrar EventSub. Vuelve a iniciar sesion.");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo registrar EventSub");
+      }
+
+      toast.success("EventSub registrado. Twitch notificará el próximo directo.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsTwitchActionLoading(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/logout", { method: "POST" });
     router.refresh();
@@ -395,6 +459,16 @@ export default function HomePage({
               <span className="sidebar-icon">VI</span>
               <span>Viendo</span>
             </button>
+            {isSpaceDrumEnabled ? (
+              <button
+                type="button"
+                className={`sidebar-link sidebar-link-button ${activeView === "spacedrum" ? "is-active" : ""}`}
+                onClick={() => selectView("spacedrum")}
+              >
+                <span className="sidebar-icon">SD</span>
+                <span>SpaceDrum</span>
+              </button>
+            ) : null}
           </nav>
         </aside>
 
@@ -477,6 +551,22 @@ export default function HomePage({
               <span className="tracker-action-icon">+</span>
               Nuevo directo
             </button>
+            <button
+              type="button"
+              className="tracker-action-secondary"
+              onClick={archiveCurrentTwitchLive}
+              disabled={isTwitchActionLoading}
+            >
+              Crear card desde Twitch
+            </button>
+            <button
+              type="button"
+              className="tracker-action-secondary"
+              onClick={registerTwitchEventSub}
+              disabled={isTwitchActionLoading}
+            >
+              Registrar EventSub
+            </button>
           </section>
         ) : null}
 
@@ -539,6 +629,10 @@ export default function HomePage({
 
             {activeView === "watching" ? (
               <WatchingPage initialAnimes={initialAnimes} isAdmin={isAdmin} />
+            ) : null}
+
+            {isSpaceDrumEnabled && activeView === "spacedrum" ? (
+              <SpaceDrumPage data={initialSpaceDrum} />
             ) : null}
           </div>
           <footer className="persistent-footer">Por fans para fans 💜 para Kala</footer>
