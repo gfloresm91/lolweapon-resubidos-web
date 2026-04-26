@@ -100,6 +100,11 @@ export default function HomeDashboard({
   const [isTwitchLoading, setIsTwitchLoading] = useState(true);
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
+  const [twitchParent, setTwitchParent] = useState("");
+
+  useEffect(() => {
+    setTwitchParent(window.location.hostname);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -173,9 +178,12 @@ export default function HomeDashboard({
   const categoryImage = currentGame?.box_art_url
     ? currentGame.box_art_url.replace("{width}", "96").replace("{height}", "128")
     : "";
-  const parent = typeof window === "undefined" ? "localhost" : window.location.hostname;
-  const twitchPlayerUrl = `https://player.twitch.tv/?channel=${encodeURIComponent(twitchChannel)}&parent=${encodeURIComponent(parent)}&muted=true`;
-  const twitchChatUrl = `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(parent)}&darkpopout`;
+  const twitchPlayerUrl = twitchParent
+    ? `https://player.twitch.tv/?channel=${encodeURIComponent(twitchChannel)}&parent=${encodeURIComponent(twitchParent)}&muted=true`
+    : "";
+  const twitchChatUrl = twitchParent
+    ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
+    : "";
   const playerKey = currentStream?.id ? `online-${currentStream.id}` : "offline";
   const streamStatusClass = isTwitchLoading ? "is-loading" : isOnline ? "is-online" : "is-offline";
 
@@ -207,12 +215,14 @@ export default function HomeDashboard({
           <div className="stream-layout">
             <div className="stream-main-column">
               <div className="stream-frame stream-player">
-                <iframe
-                  key={playerKey}
-                  src={twitchPlayerUrl}
-                  title="Directo de Twitch"
-                  allowFullScreen
-                />
+                {twitchPlayerUrl ? (
+                  <iframe
+                    key={`${playerKey}-${twitchParent}`}
+                    src={twitchPlayerUrl}
+                    title="Directo de Twitch"
+                    allowFullScreen
+                  />
+                ) : null}
               </div>
 
               <div className="stream-details">
@@ -254,7 +264,7 @@ export default function HomeDashboard({
               </div>
             </div>
             <div className="stream-frame stream-chat">
-              <iframe src={twitchChatUrl} title="Chat de Twitch" />
+              {twitchChatUrl ? <iframe src={twitchChatUrl} title="Chat de Twitch" /> : null}
             </div>
           </div>
         </div>
