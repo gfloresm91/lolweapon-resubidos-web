@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
 import AdminModal from "@/components/AdminModal";
@@ -75,9 +75,11 @@ export default function HomePage({
   initialTwitchChannelInfo = null,
   initialTwitchGame = null,
   twitchLogin,
+  youtubeChannelUrl,
   isAdmin,
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [filters, setFilters] = useState({ search: "", year: "all", status: "all" });
@@ -135,6 +137,30 @@ export default function HomePage({
   const allYears = useMemo(() => getAllYears(lives), [lives]);
   const allStatuses = useMemo(() => getAllStatuses(lives), [lives]);
   const allTags = useMemo(() => getAllTags(lives), [lives]);
+
+  useEffect(() => {
+    if (activeView !== "tracker") {
+      return;
+    }
+
+    const querySearch = searchParams.get("search") || searchParams.get("q");
+    const queryYear = searchParams.get("year");
+    const queryStatus = searchParams.get("status");
+    const queryTag = searchParams.get("tag");
+
+    if (querySearch || queryYear || queryStatus) {
+      setFilters((current) => ({
+        ...current,
+        search: querySearch ?? current.search,
+        year: queryYear || current.year,
+        status: queryStatus || current.status,
+      }));
+    }
+
+    if (queryTag !== null) {
+      setSelectedTag(queryTag);
+    }
+  }, [activeView, searchParams]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
@@ -404,6 +430,7 @@ export default function HomePage({
                 twitchChannelInfo={initialTwitchChannelInfo}
                 twitchGame={initialTwitchGame}
                 twitchLogin={twitchLogin}
+                youtubeChannelUrl={youtubeChannelUrl}
                 onTrackerOpen={() => selectView("tracker")}
               />
             ) : null}
@@ -514,6 +541,7 @@ export default function HomePage({
               <WatchingPage initialAnimes={initialAnimes} isAdmin={isAdmin} />
             ) : null}
           </div>
+          <footer className="persistent-footer">Por fans para fans 💜 para Kala</footer>
         </div>
       </div>
 

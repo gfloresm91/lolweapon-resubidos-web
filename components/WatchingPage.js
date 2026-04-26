@@ -10,6 +10,7 @@ const emptyAnime = {
   current_episode: "0",
   purchased: "0",
   image: "",
+  tracker_url: "",
 };
 
 function isFullSeason(anime) {
@@ -26,6 +27,16 @@ function stepValue(value, step) {
   }
 
   return String(Math.max((parseInt(value, 10) || 0) + step, 0));
+}
+
+function buildTrackerUrl(anime) {
+  const configuredUrl = String(anime?.tracker_url || "").trim();
+
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  return `/rastreador?search=${encodeURIComponent(anime?.name || "")}`;
 }
 
 function AnimeModal({ anime, isOpen, isSaving, onClose, onSave, onDelete }) {
@@ -88,6 +99,17 @@ function AnimeModal({ anime, isOpen, isSaving, onClose, onSave, onDelete }) {
               onChange={(event) => setImageFile(event.target.files?.[0] || null)}
             />
             {form.image ? <p className="current-image-note">{form.image}</p> : null}
+          </div>
+
+          <div className="form-group-modal">
+            <label>URL del rastreador</label>
+            <input
+              type="text"
+              className="modal-input"
+              placeholder="/rastreador?tag=WorldTrigger"
+              value={form.tracker_url}
+              onChange={(event) => updateField("tracker_url", event.target.value)}
+            />
           </div>
 
           <div className="form-row">
@@ -374,6 +396,15 @@ export default function WatchingPage({ initialAnimes, isAdmin }) {
                         </span>
                       )}
                     </div>
+                    <a
+                      href={buildTrackerUrl(anime)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="anime-tracker-button"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Ver resubidos
+                    </a>
                   </div>
                 </article>
               );

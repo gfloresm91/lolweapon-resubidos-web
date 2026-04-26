@@ -12,12 +12,18 @@ export default async function Page() {
   const isAdmin = validateSessionToken(token);
   const lives = await readLives();
   const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
+  const youtubeChannelUrl =
+    process.env.YOUTUBE_CHANNEL_URL ||
+    (process.env.YOUTUBE_CHANNEL_ID
+      ? `https://www.youtube.com/channel/${process.env.YOUTUBE_CHANNEL_ID}`
+      : "https://www.youtube.com/@Lolweapon");
 
   return (
     <HomePage
       activeView="home"
       initialLives={lives}
       twitchLogin={twitchLogin}
+      youtubeChannelUrl={youtubeChannelUrl}
       isAdmin={isAdmin}
     />
   );

@@ -19,9 +19,27 @@ function formatYoutubeDate(value) {
   }).format(new Date(value));
 }
 
+const LIVE_LINK_PLATFORMS = [
+  { key: "okru", label: "OK.RU" },
+  { key: "telegram", label: "Telegram" },
+  { key: "piero", label: "Piero" },
+  { key: "patreon", label: "Patreon" },
+];
+
+function buildLiveLinks(links) {
+  return LIVE_LINK_PLATFORMS.flatMap((platform) => {
+    const platformLinks = Array.isArray(links?.[platform.key]) ? links[platform.key] : [];
+
+    return platformLinks.map((url, index) => ({
+      key: `${platform.key}-${url}-${index}`,
+      label: platformLinks.length > 1 ? `${platform.label} ${index + 1}` : platform.label,
+      url,
+    }));
+  });
+}
+
 function RecentLiveCard({ live }) {
-  const links = live.links || {};
-  const hasLinks = ["telegram", "okru", "piero", "patreon"].some((platform) => links[platform]?.length);
+  const liveLinks = buildLiveLinks(live.links);
 
   return (
     <article className="home-live-card">
@@ -35,9 +53,17 @@ function RecentLiveCard({ live }) {
           <span key={tag}>{tag}</span>
         ))}
       </div>
-      <span className={`home-live-link-state ${hasLinks ? "ready" : ""}`}>
-        {hasLinks ? "Con enlaces" : "Sin enlaces cargados"}
-      </span>
+      {liveLinks.length ? (
+        <div className="home-live-links">
+          {liveLinks.map((link) => (
+            <a key={link.key} href={link.url} target="_blank" rel="noreferrer" className="home-live-link">
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <span className="home-live-link-state">Sin enlaces cargados</span>
+      )}
     </article>
   );
 }
@@ -64,6 +90,7 @@ export default function HomeDashboard({
   twitchChannelInfo,
   twitchGame,
   twitchLogin,
+  youtubeChannelUrl,
   onTrackerOpen,
 }) {
   const [currentStream, setCurrentStream] = useState(twitchStream);
@@ -261,6 +288,14 @@ export default function HomeDashboard({
             <span className="home-eyebrow">YouTube</span>
             <h2>Últimos videos</h2>
           </div>
+          <a
+            href={youtubeChannelUrl || "https://www.youtube.com/@Lolweapon"}
+            target="_blank"
+            rel="noreferrer"
+            className="home-section-action"
+          >
+            Ir al canal
+          </a>
         </div>
 
         {isYoutubeLoading ? (

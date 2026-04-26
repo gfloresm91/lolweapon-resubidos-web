@@ -8,6 +8,7 @@ La aplicacion permite:
 - explorar el archivo historico por busqueda, año, estado y tags
 - seguir la lista de animes en la pagina `Viendo`
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
+- abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
 - guardar los cambios sobre un dataset base o sobre un dataset local opcional
 - subir miniaturas a `public/imagenes`
@@ -126,6 +127,8 @@ El proyecto usa estas variables:
   API key de YouTube Data API para cargar videos recientes en Inicio.
 - `YOUTUBE_CHANNEL_ID`
   ID del canal de YouTube. La app lo usa para resolver la playlist de subidas si no defines `YOUTUBE_UPLOADS_PLAYLIST_ID`.
+- `YOUTUBE_CHANNEL_URL`
+  URL publica del canal de YouTube para el boton `Ir al canal` en Inicio. Es opcional; si no existe, la app usa `YOUTUBE_CHANNEL_ID` o un fallback local.
 - `YOUTUBE_UPLOADS_PLAYLIST_ID`
   Playlist de subidas del canal. Si la tienes, es la forma más directa para listar los últimos videos.
 
@@ -221,14 +224,18 @@ En producción, el middleware reescribe la raíz según el dominio:
 - muestra avatar del streamer, titulo actual, categoria e imagen de categoria
 - incluye boton de apoyo hacia Streamlabs/PayPal
 - muestra los 10 registros mas recientes del rastreador
+- en los registros recientes muestra los enlaces reales por plataforma, priorizando `OK.RU` antes que `Telegram`
 - muestra los 10 videos mas recientes de YouTube
+- incluye un boton `Ir al canal` que usa `YOUTUBE_CHANNEL_URL`, `YOUTUBE_CHANNEL_ID` o un fallback
 
 `/rastreador`:
 
 - carga el dataset inicial desde servidor
 - aplica filtros por texto, año, estado y tag
+- puede recibir filtros iniciales por query params
 - muestra estadisticas generales
 - renderiza cards con informacion, tags y links
+- agrupa tags en categorias automaticas como Anime, Juegos, Tiers, Charlas, Peliculas y Otros
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
 
 `/viendo`:
@@ -236,7 +243,33 @@ En producción, el middleware reescribe la raíz según el dominio:
 - carga el dataset de animes
 - muestra estadisticas de animes, temporadas enteras, capitulos comprados y pendientes
 - permite buscar y filtrar por estado de compra
+- muestra un boton `Ver resubidos` por anime que abre el rastreador en una pestaña nueva
 - si hay sesion admin, permite crear, editar, borrar y subir poster de animes
+- si hay sesion admin, permite guardar una URL personalizada hacia el rastreador por anime
+
+Footer:
+
+- las vistas principales muestran un footer persistente con el texto `Por fans para fans 💜 para Kala`
+
+### Query params del rastreador
+
+La ruta `/rastreador` acepta filtros iniciales en la URL:
+
+```text
+/rastreador?search=World%20Trigger
+/rastreador?q=World%20Trigger
+/rastreador?year=2026
+/rastreador?status=Completo
+/rastreador?tag=WorldTrigger
+```
+
+Tambien se pueden combinar:
+
+```text
+/rastreador?search=anime&year=2026&status=Completo&tag=WorldTrigger
+```
+
+Estos parametros se aplican en cliente al cargar la pagina.
 
 ### Panel admin
 
@@ -332,7 +365,8 @@ Cada registro de `Viendo` sigue esta forma:
   "name": "Shoujo Ramune",
   "current_episode": "0",
   "purchased": "ENTERA",
-  "image": "/imagenes/shoujo-ramune.png"
+  "image": "/imagenes/shoujo-ramune.png",
+  "tracker_url": "/rastreador?tag=ShoujoRamune"
 }
 ```
 
@@ -342,6 +376,28 @@ Cada registro de `Viendo` sigue esta forma:
 - `current_episode` puede ser numero o string
 - `purchased` puede ser un numero o `ENTERA`
 - `image` puede apuntar a una imagen versionada en `public/imagenes`
+- `tracker_url` es opcional; si no existe, el boton `Ver resubidos` usa `/rastreador?search=<nombre-del-anime>`
+
+## Tags y categorias
+
+El panel de tags agrupa automaticamente los tags del rastreador con reglas en `lib/tags.js`.
+
+Categorias actuales:
+
+- `Anime`
+- `Juegos`
+- `Tiers`
+- `Charlas`
+- `Peliculas`
+- `Otros`
+
+La clasificacion usa:
+
+- coincidencias exactas para tags concretos
+- keywords parciales para familias de tags
+- overrides manuales en `localStorage` cuando un admin mueve un tag desde el panel
+
+Si muchos tags caen en `Otros`, agrega keywords o coincidencias exactas en `lib/tags.js`.
 
 ## API interna
 
@@ -521,6 +577,7 @@ Variables disponibles:
 
 - `YOUTUBE_API_KEY`: API key de YouTube Data API.
 - `YOUTUBE_CHANNEL_ID`: ID del canal.
+- `YOUTUBE_CHANNEL_URL`: URL publica del canal para el boton `Ir al canal`.
 - `YOUTUBE_UPLOADS_PLAYLIST_ID`: playlist de subidas. Es opcional, pero recomendable.
 
 Si tienes la playlist de subidas, define `YOUTUBE_UPLOADS_PLAYLIST_ID` porque evita una consulta extra para resolverla desde el canal.
@@ -537,7 +594,10 @@ La autenticacion actual es simple y funcional para uso privado o de comunidad pe
 Importante:
 
 - no subas `.env`
+- si una credencial de `.env` se comparte por error, rota el secreto o API key afectado antes de usarlo en produccion
 - cambia siempre `ADMIN_PASSWORD` y `ADMIN_SESSION_TOKEN` antes de usarlo fuera de local
+- restringe `YOUTUBE_API_KEY` en Google Cloud por API y, si aplica, por dominio o IP
+- rota `TWITCH_CLIENT_SECRET` y `TWITCH_EVENTSUB_SECRET` si se exponen
 - la persistencia actual escribe el archivo JSON completo en cada operación
 - en plataformas serverless, los cambios escritos en archivos locales pueden no persistir; para produccion con escritura real conviene usar base de datos o storage persistente
 
@@ -629,6 +689,21 @@ Revisa:
 - que `YOUTUBE_API_KEY` exista
 - que `YOUTUBE_CHANNEL_ID` o `YOUTUBE_UPLOADS_PLAYLIST_ID` esten configurados
 - que la API key tenga habilitada YouTube Data API v3
+
+### El boton Ir al canal abre una URL incorrecta
+
+Revisa:
+
+- que `YOUTUBE_CHANNEL_URL` tenga la URL publica esperada
+- si no usas `YOUTUBE_CHANNEL_URL`, que `YOUTUBE_CHANNEL_ID` corresponda al canal correcto
+
+### Ver resubidos no filtra como esperabas
+
+Revisa:
+
+- que el anime tenga `tracker_url` configurado si necesita un filtro especifico
+- que el tag o texto usado exista en los registros del rastreador
+- que la URL use los parametros soportados: `search`, `q`, `year`, `status` o `tag`
 
 ## Desarrollo futuro sugerido
 
