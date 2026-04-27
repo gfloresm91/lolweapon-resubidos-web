@@ -211,6 +211,29 @@ export default function HomePage({
   }, [animes.length, currentView]);
 
   useEffect(() => {
+    if (currentView !== "tracker" || lives.length) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadLives() {
+      const response = await fetch("/api/lives", { cache: "no-store" });
+      const data = await response.json();
+
+      if (isMounted && response.ok) {
+        setLives(data.lives || []);
+      }
+    }
+
+    loadLives();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentView, lives.length]);
+
+  useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [deferredSearch, filters.status, filters.year, selectedTag]);
 
