@@ -106,6 +106,10 @@ export default function HomePage({
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
 
+  useEffect(() => {
+    setLives(initialLives);
+  }, [initialLives]);
+
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
     toast.error(message || "Tu sesion de admin ya no es valida. Vuelve a iniciar sesion.");

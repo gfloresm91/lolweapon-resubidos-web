@@ -64,3 +64,5 @@ public/imagenes/*
 # Mantener ignoradas carpetas de subidas temporales/locales
 public/imagenes/uploads/
 public/imagenes/tmp/
+
+*.json.back*
