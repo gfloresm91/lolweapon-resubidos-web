@@ -65,4 +65,4 @@ public/imagenes/*
 public/imagenes/uploads/
 public/imagenes/tmp/
 
-*.json.back*
+*.json.bak*
