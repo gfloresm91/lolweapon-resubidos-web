@@ -6,9 +6,11 @@ La aplicacion permite:
 
 - mostrar un inicio con player/chat de Twitch, metadata del canal, ultimos directos y ultimos videos de YouTube
 - explorar el archivo historico por busqueda, año, estado y tags
+- abrir una pagina de detalle por resubido con player OK.RU, selector de partes y links relacionados
 - seguir la lista de animes en la pagina `Viendo`
 - publicar una sección de manga `SpaceDrum` con ficha y lector
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
+- reproducir embeds de `OK.RU` sin salir de la app cuando el link lo permite
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
 - administrar categorias globales de tags desde la interfaz admin
@@ -99,6 +101,8 @@ npm run start
 npm run lint
 ```
 
+Nota: en `Next.js 15`, `next lint` está deprecado. Si el proyecto no tiene una configuración ESLint creada, `npm run lint` puede abrir un asistente interactivo de configuración. Para verificación no interactiva, `npm run build` compila, valida tipos y recolecta las rutas.
+
 ## Variables de entorno
 
 El proyecto usa estas variables:
@@ -164,10 +168,14 @@ app/
     youtube/
       videos/route.js
   inicio/page.js
+  imagenes/
+    [filename]/route.js
   login/page.js
   layout.js
   page.js
-  rastreador/page.js
+  rastreador/
+    page.js
+    [id]/page.js
   spacedrum/page.js
   viendo/page.js
   globals.css
@@ -175,11 +183,13 @@ app/
 components/
   AdminModal.js
   ConfirmModal.js
+  DetailTopbarActions.js
   FiltersBar.js
   HomeDashboard.js
   HomePage.js
   LiveCard.js
   LoreModal.js
+  OkruWatchPlayer.js
   SpaceDrumPage.js
   StatsBar.js
   TagPanel.js
@@ -251,11 +261,39 @@ En producción, el middleware reescribe la raíz según el dominio:
 - carga el dataset inicial desde servidor
 - aplica filtros por texto, año, estado y tag
 - puede recibir filtros iniciales por query params
+- usa controles custom para año y estado, evitando los selects nativos en móvil
 - muestra estadisticas generales
-- renderiza cards con informacion, tags y links
+- renderiza cards con información, tags, disponibilidad por plataforma y CTA hacia el detalle
+- resalta coincidencias del texto buscado dentro de titulo, preview y tags
+- muestra miniatura cuando `image` existe en el registro
+- permite copiar el link de la ficha desde la card
+- permite filtrar por año o estado haciendo click en la fecha o estado de una card
+- permite alternar densidad de cards entre `Comodo` y `Compacto`
 - agrupa tags en categorias automaticas como Anime, Juegos, Tiers, Charlas, Peliculas y Otros
 - carga categorias personalizadas y movimientos manuales desde `/api/tags`
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
+
+`/rastreador/[id]`:
+
+- carga un registro concreto del rastreador por `id`
+- mantiene el mismo shell visual de la app: menu lateral, topbar y footer persistente
+- muestra una pagina tipo watch page con player principal, metadata, tags, descripcion y links
+- convierte links `https://ok.ru/video/<id>` o `https://ok.ru/videoembed/<id>` en iframes `https://ok.ru/videoembed/<id>`
+- cuando hay varias partes de `OK.RU`, permite cambiar la parte sin abrir una pestaña nueva
+- actualiza la URL con `?parte=N` para compartir una parte concreta
+- recuerda la ultima parte vista por resubido usando `localStorage`
+- permite copiar la pagina completa o la parte activa
+- permite abrir externamente la parte activa de `OK.RU`
+- incluye modo teatro para enfocar el player
+- soporta atajos: `Esc` sale de modo teatro, `T` alterna modo teatro, flechas izquierda/derecha cambian parte, `C` copia la parte activa
+- muestra fallback hacia Telegram cuando no hay player OK.RU reproducible
+- incluye navegación `Anterior` y `Siguiente` ordenada por fecha ascendente
+- incluye un link `Reportar link caido` que prepara un correo hacia `kalathraslolweaponvods@gmail.com`
+
+Al entrar al detalle desde una card:
+
+- el rastreador guarda temporalmente filtros, tag, cantidad visible, scroll y card actual en `sessionStorage`
+- al volver con `Volver al rastreador`, restaura el estado y vuelve a la posición aproximada de la card
 
 `/viendo`:
 
@@ -297,6 +335,16 @@ Tambien se pueden combinar:
 ```
 
 Estos parametros se aplican en cliente al cargar la pagina.
+
+### Query params del detalle de resubido
+
+La ruta `/rastreador/[id]` acepta:
+
+```text
+/rastreador/new_123?parte=2
+```
+
+`parte` selecciona la parte activa del player OK.RU. Si no existe o está fuera de rango, la app usa la parte guardada en `localStorage` para ese resubido o vuelve a la parte 1.
 
 ### Panel admin
 
@@ -417,6 +465,9 @@ Cada registro del rastreador sigue esta forma:
 - `year` se guarda como string
 - `tags` debe ser un array de strings
 - `links` contiene arrays por plataforma
+- los links de `okru` deben usar idealmente `https://ok.ru/video/<id>` o `https://ok.ru/videoembed/<id>` para que el player pueda crear el iframe
+- si hay varios links `okru`, se interpretan como partes en el orden del array
+- los links de `telegram` se listan como enlaces externos y no se embeben
 - `image` puede estar vacio
 - `additional_info` es opcional
 
@@ -926,6 +977,47 @@ Revisa:
 - que el tag o texto usado exista en los registros del rastreador
 - que la URL use los parametros soportados: `search`, `q`, `year`, `status` o `tag`
 
+### Un link OK.RU no aparece en el player
+
+El detalle solo embebe links que permitan extraer un id de video con estas formas:
+
+```text
+https://ok.ru/video/123456789
+https://ok.ru/videoembed/123456789
+```
+
+Revisa:
+
+- que el link esté en `links.okru`
+- que el path contenga `/video/` o `/videoembed/`
+- que el video permita embed desde OK.RU
+- que el navegador no bloquee iframes o contenido de terceros
+
+Si no hay un OK.RU reproducible pero hay Telegram, la página muestra un acceso directo a Telegram.
+
+### El detalle no vuelve al mismo lugar del rastreador
+
+La restauración depende de `sessionStorage` y solo se guarda al entrar al detalle desde una card del rastreador.
+
+Revisa:
+
+- que hayas entrado desde una card, no pegando la URL manualmente
+- que el navegador no bloquee `sessionStorage`
+- que no hayas abierto el detalle en otra pestaña
+- que el dataset no haya cambiado de forma que el card ya no exista con el mismo `id`
+
+### La parte activa de OK.RU no se recuerda
+
+El detalle guarda la última parte vista por resubido en `localStorage`.
+
+Revisa:
+
+- que el navegador no bloquee `localStorage`
+- que el registro tenga un `id` estable
+- que el link OK.RU sea reproducible
+
+Si compartes una URL con `?parte=N`, ese valor tiene prioridad sobre lo guardado localmente.
+
 ## Desarrollo futuro sugerido
 
 Ideas naturales para seguir mejorándolo:
@@ -933,6 +1025,9 @@ Ideas naturales para seguir mejorándolo:
 - validación más estricta de URLs por plataforma
 - auditoría o historial de cambios
 - import/export de dataset desde panel admin
+- estado visual de links reportados o rotos
+- formulario propio para reportar links caidos en vez de `mailto`
+- tests de interaccion para el player OK.RU y restauracion del rastreador
 - confirmaciones más detalladas para cambios destructivos
 - tests para `lib/lives.js`, `lib/data.js`, `lib/animes.js`, `lib/animeData.js` y `lib/tagSettings.js`
 

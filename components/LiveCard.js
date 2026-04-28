@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 function statusClass(status) {
   const normalized = String(status || "").toLowerCase();
@@ -11,47 +12,13 @@ function statusClass(status) {
   return "status-badge status-badge--pendiente";
 }
 
-function platformLabel(platform) {
-  if (platform === "okru") return "OK.RU";
-  if (platform === "piero") return "Piero";
-  if (platform === "patreon") return "Patreon";
-  return "Telegram";
-}
+function statusDotClass(status) {
+  const normalized = String(status || "").toLowerCase();
 
-function platformIcon(platform) {
-  if (platform === "okru") return "🇷🇺";
-  if (platform === "piero") return "🔥";
-  if (platform === "patreon") return "💎";
-  return "";
-}
-
-function TelegramIcon() {
-  return (
-    <svg
-      className="platform-inline-icon"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <path
-        fill="currentColor"
-        d="M21.6 4.2c.3-.2.7.1.6.5l-3 14.3c-.1.5-.7.7-1.1.5l-4.5-3.3-2.3 2.2c-.3.3-.8.1-.8-.4v-3.6l8.1-7.4c.2-.2 0-.5-.2-.4l-10 6.3-4.3-1.4c-.5-.2-.5-.9 0-1.1L21.6 4.2z"
-      />
-    </svg>
-  );
-}
-
-function buildPlatformLinkLabel(platform, total, index) {
-  const label = platformLabel(platform);
-  const icon = platform === "telegram" ? <TelegramIcon /> : platformIcon(platform);
-  const suffix = total <= 1 ? "" : ` ${index + 1}`;
-
-  return (
-    <>
-      <span className="platform-label-icon">{icon}</span>
-      <span>{`${label}${suffix}`}</span>
-    </>
-  );
+  if (normalized.includes("completo")) return "status-dot status-dot-completo";
+  if (normalized.includes("lost")) return "status-dot status-dot-lost";
+  if (normalized.includes("subiendo")) return "status-dot status-dot-subiendo";
+  return "status-dot status-dot-pendiente";
 }
 
 function renderInfoText(text) {
@@ -70,59 +37,169 @@ function renderInfoText(text) {
   });
 }
 
-function LiveCard({ live, isAdmin, onEdit, onFilterTag }) {
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightText(text, searchTerm) {
+  const value = String(text || "");
+  const query = String(searchTerm || "").trim();
+
+  if (!query) {
+    return value;
+  }
+
+  const pattern = new RegExp(`(${escapeRegExp(query)})`, "ig");
+  return value.split(pattern).map((part, index) =>
+    part.toLowerCase() === query.toLowerCase() ? (
+      <mark key={`${part}-${index}`} className="search-highlight">
+        {part}
+      </mark>
+    ) : (
+      <span key={`${part}-${index}`}>{part}</span>
+    ),
+  );
+}
+
+function pluralize(count, singular, plural) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function formatDisplayDate(value) {
+  const [day, month, year] = String(value || "").split("/");
+  const date = new Date(`${year}-${month}-${day}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value || "Sin fecha";
+  }
+
+  return new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function LiveCard({
+  live,
+  isAdmin,
+  onEdit,
+  onFilterTag,
+  onFilterYear,
+  onFilterStatus,
+  onOpenDetail,
+  searchTerm,
+}) {
+  const router = useRouter();
   const [showInfo, setShowInfo] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [copyLabel, setCopyLabel] = useState("Copiar ficha");
   const allTags = Array.isArray(live.tags) ? live.tags : [];
   const visibleTags = showAllTags ? allTags : allTags.slice(0, 4);
   const hiddenCount = Math.max(allTags.length - visibleTags.length, 0);
-  const allLinks = live.links || {};
-  const platforms = ["okru", "telegram", "piero", "patreon"];
+  const okruCount = Array.isArray(live.links?.okru) ? live.links.okru.length : 0;
+  const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
+  const hasAnyLinks = okruCount > 0 || telegramCount > 0;
+  const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
+  const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
+  const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
+  const hasImage = Boolean(live.image);
+
+  function openDetail() {
+    onOpenDetail?.(live.id);
+    router.push(detailPath);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openDetail();
+    }
+  }
+
+  async function copyDetailLink(event) {
+    event.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${detailPath}`);
+      setCopyLabel("Copiado");
+      window.setTimeout(() => setCopyLabel("Copiar ficha"), 1400);
+    } catch {
+      setCopyLabel("No se pudo copiar");
+      window.setTimeout(() => setCopyLabel("Copiar ficha"), 1400);
+    }
+  }
 
   return (
-    <article className={`live-card visible ${isAdmin ? "is-admin" : ""}`} onClick={isAdmin ? onEdit : undefined}>
-      {isAdmin ? <div className="edit-indicator">Editar</div> : null}
+    <article
+      className={`live-card visible ${isAdmin ? "is-admin" : ""} ${hasImage ? "has-thumb" : ""}`}
+      role="link"
+      tabIndex={0}
+      data-live-id={live.id}
+      onClick={openDetail}
+      onKeyDown={handleKeyDown}
+    >
+      {isAdmin ? (
+        <button
+          type="button"
+          className="edit-indicator"
+          onClick={(event) => {
+            event.stopPropagation();
+            onEdit();
+          }}
+        >
+          Editar
+        </button>
+      ) : null}
+
+      {hasImage ? (
+        <div className="live-thumb" aria-hidden="true">
+          <img src={live.image} alt="" loading="lazy" />
+        </div>
+      ) : null}
 
       <div className="live-content">
         <div className="live-meta">
-          <span>
-            {live.date || "Sin fecha"}
-            {live.year ? ` · ${live.year}` : ""}
-          </span>
-          <span className={statusClass(live.status)}>{live.status || "Pendiente"}</span>
+          <button
+            type="button"
+            className="live-date-pill"
+            onClick={(event) => {
+              event.stopPropagation();
+              onFilterYear?.(live.year);
+            }}
+          >
+            {formatDisplayDate(live.date)}
+          </button>
+          <button
+            type="button"
+            className={statusClass(live.status)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onFilterStatus?.(live.status);
+            }}
+          >
+            <span className={statusDotClass(live.status)} aria-hidden="true" />
+            {live.status || "Pendiente"}
+          </button>
         </div>
 
-        <h2 className="live-title">{live.title || "Sin titulo"}</h2>
+        <h2 className="live-title">{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
 
         {live.additional_info ? (
           <>
+            <p className={`info-preview ${showInfo ? "is-expanded" : ""}`}>
+              {showInfo ? renderInfoText(live.additional_info) : highlightText(infoPreview, searchTerm)}
+            </p>
             <button
               type="button"
-              className={`info-toggle-btn ${showInfo ? "active" : ""}`}
+              className="info-inline-toggle"
               onClick={(event) => {
                 event.stopPropagation();
                 setShowInfo((current) => !current);
               }}
             >
-              <span className="info-icon">ℹ️</span>
-              <span>Información Adicional</span>
-              <svg
-                className="chevron"
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m6 9 6 6 6-6" />
-              </svg>
+              {showInfo ? "Ver menos" : "Ver mas"}
             </button>
-            {showInfo ? <div className="additional-info">{renderInfoText(live.additional_info)}</div> : null}
           </>
         ) : null}
 
@@ -137,7 +214,7 @@ function LiveCard({ live, isAdmin, onEdit, onFilterTag }) {
                 onFilterTag(tag);
               }}
             >
-              {tag}
+              {highlightText(tag, searchTerm)}
             </button>
           ))}
           {hiddenCount ? (
@@ -166,29 +243,39 @@ function LiveCard({ live, isAdmin, onEdit, onFilterTag }) {
           ) : null}
         </div>
 
-        <div className="links-container">
-          {platforms.some((platform) => Array.isArray(allLinks[platform]) && allLinks[platform].length > 0) ? (
-            platforms.flatMap((platform) =>
-              (allLinks[platform] || []).map((href, index, entries) => {
-                const label = buildPlatformLinkLabel(platform, entries.length, index);
+        <div className="availability-row" aria-label="Disponibilidad del resubido">
+          {okruCount > 0 ? (
+            <span className="availability-chip availability-chip-okru">
+              OK.RU · {pluralize(okruCount, "parte", "partes")}
+            </span>
+          ) : null}
+          {telegramCount > 0 ? (
+            <span className="availability-chip availability-chip-telegram">
+              Telegram · {pluralize(telegramCount, "link", "links")}
+            </span>
+          ) : null}
+          {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
+        </div>
 
-                return (
-                  <a
-                    key={`${platform}-${index}-${href}`}
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`platform-btn platform-${platform}`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {label}
-                  </a>
-                );
-              }),
-            )
-          ) : (
-            <span className="no-links-msg">Sin links cargados</span>
-          )}
+        <div className="quick-actions" aria-label="Acciones rapidas">
+          <button type="button" className="quick-action-btn" onClick={copyDetailLink}>
+            {copyLabel}
+          </button>
+        </div>
+
+        <div className="links-container">
+          <button
+            type="button"
+            className="platform-btn platform-detail"
+            title="Abrir pagina del resubido"
+            onClick={(event) => {
+              event.stopPropagation();
+              openDetail();
+            }}
+          >
+            <span>{detailCtaLabel}</span>
+            <span aria-hidden="true">→</span>
+          </button>
         </div>
       </div>
     </article>

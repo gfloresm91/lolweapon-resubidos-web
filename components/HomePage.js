@@ -67,6 +67,7 @@ const VIEW_PATHS = {
   watching: "/viendo",
   spacedrum: "/spacedrum",
 };
+const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
 
 function getViewFromPath(pathname) {
   return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
@@ -102,9 +103,13 @@ export default function HomePage({
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  const [pendingTrackerRestore, setPendingTrackerRestore] = useState(null);
+  const [cardDensity, setCardDensity] = useState("comfortable");
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
+  const didRestoreTrackerRef = useRef(false);
+  const skipVisibleResetRef = useRef(false);
 
   useEffect(() => {
     setLives(initialLives);
@@ -188,6 +193,43 @@ export default function HomePage({
   }, [currentView, searchParams]);
 
   useEffect(() => {
+    if (currentView !== "tracker" || didRestoreTrackerRef.current) {
+      return;
+    }
+
+    didRestoreTrackerRef.current = true;
+
+    try {
+      const rawState = window.sessionStorage.getItem(TRACKER_RETURN_STATE_KEY);
+
+      if (!rawState) {
+        return;
+      }
+
+      const savedState = JSON.parse(rawState);
+      window.sessionStorage.removeItem(TRACKER_RETURN_STATE_KEY);
+
+      if (savedState?.filters) {
+        skipVisibleResetRef.current = true;
+        setFilters({
+          search: savedState.filters.search || "",
+          year: savedState.filters.year || "all",
+          status: savedState.filters.status || "all",
+        });
+      }
+
+      setSelectedTag(savedState?.selectedTag || "");
+      setVisibleCount(Math.max(Number(savedState?.visibleCount) || INITIAL_VISIBLE_COUNT, INITIAL_VISIBLE_COUNT));
+      setPendingTrackerRestore({
+        liveId: savedState?.liveId || "",
+        scrollY: Number(savedState?.scrollY) || 0,
+      });
+    } catch {
+      window.sessionStorage.removeItem(TRACKER_RETURN_STATE_KEY);
+    }
+  }, [currentView]);
+
+  useEffect(() => {
     if (currentView !== "watching" || animes.length) {
       return undefined;
     }
@@ -234,8 +276,33 @@ export default function HomePage({
   }, [currentView, lives.length]);
 
   useEffect(() => {
+    if (skipVisibleResetRef.current) {
+      skipVisibleResetRef.current = false;
+      return;
+    }
+
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [deferredSearch, filters.status, filters.year, selectedTag]);
+
+  useEffect(() => {
+    if (currentView !== "tracker" || !pendingTrackerRestore || !visibleLives.length) {
+      return;
+    }
+
+    const target = pendingTrackerRestore.liveId
+      ? document.querySelector(`[data-live-id="${CSS.escape(pendingTrackerRestore.liveId)}"]`)
+      : null;
+
+    requestAnimationFrame(() => {
+      if (target) {
+        target.scrollIntoView({ block: "center" });
+      } else {
+        window.scrollTo({ top: pendingTrackerRestore.scrollY, behavior: "instant" });
+      }
+
+      setPendingTrackerRestore(null);
+    });
+  }, [currentView, pendingTrackerRestore, visibleLives.length]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 901px)");
@@ -458,6 +525,23 @@ export default function HomePage({
     });
   }
 
+  function saveTrackerReturnState(liveId) {
+    try {
+      window.sessionStorage.setItem(
+        TRACKER_RETURN_STATE_KEY,
+        JSON.stringify({
+          filters,
+          selectedTag,
+          visibleCount,
+          liveId,
+          scrollY: window.scrollY,
+        }),
+      );
+    } catch {
+      // Session storage can be unavailable in strict browser modes.
+    }
+  }
+
   return (
     <>
       <Toaster position="top-right" richColors closeButton />
@@ -643,6 +727,9 @@ export default function HomePage({
           years={allYears}
           statuses={allStatuses}
           selectedTag={selectedTag}
+          onSearchChange={(search) => {
+            setFilters((current) => ({ ...current, search }));
+          }}
           onFiltersChange={(partial) =>
             startTransition(() => {
               setFilters((current) => ({ ...current, ...partial }));
@@ -660,20 +747,49 @@ export default function HomePage({
           {filteredLives.length ? (
             <>
               <div className="results-meta">
-                Mostrando {visibleLives.length} de {filteredLives.length} resultados
+                <span>Mostrando {visibleLives.length} de {filteredLives.length} resultados</span>
+                {isPending ? <span className="tracker-loading-strip">Actualizando resultados...</span> : null}
+                <div className="density-toggle" aria-label="Densidad de tarjetas">
+                  <button
+                    type="button"
+                    className={cardDensity === "comfortable" ? "is-active" : ""}
+                    onClick={() => setCardDensity("comfortable")}
+                  >
+                    Comodo
+                  </button>
+                  <button
+                    type="button"
+                    className={cardDensity === "compact" ? "is-active" : ""}
+                    onClick={() => setCardDensity("compact")}
+                  >
+                    Compacto
+                  </button>
+                </div>
               </div>
-              <div id="lives-grid" className="lives-grid">
+              <div id="lives-grid" className={`lives-grid lives-grid-${cardDensity}`}>
                 {visibleLives.map((live) => (
                   <LiveCard
                     key={live.id}
                     live={live}
                     isAdmin={isAdmin}
+                    searchTerm={deferredSearch}
                     onEdit={() => setEditingLive(live)}
                     onFilterTag={(tag) =>
                       startTransition(() => {
                         setSelectedTag(tag);
                       })
                     }
+                    onFilterYear={(year) =>
+                      startTransition(() => {
+                        setFilters((current) => ({ ...current, year: year || "all" }));
+                      })
+                    }
+                    onFilterStatus={(status) =>
+                      startTransition(() => {
+                        setFilters((current) => ({ ...current, status: status || "all" }));
+                      })
+                    }
+                    onOpenDetail={saveTrackerReturnState}
                   />
                 ))}
               </div>
@@ -687,6 +803,16 @@ export default function HomePage({
             <div className="empty-state">
               <div className="empty-state-icon">📼</div>
               <div className="empty-state-text">No hay resultados con esos filtros.</div>
+              <button
+                type="button"
+                className="empty-state-action"
+                onClick={() => {
+                  setFilters({ search: "", year: "all", status: "all" });
+                  setSelectedTag("");
+                }}
+              >
+                Limpiar filtros
+              </button>
             </div>
           )}
         </main>
