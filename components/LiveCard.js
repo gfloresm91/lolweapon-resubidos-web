@@ -103,7 +103,7 @@ function LiveCard({
   const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
-  const hasImage = Boolean(live.image);
+  const showThumbnail = false;
 
   function openDetail() {
     onOpenDetail?.(live.id);
@@ -132,7 +132,7 @@ function LiveCard({
 
   return (
     <article
-      className={`live-card visible ${isAdmin ? "is-admin" : ""} ${hasImage ? "has-thumb" : ""}`}
+      className={`live-card visible ${isAdmin ? "is-admin" : ""} ${showThumbnail ? "has-thumb" : ""}`}
       role="link"
       tabIndex={0}
       data-live-id={live.id}
@@ -152,7 +152,7 @@ function LiveCard({
         </button>
       ) : null}
 
-      {hasImage ? (
+      {showThumbnail ? (
         <div className="live-thumb" aria-hidden="true">
           <img src={live.image} alt="" loading="lazy" />
         </div>
