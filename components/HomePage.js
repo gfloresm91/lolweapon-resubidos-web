@@ -509,6 +509,7 @@ export default function HomePage({
     const nextPath = VIEW_PATHS[view] || "/inicio";
     setCurrentView(view);
     window.history.pushState(null, "", nextPath);
+    window.dispatchEvent(new Event("kala:navigation"));
     window.scrollTo({ top: 0, behavior: "instant" });
 
     if (window.matchMedia("(max-width: 900px)").matches) {
@@ -653,18 +654,19 @@ export default function HomePage({
           </header>
 
           <div className="app-wrapper">
-            <HomeDashboard
-              lives={lives}
-              youtubeVideos={initialYoutubeVideos}
-              twitchStream={initialTwitchStream}
-              twitchProfile={initialTwitchProfile}
-              twitchChannelInfo={initialTwitchChannelInfo}
-              twitchGame={initialTwitchGame}
-              twitchLogin={twitchLogin}
-              youtubeChannelUrl={youtubeChannelUrl}
-              onTrackerOpen={() => selectView("tracker")}
-              mode={currentView === "home" ? "full" : "mini"}
-            />
+            {currentView === "home" ? (
+              <HomeDashboard
+                lives={lives}
+                youtubeVideos={initialYoutubeVideos}
+                twitchStream={initialTwitchStream}
+                twitchProfile={initialTwitchProfile}
+                twitchChannelInfo={initialTwitchChannelInfo}
+                twitchGame={initialTwitchGame}
+                twitchLogin={twitchLogin}
+                youtubeChannelUrl={youtubeChannelUrl}
+                onTrackerOpen={() => selectView("tracker")}
+              />
+            ) : null}
 
             {currentView === "tracker" ? (
               <>

@@ -1,0 +1,303 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+
+const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
+const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
+const MINI_PLAYER_DEFAULT_WIDTH = 380;
+const MINI_PLAYER_MIN_WIDTH = 380;
+const MINI_PLAYER_MAX_WIDTH = 720;
+const MINI_ROUTES = ["/rastreador", "/viendo", "/spacedrum"];
+
+function loadTwitchEmbedScript() {
+  if (window.Twitch?.Player) {
+    return Promise.resolve();
+  }
+
+  if (window.__twitchEmbedScriptPromise) {
+    return window.__twitchEmbedScriptPromise;
+  }
+
+  window.__twitchEmbedScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = TWITCH_EMBED_SCRIPT_URL;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+
+  return window.__twitchEmbedScriptPromise;
+}
+
+function clampMiniPlayerWidth(value) {
+  return Math.min(MINI_PLAYER_MAX_WIDTH, Math.max(MINI_PLAYER_MIN_WIDTH, value));
+}
+
+function getRouteMode(pathname) {
+  if (pathname === "/" || pathname === "/inicio") {
+    return "full";
+  }
+
+  if (MINI_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    return "mini";
+  }
+
+  return "hidden";
+}
+
+function buildMiniStyle(width) {
+  return {
+    bottom: "calc(3.6rem + env(safe-area-inset-bottom))",
+    height: `${Math.round((width * 9) / 16)}px`,
+    right: "1.25rem",
+    top: "auto",
+    width: `min(${width}px, calc(100vw - 2rem))`,
+  };
+}
+
+export default function PersistentTwitchPlayer({ twitchLogin }) {
+  const pathname = usePathname();
+  const twitchChannel = twitchLogin || "kalathraslolweapon";
+  const [currentPath, setCurrentPath] = useState("");
+  const [twitchParent, setTwitchParent] = useState("");
+  const [currentStream, setCurrentStream] = useState(null);
+  const [isMiniDismissed, setIsMiniDismissed] = useState(false);
+  const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
+  const [playerStyle, setPlayerStyle] = useState(buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH));
+  const playerRef = useRef(null);
+  const resizeStateRef = useRef(null);
+  const resizeFrameRef = useRef(null);
+  const isOnline = Boolean(currentStream);
+  const routeMode = getRouteMode(currentPath);
+  const isVisible = routeMode === "full" || (routeMode === "mini" && isOnline && !isMiniDismissed);
+
+  useEffect(() => {
+    setCurrentPath(pathname || window.location.pathname);
+  }, [pathname]);
+
+  useEffect(() => {
+    setTwitchParent(window.location.hostname);
+
+    const savedWidth = Number(window.localStorage.getItem(MINI_PLAYER_SIZE_STORAGE_KEY));
+
+    if (Number.isFinite(savedWidth)) {
+      setMiniPlayerWidth(clampMiniPlayerWidth(savedWidth));
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(MINI_PLAYER_SIZE_STORAGE_KEY, String(miniPlayerWidth));
+  }, [miniPlayerWidth]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setIsMiniDismissed(false);
+    }
+  }, [isOnline]);
+
+  useEffect(() => {
+    function notifyPathChange() {
+      setCurrentPath(window.location.pathname);
+    }
+
+    window.addEventListener("popstate", notifyPathChange);
+    window.addEventListener("kala:navigation", notifyPathChange);
+
+    return () => {
+      window.removeEventListener("popstate", notifyPathChange);
+      window.removeEventListener("kala:navigation", notifyPathChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!twitchParent) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    function tryMutedAutoplay(player) {
+      try {
+        player.setMuted(true);
+      } catch {}
+
+      try {
+        const playResult = player.play();
+        playResult?.catch?.(() => {});
+      } catch {}
+    }
+
+    loadTwitchEmbedScript()
+      .then(() => {
+        if (isCancelled || !window.Twitch?.Player) {
+          return;
+        }
+
+        const player = new window.Twitch.Player("persistent-twitch-player-embed", {
+          channel: twitchChannel,
+          parent: [twitchParent],
+          width: "100%",
+          height: "100%",
+          muted: true,
+          autoplay: true,
+        });
+
+        playerRef.current = player;
+        player.addEventListener(window.Twitch.Player.READY, () => tryMutedAutoplay(player));
+        player.addEventListener(window.Twitch.Player.ONLINE, () => tryMutedAutoplay(player));
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+
+      try {
+        playerRef.current?.setMuted?.(true);
+        playerRef.current?.pause?.();
+      } catch {}
+
+      if (typeof playerRef.current?.destroy === "function") {
+        playerRef.current.destroy();
+      }
+
+      playerRef.current = null;
+    };
+  }, [twitchChannel, twitchParent]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function refreshStatus() {
+      try {
+        const response = await fetch("/api/twitch/status", { cache: "no-store" });
+        const data = await response.json();
+
+        if (isMounted && response.ok) {
+          setCurrentStream(data.stream || null);
+        }
+      } catch {
+        if (isMounted) {
+          setCurrentStream(null);
+        }
+      }
+    }
+
+    refreshStatus();
+    const intervalId = window.setInterval(refreshStatus, 60000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let frameId = 0;
+
+    function updatePlayerPosition() {
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        if (routeMode === "full") {
+          const anchor = document.querySelector('[data-twitch-player-anchor="home"]');
+
+          if (anchor) {
+            const rect = anchor.getBoundingClientRect();
+            setPlayerStyle({
+              borderRadius: window.getComputedStyle(anchor.parentElement || anchor).borderRadius,
+              bottom: "auto",
+              height: `${rect.height}px`,
+              left: `${rect.left}px`,
+              right: "auto",
+              top: `${rect.top}px`,
+              width: `${rect.width}px`,
+            });
+            return;
+          }
+        }
+
+        setPlayerStyle(buildMiniStyle(miniPlayerWidth));
+      });
+    }
+
+    updatePlayerPosition();
+    window.addEventListener("resize", updatePlayerPosition);
+    window.addEventListener("scroll", updatePlayerPosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", updatePlayerPosition);
+      window.removeEventListener("scroll", updatePlayerPosition, true);
+    };
+  }, [miniPlayerWidth, routeMode]);
+
+  function startMiniResize(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    resizeStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: miniPlayerWidth,
+    };
+  }
+
+  function resizeMiniPlayer(event) {
+    const resizeState = resizeStateRef.current;
+
+    if (!resizeState || resizeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextWidth = clampMiniPlayerWidth(resizeState.startWidth + (resizeState.startX - event.clientX));
+
+    if (resizeFrameRef.current) {
+      window.cancelAnimationFrame(resizeFrameRef.current);
+    }
+
+    resizeFrameRef.current = window.requestAnimationFrame(() => {
+      setMiniPlayerWidth(nextWidth);
+      resizeFrameRef.current = null;
+    });
+  }
+
+  function stopMiniResize(event) {
+    if (resizeStateRef.current?.pointerId !== event.pointerId) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    resizeStateRef.current = null;
+  }
+
+  return (
+    <div
+      className={`persistent-twitch-player is-${routeMode} ${isVisible ? "" : "is-hidden"}`}
+      style={playerStyle}
+      aria-hidden={!isVisible}
+    >
+      {routeMode === "mini" ? (
+        <>
+          <button type="button" className="mini-player-close" onClick={() => setIsMiniDismissed(true)}>
+            Cerrar
+          </button>
+          <button
+            type="button"
+            className="mini-player-resize"
+            aria-label="Redimensionar mini player"
+            onPointerDown={startMiniResize}
+            onPointerMove={resizeMiniPlayer}
+            onPointerUp={stopMiniResize}
+            onPointerCancel={stopMiniResize}
+          />
+        </>
+      ) : null}
+      <div className="persistent-twitch-frame">
+        <div id="persistent-twitch-player-embed" className="twitch-player-embed" aria-label="Directo de Twitch" />
+      </div>
+    </div>
+  );
+}

@@ -249,6 +249,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 
 - muestra el player y chat de Twitch
 - el player usa el SDK oficial de Twitch para intentar autoplay muteado al cargar y cuando detecta estado online
+- el iframe de Twitch se monta como player persistente para pasar de Inicio a Rastreador o Ver resubido sin reiniciar la reproducción
 - consulta `/api/twitch/status` para mostrar si el canal esta online
 - muestra metadata del canal aunque el streamer este offline
 - muestra avatar del streamer, titulo actual, categoria e imagen de categoria
@@ -267,7 +268,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 - muestra estadisticas generales
 - renderiza cards con información, tags, disponibilidad por plataforma y CTA hacia el detalle
 - resalta coincidencias del texto buscado dentro de titulo, preview y tags
-- muestra miniatura cuando `image` existe en el registro
+- conserva el campo `image`, pero por ahora oculta las miniaturas en los cards del rastreador
 - permite copiar el link de la ficha desde la card
 - permite filtrar por año o estado haciendo click en la fecha o estado de una card
 - permite alternar densidad de cards entre `Comodo` y `Compacto`
