@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
+import SocialLinks from "@/components/SocialLinks";
 import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
 import { readLives } from "@/lib/data";
 
@@ -129,6 +130,10 @@ export default async function LiveDetailPage({ params }) {
               </Link>
             ) : null}
           </nav>
+          <div className="sidebar-social-block">
+            <span>Redes oficiales</span>
+            <SocialLinks compact />
+          </div>
         </aside>
 
         <div className="content-shell">
@@ -234,7 +239,9 @@ export default async function LiveDetailPage({ params }) {
             </div>
           </main>
 
-          <footer className="persistent-footer">Por fans para fans 💜 para Kala</footer>
+          <footer className="persistent-footer">
+            <span>Por fans para fans 💜 para Kala</span>
+          </footer>
         </div>
       </div>
     </>

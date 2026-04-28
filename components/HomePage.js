@@ -10,6 +10,7 @@ import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
+import SocialLinks from "@/components/SocialLinks";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
@@ -623,6 +624,10 @@ export default function HomePage({
               </button>
             ) : null}
           </nav>
+          <div className="sidebar-social-block">
+            <span>Redes oficiales</span>
+            <SocialLinks compact />
+          </div>
         </aside>
 
         <div className="content-shell">
@@ -829,7 +834,9 @@ export default function HomePage({
               <SpaceDrumPage data={initialSpaceDrum} />
             ) : null}
           </div>
-          <footer className="persistent-footer">Por fans para fans 💜 para Kala</footer>
+          <footer className="persistent-footer">
+            <span>Por fans para fans 💜 para Kala</span>
+          </footer>
         </div>
       </div>
 

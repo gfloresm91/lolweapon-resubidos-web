@@ -256,6 +256,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  flex: 1;
 }
 
 .sidebar-link {
@@ -338,6 +339,22 @@ body::before {
   background: var(--purple);
   border-color: var(--purple);
   color: #fff;
+}
+
+.sidebar-social-block {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-social-block > span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.55rem;
+  text-transform: uppercase;
 }
 
 .content-shell {
@@ -1464,6 +1481,87 @@ body::before {
   top: 1.5rem;
   right: 1.5rem;
   z-index: 100;
+}
+
+.social-links {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.social-link {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: all var(--t-fast);
+}
+
+.social-link svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+}
+
+.social-link-monogram {
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.social-link-youtube:hover,
+.social-link-youtube:focus-visible {
+  border-color: rgba(248, 113, 113, 0.38);
+  background: rgba(248, 113, 113, 0.13);
+  color: #fecaca;
+}
+
+.social-link-x:hover,
+.social-link-x:focus-visible {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+}
+
+.social-link-instagram:hover,
+.social-link-instagram:focus-visible {
+  border-color: rgba(244, 114, 182, 0.38);
+  background: rgba(244, 114, 182, 0.13);
+  color: #fbcfe8;
+}
+
+.social-link-patreon:hover,
+.social-link-patreon:focus-visible {
+  border-color: rgba(255, 107, 129, 0.38);
+  background: rgba(255, 107, 129, 0.13);
+  color: #fecdd3;
+}
+
+.social-link-spacedrum:hover,
+.social-link-spacedrum:focus-visible {
+  border-color: rgba(34, 211, 238, 0.36);
+  background: rgba(34, 211, 238, 0.12);
+  color: #a5f3fc;
 }
 
 .main-header {

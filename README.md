@@ -11,6 +11,7 @@ La aplicacion permite:
 - publicar una sección de manga `SpaceDrum` con ficha y lector
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - reproducir embeds de `OK.RU` sin salir de la app cuando el link lo permite
+- mostrar redes oficiales en el menu lateral
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
 - administrar categorias globales de tags desde la interfaz admin
@@ -191,6 +192,7 @@ components/
   LoreModal.js
   OkruWatchPlayer.js
   SpaceDrumPage.js
+  SocialLinks.js
   StatsBar.js
   TagPanel.js
   TagsInput.js
@@ -312,9 +314,10 @@ Al entrar al detalle desde una card:
 - está preparado para datos de prueba y para reemplazar imágenes/metadata por contenido real
 - solo se muestra si `NEXT_PUBLIC_ENABLE_SPACEDRUM=true`; si no, la ruta devuelve 404 y no aparece en el menú
 
-Footer:
+Menu lateral y footer:
 
 - las vistas principales muestran un footer persistente con el texto `Por fans para fans 💜 para Kala`
+- el menu lateral incluye accesos externos a YouTube, X, Instagram, Patreon y SpaceDrum mediante `components/SocialLinks.js`
 
 ### Query params del rastreador
 
