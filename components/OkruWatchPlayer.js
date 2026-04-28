@@ -74,9 +74,8 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
   const activeLink = playableLinks[activeIndex] || null;
   const activePartLabel = activeLink ? `Parte ${activeIndex + 1}` : "";
   const activePartSummary = activeLink ? `${activePartLabel} de ${playableLinks.length}` : "Sin parte seleccionada";
-  const streamlinkCommand = activeLink
-    ? `streamlink "${activeLink.href}" best -o "${buildSafeFilename(title, activeIndex + 1)}"`
-    : "";
+  const downloadFilename = buildSafeFilename(title, activeIndex + 1);
+  const streamlinkCommand = activeLink ? `streamlink "${activeLink.href}" best -o "${downloadFilename}"` : "";
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -215,11 +214,6 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
               Abrir OK.RU
             </a>
           ) : null}
-          {activeLink ? (
-            <button type="button" className="watch-tool-button" onClick={() => setIsDownloadModalOpen(true)}>
-              Descargar con Streamlink
-            </button>
-          ) : null}
           <button type="button" className="watch-tool-button" onClick={copyPageUrl}>
             {copyPageLabel}
           </button>
@@ -256,7 +250,14 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
       )}
 
       <div className="watch-link-group">
-        <h3>{activeLink ? `OK.RU · ${activePartSummary}` : "OK.RU"}</h3>
+        <div className="watch-link-group-header">
+          <h3>{activeLink ? `OK.RU · ${activePartSummary}` : "OK.RU"}</h3>
+          {activeLink ? (
+            <button type="button" className="watch-download-fallback" onClick={() => setIsDownloadModalOpen(true)}>
+              Descargar en caso de fallar
+            </button>
+          ) : null}
+        </div>
         {playableLinks.length ? (
           <ol className="detail-link-list">
             {playableLinks.map((item, index) => (
@@ -303,43 +304,30 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
             </div>
 
             <p className="download-modal-note">
-              La descarga se realiza en tu computador. Esta web no descarga ni guarda el video, solo prepara el
-              comando para la parte seleccionada.
+              La descarga se realiza en tu computador. Esta web no descarga ni guarda el video.
             </p>
 
-            <div className="download-command-card download-step">
-              <span className="download-step-label">Paso 3</span>
-              <h3>Copiar y ejecutar el comando</h3>
-              <p>
-                El archivo se guardará en la carpeta actual de la terminal. Para elegir otra carpeta, cambia lo que va
-                después de <code>-o</code>.
-              </p>
-              <span>Comando para {activePartSummary}</span>
-              <code className="download-command-code">{streamlinkCommand}</code>
-              <div className="download-command-actions">
-                <button type="button" className="btn-modal btn-modal-primary" onClick={copyStreamlinkCommand}>
-                  {copyCommandLabel}
-                </button>
-                <button type="button" className="btn-modal btn-modal-secondary" onClick={copyOkruUrl}>
-                  {copyOkruLabel}
-                </button>
-              </div>
-              <div className="download-path-examples">
-                <span>Ejemplos para guardar en Descargas</span>
-                <code>macOS/Linux: -o "~/Downloads/{buildSafeFilename(title, activeIndex + 1)}"</code>
-                <code>Windows: -o "%USERPROFILE%\Downloads\{buildSafeFilename(title, activeIndex + 1)}"</code>
-              </div>
-            </div>
-
             <div className="download-help">
-              <details open>
-                <summary>Paso 1: Instalar Streamlink</summary>
-                <div className="download-help-body">
-                  <p>
-                    Windows: descarga el instalador oficial desde la pagina de releases. En macOS se recomienda
-                    Homebrew y luego ejecutar <code>brew install streamlink</code>. En Linux revisa las opciones
-                    oficiales para tu distribucion.
-                  </p>
+              <section className="download-step">
+                <span className="download-step-label">1</span>
+                <div className="download-step-content">
+                  <h3>Instala Streamlink</h3>
+                  <dl className="download-platform-list">
+                    <div>
+                      <dt>Windows</dt>
+                      <dd>Descarga el instalador oficial desde Releases de Streamlink.</dd>
+                    </div>
+                    <div>
+                      <dt>macOS</dt>
+                      <dd>
+                        Instala Homebrew y luego ejecuta <code>brew install streamlink</code>.
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Linux</dt>
+                      <dd>Revisa las opciones oficiales para tu distribucion.</dd>
+                    </div>
+                  </dl>
                   <a href="https://streamlink.github.io/install.html" target="_blank" rel="noreferrer">
                     Guia oficial de Streamlink
                   </a>
@@ -350,36 +338,96 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
                     Homebrew para macOS
                   </a>
                 </div>
-              </details>
+              </section>
 
-              <details>
-                <summary>Paso 2: Instalar FFmpeg si hace falta</summary>
-                <div className="download-help-body">
+              <section className="download-step">
+                <span className="download-step-label">2</span>
+                <div className="download-step-content">
+                  <h3>Instala FFmpeg si Streamlink lo necesita</h3>
                   <p>
-                    Streamlink puede necesitar FFmpeg para guardar o unir correctamente algunos streams. En Windows
-                    puedes usar <code>winget install Gyan.FFmpeg</code>. En macOS puedes usar{" "}
-                    <code>brew install ffmpeg</code>. En Linux usa el gestor de paquetes de tu distro.
+                    Streamlink puede necesitar FFmpeg para guardar o unir correctamente algunos streams.
                   </p>
+                  <dl className="download-platform-list">
+                    <div>
+                      <dt>Windows</dt>
+                      <dd>
+                        En la pagina oficial, usa una build enlazada en Windows EXE Files. Tambien puedes usar{" "}
+                        <code>winget install Gyan.FFmpeg</code>.
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>macOS</dt>
+                      <dd>
+                        Ejecuta <code>brew install ffmpeg</code>.
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Linux</dt>
+                      <dd>
+                        Usa el gestor de paquetes de tu distro: <code>sudo apt install ffmpeg</code>,{" "}
+                        <code>sudo dnf install ffmpeg</code> o <code>sudo pacman -S ffmpeg</code>.
+                      </dd>
+                    </div>
+                  </dl>
                   <a href="https://ffmpeg.org/download.html" target="_blank" rel="noreferrer">
                     Descargas oficiales de FFmpeg
                   </a>
                 </div>
-              </details>
+              </section>
 
-              <details>
-                <summary>Verificar y ejecutar en terminal</summary>
-                <div className="download-help-body">
-                  <p>
-                    Abre PowerShell o CMD en Windows, Terminal en macOS o Linux, pega el comando y presiona Enter.
-                    Puedes verificar la instalacion con <code>streamlink --version</code> y{" "}
-                    <code>ffmpeg -version</code>.
-                  </p>
-                  <p>
-                    Si quieres guardar en una carpeta concreta, cambia el valor despues de <code>-o</code> por una
-                    ruta local de tu equipo.
-                  </p>
+              <section className="download-step">
+                <span className="download-step-label">3</span>
+                <div className="download-step-content">
+                  <h3>Abre una terminal</h3>
+                  <dl className="download-platform-list">
+                    <div>
+                      <dt>Windows</dt>
+                      <dd>PowerShell o CMD.</dd>
+                    </div>
+                    <div>
+                      <dt>macOS</dt>
+                      <dd>Terminal.</dd>
+                    </div>
+                    <div>
+                      <dt>Linux</dt>
+                      <dd>Terminal.</dd>
+                    </div>
+                  </dl>
                 </div>
-              </details>
+              </section>
+
+              <section className="download-command-card download-step">
+                <span className="download-step-label">4</span>
+                <div className="download-step-content">
+                  <h3>Copia y ejecuta este comando</h3>
+                  <span>Comando para {activePartSummary}</span>
+                  <code className="download-command-code">{streamlinkCommand}</code>
+                  <div className="download-command-actions">
+                    <button type="button" className="btn-modal btn-modal-primary" onClick={copyStreamlinkCommand}>
+                      {copyCommandLabel}
+                    </button>
+                    <button type="button" className="btn-modal btn-modal-secondary" onClick={copyOkruUrl}>
+                      {copyOkruLabel}
+                    </button>
+                  </div>
+                  <div className="download-path-examples">
+                    <span>Ejemplos para guardar en Descargas</span>
+                    <code>macOS/Linux: -o "~/Downloads/{downloadFilename}"</code>
+                    <code>Windows: -o "%USERPROFILE%\Downloads\{downloadFilename}"</code>
+                  </div>
+                </div>
+              </section>
+
+              <section className="download-step download-notes">
+                <span className="download-step-label">Notas</span>
+                <ul>
+                  <li>En Windows se recomienda usar el instalador oficial de Streamlink.</li>
+                  <li>En macOS se recomienda Homebrew.</li>
+                  <li>Si el comando no se reconoce, cierra y vuelve a abrir la terminal.</li>
+                  <li>Si falla al guardar o unir el archivo, instala FFmpeg y vuelve a intentar.</li>
+                  <li>Para verificar la instalacion, usa <code>streamlink --version</code> y <code>ffmpeg -version</code>.</li>
+                </ul>
+              </section>
             </div>
 
             <div className="modal-actions">

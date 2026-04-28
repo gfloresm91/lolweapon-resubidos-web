@@ -352,7 +352,7 @@ La ruta `/rastreador/[id]` acepta:
 
 ### Descarga local con Streamlink
 
-En `/rastreador/[id]`, cuando existe una parte reproducible de `OK.RU`, el player muestra el boton `Descargar con Streamlink`.
+En `/rastreador/[id]`, cuando existe una parte reproducible de `OK.RU`, debajo del player se muestra el boton rojo `Descargar en caso de fallar`.
 
 La app no descarga videos en el servidor ni en el navegador. El modal solo prepara un comando para que el usuario lo ejecute localmente en su computador.
 
@@ -374,6 +374,28 @@ Links mostrados en el modal:
 - Homebrew para macOS: `https://brew.sh/`
 - Descargas oficiales de FFmpeg: `https://ffmpeg.org/download.html`
 
+El modal organiza la ayuda en cuatro pasos:
+
+1. Instalar Streamlink.
+
+   - Windows: usar el instalador oficial desde Releases de Streamlink.
+   - macOS: instalar Homebrew y ejecutar `brew install streamlink`.
+   - Linux: revisar la guia oficial para la distribucion usada.
+
+2. Instalar FFmpeg si Streamlink lo necesita.
+
+   - Windows: usar una build enlazada en Windows EXE Files desde la pagina oficial o ejecutar `winget install Gyan.FFmpeg`.
+   - macOS: ejecutar `brew install ffmpeg`.
+   - Linux: usar el gestor de paquetes de la distro, por ejemplo `sudo apt install ffmpeg`, `sudo dnf install ffmpeg` o `sudo pacman -S ffmpeg`.
+
+3. Abrir una terminal.
+
+   - Windows: PowerShell o CMD.
+   - macOS: Terminal.
+   - Linux: Terminal.
+
+4. Copiar y ejecutar el comando de la parte activa.
+
 Notas de uso:
 
 - el archivo se guarda en la carpeta actual de la terminal
@@ -381,6 +403,8 @@ Notas de uso:
 - ejemplo macOS/Linux: `-o "~/Downloads/video.mp4"`
 - ejemplo Windows: `-o "%USERPROFILE%\Downloads\video.mp4"`
 - se puede verificar la instalacion con `streamlink --version` y `ffmpeg -version`
+- si el comando no se reconoce, se recomienda cerrar y volver a abrir la terminal
+- si falla al guardar o unir el archivo, instala FFmpeg y vuelve a intentar
 - mientras el modal esta abierto, `Esc` lo cierra y los atajos globales del player quedan pausados
 
 ### Panel admin
