@@ -286,6 +286,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 - recuerda la ultima parte vista por resubido usando `localStorage`
 - permite copiar la pagina completa o la parte activa
 - permite abrir externamente la parte activa de `OK.RU`
+- incluye un modal `Descargar` con comando local de Streamlink, enlaces de instalacion y notas de FFmpeg
 - incluye modo teatro para enfocar el player
 - soporta atajos: `Esc` sale de modo teatro, `T` alterna modo teatro, flechas izquierda/derecha cambian parte, `C` copia la parte activa
 - muestra fallback hacia Telegram cuando no hay player OK.RU reproducible
@@ -348,6 +349,39 @@ La ruta `/rastreador/[id]` acepta:
 ```
 
 `parte` selecciona la parte activa del player OK.RU. Si no existe o está fuera de rango, la app usa la parte guardada en `localStorage` para ese resubido o vuelve a la parte 1.
+
+### Descarga local con Streamlink
+
+En `/rastreador/[id]`, cuando existe una parte reproducible de `OK.RU`, el player muestra el boton `Descargar con Streamlink`.
+
+La app no descarga videos en el servidor ni en el navegador. El modal solo prepara un comando para que el usuario lo ejecute localmente en su computador.
+
+El comando generado usa esta forma:
+
+```bash
+streamlink "https://ok.ru/video/123456789" best -o "titulo-del-resubido-parte-1.mp4"
+```
+
+Dependencias recomendadas:
+
+- `Streamlink`: necesario para resolver y descargar el stream de OK.RU.
+- `FFmpeg`: puede ser necesario para guardar o unir correctamente algunos streams.
+
+Links mostrados en el modal:
+
+- Guia oficial de Streamlink: `https://streamlink.github.io/install.html`
+- Releases de Streamlink: `https://github.com/streamlink/streamlink/releases`
+- Homebrew para macOS: `https://brew.sh/`
+- Descargas oficiales de FFmpeg: `https://ffmpeg.org/download.html`
+
+Notas de uso:
+
+- el archivo se guarda en la carpeta actual de la terminal
+- para guardar en otra carpeta, se debe cambiar el valor despues de `-o`
+- ejemplo macOS/Linux: `-o "~/Downloads/video.mp4"`
+- ejemplo Windows: `-o "%USERPROFILE%\Downloads\video.mp4"`
+- se puede verificar la instalacion con `streamlink --version` y `ffmpeg -version`
+- mientras el modal esta abierto, `Esc` lo cierra y los atajos globales del player quedan pausados
 
 ### Panel admin
 
