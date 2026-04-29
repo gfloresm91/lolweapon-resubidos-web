@@ -255,9 +255,9 @@ body::before {
 
 .sidebar-brand-text {
   font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 1rem;
+  font-size: 0.82rem;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
