@@ -61,6 +61,14 @@ function buildMiniStyle(width) {
   };
 }
 
+function buildHiddenStyle(width) {
+  return {
+    ...buildMiniStyle(width),
+    opacity: 0,
+    pointerEvents: "none",
+  };
+}
+
 export default function PersistentTwitchPlayer({ twitchLogin }) {
   const pathname = usePathname();
   const twitchChannel = twitchLogin || "kalathraslolweapon";
@@ -217,6 +225,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   useLayoutEffect(() => {
     let frameId = 0;
+    let retryCount = 0;
 
     function updatePlayerPosition() {
       window.cancelAnimationFrame(frameId);
@@ -226,17 +235,31 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
           if (anchor) {
             const rect = anchor.getBoundingClientRect();
-            setPlayerStyle({
-              borderRadius: window.getComputedStyle(anchor.parentElement || anchor).borderRadius,
-              bottom: "auto",
-              height: `${rect.height}px`,
-              left: `${rect.left}px`,
-              right: "auto",
-              top: `${rect.top}px`,
-              width: `${rect.width}px`,
-            });
-            return;
+
+            if (rect.width > 0 && rect.height > 0) {
+              setPlayerStyle({
+                borderRadius: window.getComputedStyle(anchor.parentElement || anchor).borderRadius,
+                bottom: "auto",
+                height: `${rect.height}px`,
+                left: `${rect.left}px`,
+                opacity: 1,
+                pointerEvents: "auto",
+                right: "auto",
+                top: `${rect.top}px`,
+                width: `${rect.width}px`,
+              });
+              return;
+            }
           }
+
+          setPlayerStyle(buildHiddenStyle(miniPlayerWidth));
+
+          if (retryCount < 30) {
+            retryCount += 1;
+            updatePlayerPosition();
+          }
+
+          return;
         }
 
         setPlayerStyle(buildMiniStyle(miniPlayerWidth));
