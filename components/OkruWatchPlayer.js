@@ -67,8 +67,7 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-  const [copyPageLabel, setCopyPageLabel] = useState("Copiar pagina");
-  const [copyPartLabel, setCopyPartLabel] = useState("Copiar parte");
+  const [shareLabel, setShareLabel] = useState("Compartir");
   const [copyCommandLabel, setCopyCommandLabel] = useState("Copiar comando");
   const [copyOkruLabel, setCopyOkruLabel] = useState("Copiar URL OK.RU");
   const activeLink = playableLinks[activeIndex] || null;
@@ -127,8 +126,21 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
     const clampedIndex = clampPartIndex(nextIndex, playableLinks.length);
 
     setActiveIndex(clampedIndex);
-    setIsPlayerLoading(Boolean(playableLinks[clampedIndex]));
   }, [playableLinks, searchParams, storageKey]);
+
+  useEffect(() => {
+    if (!activeLink) {
+      setIsPlayerLoading(false);
+      return undefined;
+    }
+
+    setIsPlayerLoading(true);
+    const fallbackTimeout = window.setTimeout(() => {
+      setIsPlayerLoading(false);
+    }, 8000);
+
+    return () => window.clearTimeout(fallbackTimeout);
+  }, [activeLink]);
 
   function updateActivePart(index) {
     const params = new URLSearchParams(searchParams.toString());
@@ -136,7 +148,6 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
 
     params.set("parte", String(clampedIndex + 1));
     setActiveIndex(clampedIndex);
-    setIsPlayerLoading(Boolean(playableLinks[clampedIndex]));
     try {
       window.localStorage.setItem(storageKey, String(clampedIndex + 1));
     } catch {
@@ -162,14 +173,8 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
     }
   }
 
-  function copyPageUrl() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete("parte");
-    copyText(url.toString(), setCopyPageLabel, "Copiar pagina");
-  }
-
   function copyPartUrl() {
-    copyText(buildPartUrl(), setCopyPartLabel, "Copiar parte");
+    copyText(buildPartUrl(), setShareLabel, "Compartir");
   }
 
   function copyStreamlinkCommand() {
@@ -208,19 +213,6 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
 
       <div className="watch-player-topline">
         <span>{activeLink ? `Reproduciendo ${activePartSummary}` : "Sin parte seleccionada"}</span>
-        <div className="watch-player-actions">
-          {activeLink ? (
-            <a href={activeLink.href} target="_blank" rel="noreferrer" className="watch-tool-button">
-              Abrir OK.RU
-            </a>
-          ) : null}
-          <button type="button" className="watch-tool-button" onClick={copyPageUrl}>
-            {copyPageLabel}
-          </button>
-          <button type="button" className="watch-tool-button" onClick={copyPartUrl}>
-            {copyPartLabel}
-          </button>
-        </div>
       </div>
 
       {activeLink ? (
@@ -253,9 +245,26 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
         <div className="watch-link-group-header">
           <h3>{activeLink ? `OK.RU · ${activePartSummary}` : "OK.RU"}</h3>
           {activeLink ? (
-            <button type="button" className="watch-download-fallback" onClick={() => setIsDownloadModalOpen(true)}>
-              Descargar en caso de fallar
-            </button>
+            <div className="watch-link-actions">
+              <a
+                href={activeLink.href}
+                target="_blank"
+                rel="noreferrer"
+                className="watch-link-action watch-link-action-okru"
+              >
+                Abrir OK.RU
+              </a>
+              <button type="button" className="watch-link-action watch-link-action-share" onClick={copyPartUrl}>
+                {shareLabel}
+              </button>
+              <button
+                type="button"
+                className="watch-link-action watch-link-action-danger"
+                onClick={() => setIsDownloadModalOpen(true)}
+              >
+                Descargar en caso de fallar
+              </button>
+            </div>
           ) : null}
         </div>
         {playableLinks.length ? (

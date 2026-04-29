@@ -262,16 +262,16 @@ En producción, el middleware reescribe la raíz según el dominio:
 `/rastreador`:
 
 - carga el dataset inicial desde servidor
-- aplica filtros por texto, año, estado y tag
+- aplica filtros por texto, año, mes, estado y tag
+- el filtro de mes se habilita solo al seleccionar un año y muestra solo meses con data en ese año
 - puede recibir filtros iniciales por query params
 - usa controles custom para año y estado, evitando los selects nativos en móvil
 - muestra estadisticas generales
 - renderiza cards con información, tags, disponibilidad por plataforma y CTA hacia el detalle
 - resalta coincidencias del texto buscado dentro de titulo, preview y tags
 - conserva el campo `image`, pero por ahora oculta las miniaturas en los cards del rastreador
-- permite copiar el link de la ficha desde la card
 - permite filtrar por año o estado haciendo click en la fecha o estado de una card
-- permite alternar densidad de cards entre `Comodo` y `Compacto`
+- permite alternar entre `Comodo` como cards y `Compacto` como tabla
 - agrupa tags en categorias automaticas como Anime, Juegos, Tiers, Charlas, Peliculas y Otros
 - carga categorias personalizadas y movimientos manuales desde `/api/tags`
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
@@ -285,8 +285,8 @@ En producción, el middleware reescribe la raíz según el dominio:
 - cuando hay varias partes de `OK.RU`, permite cambiar la parte sin abrir una pestaña nueva
 - actualiza la URL con `?parte=N` para compartir una parte concreta
 - recuerda la ultima parte vista por resubido usando `localStorage`
-- permite copiar la pagina completa o la parte activa
-- permite abrir externamente la parte activa de `OK.RU`
+- permite compartir la parte activa y abrir externamente la parte activa de `OK.RU`
+- muestra un estado de carga al cambiar de parte y lo limpia con fallback si el iframe de OK.RU no emite `load`
 - incluye un modal `Descargar` con comando local de Streamlink, enlaces de instalacion y notas de FFmpeg
 - incluye modo teatro para enfocar el player
 - soporta atajos: `Esc` sale de modo teatro, `T` alterna modo teatro, flechas izquierda/derecha cambian parte, `C` copia la parte activa
@@ -329,6 +329,7 @@ La ruta `/rastreador` acepta filtros iniciales en la URL:
 /rastreador?search=World%20Trigger
 /rastreador?q=World%20Trigger
 /rastreador?year=2026
+/rastreador?month=04
 /rastreador?status=Completo
 /rastreador?tag=WorldTrigger
 ```
@@ -336,7 +337,7 @@ La ruta `/rastreador` acepta filtros iniciales en la URL:
 Tambien se pueden combinar:
 
 ```text
-/rastreador?search=anime&year=2026&status=Completo&tag=WorldTrigger
+/rastreador?search=anime&year=2026&month=04&status=Completo&tag=WorldTrigger
 ```
 
 Estos parametros se aplican en cliente al cargar la pagina.

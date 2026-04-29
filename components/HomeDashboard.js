@@ -19,27 +19,11 @@ function formatYoutubeDate(value) {
   }).format(new Date(value));
 }
 
-const LIVE_LINK_PLATFORMS = [
-  { key: "okru", label: "OK.RU" },
-  { key: "telegram", label: "Telegram" },
-  { key: "piero", label: "Piero" },
-  { key: "patreon", label: "Patreon" },
-];
-
-function buildLiveLinks(links) {
-  return LIVE_LINK_PLATFORMS.flatMap((platform) => {
-    const platformLinks = Array.isArray(links?.[platform.key]) ? links[platform.key] : [];
-
-    return platformLinks.map((url, index) => ({
-      key: `${platform.key}-${url}-${index}`,
-      label: platformLinks.length > 1 ? `${platform.label} ${index + 1}` : platform.label,
-      url,
-    }));
-  });
-}
-
 function RecentLiveCard({ live }) {
-  const liveLinks = buildLiveLinks(live.links);
+  const okruCount = Array.isArray(live.links?.okru) ? live.links.okru.length : 0;
+  const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
+  const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
+  const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
 
   return (
     <article className="home-live-card">
@@ -49,21 +33,14 @@ function RecentLiveCard({ live }) {
       </div>
       <h3>{live.title || "Sin titulo"}</h3>
       <div className="home-live-tags">
-        {(live.tags || []).slice(0, 3).map((tag) => (
+        {(live.tags || []).map((tag) => (
           <span key={tag}>{tag}</span>
         ))}
       </div>
-      {liveLinks.length ? (
-        <div className="home-live-links">
-          {liveLinks.map((link) => (
-            <a key={link.key} href={link.url} target="_blank" rel="noreferrer" className="home-live-link">
-              {link.label}
-            </a>
-          ))}
-        </div>
-      ) : (
-        <span className="home-live-link-state">Sin enlaces cargados</span>
-      )}
+      <a href={detailPath} className="platform-btn platform-detail home-live-detail-link">
+        <span>{detailCtaLabel}</span>
+        <span aria-hidden="true">→</span>
+      </a>
     </article>
   );
 }

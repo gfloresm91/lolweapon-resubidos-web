@@ -40,6 +40,22 @@ function getAllStatuses(lives) {
   ).sort((left, right) => left.localeCompare(right));
 }
 
+function getLiveMonth(live) {
+  const [, month = ""] = String(live.date || "").split("/");
+  return month.padStart(2, "0");
+}
+
+function getAvailableMonths(lives, year) {
+  return Array.from(
+    new Set(
+      lives
+        .filter((live) => year === "all" || live.year === year)
+        .map(getLiveMonth)
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => Number(left) - Number(right));
+}
+
 function parseDate(value) {
   const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
   return `${year}-${month}-${day}`;
@@ -95,7 +111,7 @@ export default function HomePage({
   const [animes, setAnimes] = useState(initialAnimes);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
-  const [filters, setFilters] = useState({ search: "", year: "all", status: "all" });
+  const [filters, setFilters] = useState({ search: "", year: "all", month: "all", status: "all" });
   const [selectedTag, setSelectedTag] = useState("");
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
   const [isLoreOpen, setIsLoreOpen] = useState(false);
@@ -134,6 +150,7 @@ export default function HomePage({
       ...live,
       _searchHaystack: buildSearchHaystack(live),
       _sortDate: parseDate(live.date),
+      _month: getLiveMonth(live),
     }));
   }, [lives]);
 
@@ -144,12 +161,13 @@ export default function HomePage({
       .filter((live) => {
         const searchMatch = !normalizedSearch || live._searchHaystack.includes(normalizedSearch);
         const yearMatch = filters.year === "all" || live.year === filters.year;
+        const monthMatch = filters.month === "all" || live._month === filters.month;
         const statusMatch = filters.status === "all" || live.status === filters.status;
         const tagMatch = !selectedTag || (live.tags || []).includes(selectedTag);
-        return searchMatch && yearMatch && statusMatch && tagMatch;
+        return searchMatch && yearMatch && monthMatch && statusMatch && tagMatch;
       })
       .sort((left, right) => right._sortDate.localeCompare(left._sortDate));
-  }, [deferredSearch, filters.status, filters.year, preparedLives, selectedTag]);
+  }, [deferredSearch, filters.month, filters.status, filters.year, preparedLives, selectedTag]);
 
   const visibleLives = useMemo(() => {
     return filteredLives.slice(0, visibleCount);
@@ -157,6 +175,7 @@ export default function HomePage({
   const hasMoreLives = visibleLives.length < filteredLives.length;
 
   const allYears = useMemo(() => getAllYears(lives), [lives]);
+  const availableMonths = useMemo(() => getAvailableMonths(lives, filters.year), [filters.year, lives]);
   const allStatuses = useMemo(() => getAllStatuses(lives), [lives]);
   const allTags = useMemo(() => getAllTags(lives), [lives]);
 
@@ -176,14 +195,16 @@ export default function HomePage({
 
     const querySearch = searchParams.get("search") || searchParams.get("q");
     const queryYear = searchParams.get("year");
+    const queryMonth = searchParams.get("month");
     const queryStatus = searchParams.get("status");
     const queryTag = searchParams.get("tag");
 
-    if (querySearch || queryYear || queryStatus) {
+    if (querySearch || queryYear || queryMonth || queryStatus) {
       setFilters((current) => ({
         ...current,
         search: querySearch ?? current.search,
         year: queryYear || current.year,
+        month: queryMonth || current.month,
         status: queryStatus || current.status,
       }));
     }
@@ -215,6 +236,7 @@ export default function HomePage({
         setFilters({
           search: savedState.filters.search || "",
           year: savedState.filters.year || "all",
+          month: savedState.filters.month || "all",
           status: savedState.filters.status || "all",
         });
       }
@@ -283,7 +305,15 @@ export default function HomePage({
     }
 
     setVisibleCount(INITIAL_VISIBLE_COUNT);
-  }, [deferredSearch, filters.status, filters.year, selectedTag]);
+  }, [deferredSearch, filters.month, filters.status, filters.year, selectedTag]);
+
+  useEffect(() => {
+    if (filters.month === "all" || availableMonths.includes(filters.month)) {
+      return;
+    }
+
+    setFilters((current) => ({ ...current, month: "all" }));
+  }, [availableMonths, filters.month]);
 
   useEffect(() => {
     if (currentView !== "tracker" || !pendingTrackerRestore || !visibleLives.length) {
@@ -507,9 +537,9 @@ export default function HomePage({
 
   function selectView(view) {
     const nextPath = VIEW_PATHS[view] || "/inicio";
-    setCurrentView(view);
     window.history.pushState(null, "", nextPath);
-    window.dispatchEvent(new Event("kala:navigation"));
+    window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
+    setCurrentView(view);
     window.scrollTo({ top: 0, behavior: "instant" });
 
     if (window.matchMedia("(max-width: 900px)").matches) {
@@ -732,6 +762,7 @@ export default function HomePage({
         <FiltersBar
           filters={filters}
           years={allYears}
+          months={availableMonths}
           statuses={allStatuses}
           selectedTag={selectedTag}
           onSearchChange={(search) => {
@@ -774,6 +805,16 @@ export default function HomePage({
                 </div>
               </div>
               <div id="lives-grid" className={`lives-grid lives-grid-${cardDensity}`}>
+                {cardDensity === "compact" ? (
+                  <div className="lives-table-header" role="row" aria-hidden="true">
+                    <span>Fecha</span>
+                    <span>Título</span>
+                    <span>Estado</span>
+                    <span>Tags</span>
+                    <span>Disponibilidad</span>
+                    <span>Acción</span>
+                  </div>
+                ) : null}
                 {visibleLives.map((live) => (
                   <LiveCard
                     key={live.id}
@@ -788,7 +829,7 @@ export default function HomePage({
                     }
                     onFilterYear={(year) =>
                       startTransition(() => {
-                        setFilters((current) => ({ ...current, year: year || "all" }));
+                        setFilters((current) => ({ ...current, year: year || "all", month: "all" }));
                       })
                     }
                     onFilterStatus={(status) =>
@@ -814,7 +855,7 @@ export default function HomePage({
                 type="button"
                 className="empty-state-action"
                 onClick={() => {
-                  setFilters({ search: "", year: "all", status: "all" });
+                  setFilters({ search: "", year: "all", month: "all", status: "all" });
                   setSelectedTag("");
                 }}
               >

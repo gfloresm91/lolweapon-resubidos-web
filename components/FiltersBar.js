@@ -2,7 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 
-function FilterSelect({ id, label, value, options, onChange }) {
+const MONTH_LABELS = {
+  "01": "Enero",
+  "02": "Febrero",
+  "03": "Marzo",
+  "04": "Abril",
+  "05": "Mayo",
+  "06": "Junio",
+  "07": "Julio",
+  "08": "Agosto",
+  "09": "Septiembre",
+  "10": "Octubre",
+  "11": "Noviembre",
+  "12": "Diciembre",
+};
+
+function FilterSelect({ id, label, value, options, onChange, disabled = false, disabledHint = "" }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef(null);
   const selectedOption = options.find((option) => option.value === value) || options[0];
@@ -34,25 +49,35 @@ function FilterSelect({ id, label, value, options, onChange }) {
   }, [isOpen]);
 
   function selectOption(nextValue) {
+    if (disabled) {
+      return;
+    }
+
     onChange(nextValue);
     setIsOpen(false);
   }
 
   return (
-    <div ref={selectRef} className="filter-select" id={id}>
+    <div ref={selectRef} className={`filter-select ${disabled ? "is-disabled" : ""}`} id={id}>
       <button
         type="button"
         className={`filter-select-button ${isOpen ? "is-open" : ""}`}
         aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setIsOpen((current) => !current)}
+        aria-expanded={disabled ? false : isOpen}
+        disabled={disabled}
+        title={disabledHint}
+        onClick={() => {
+          if (!disabled) {
+            setIsOpen((current) => !current);
+          }
+        }}
       >
         <span className="filter-select-label">{label}</span>
         <strong>{selectedOption.label}</strong>
         <span className="filter-select-chevron" aria-hidden="true">⌄</span>
       </button>
 
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div className="filter-select-menu" role="listbox" aria-label={label}>
           {options.map((option) => (
             <button
@@ -76,6 +101,7 @@ function FilterSelect({ id, label, value, options, onChange }) {
 export default function FiltersBar({
   filters,
   years,
+  months,
   statuses,
   selectedTag,
   onSearchChange,
@@ -86,6 +112,10 @@ export default function FiltersBar({
   const yearOptions = [
     { value: "all", label: "Todos los años" },
     ...years.map((year) => ({ value: year, label: year })),
+  ];
+  const monthOptions = [
+    { value: "all", label: "Todos los meses" },
+    ...months.map((month) => ({ value: month, label: MONTH_LABELS[month] || month })),
   ];
   const statusOptions = [
     { value: "all", label: "Todos los estados" },
@@ -109,7 +139,17 @@ export default function FiltersBar({
           label="Año"
           value={filters.year}
           options={yearOptions}
-          onChange={(year) => onFiltersChange({ year })}
+          onChange={(year) => onFiltersChange({ year, month: "all" })}
+        />
+
+        <FilterSelect
+          id="filter-month"
+          label="Mes"
+          value={filters.month}
+          options={monthOptions}
+          disabled={filters.year === "all"}
+          disabledHint="Selecciona un año para filtrar por mes"
+          onChange={(month) => onFiltersChange({ month })}
         />
 
         <FilterSelect

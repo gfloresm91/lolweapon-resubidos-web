@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
@@ -35,7 +35,11 @@ function clampMiniPlayerWidth(value) {
   return Math.min(MINI_PLAYER_MAX_WIDTH, Math.max(MINI_PLAYER_MIN_WIDTH, value));
 }
 
-function getRouteMode(pathname) {
+function getRouteMode(pathname, hostname = "") {
+  if (pathname === "/" && /^(resubidos|viendo)(-|\.|$)/.test(hostname)) {
+    return "mini";
+  }
+
   if (pathname === "/" || pathname === "/inicio") {
     return "full";
   }
@@ -61,17 +65,24 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const pathname = usePathname();
   const twitchChannel = twitchLogin || "kalathraslolweapon";
   const [currentPath, setCurrentPath] = useState("");
+  const [currentHostname, setCurrentHostname] = useState("");
   const [twitchParent, setTwitchParent] = useState("");
   const [currentStream, setCurrentStream] = useState(null);
   const [isMiniDismissed, setIsMiniDismissed] = useState(false);
+  const [isSuppressingTransition, setIsSuppressingTransition] = useState(false);
   const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
   const [playerStyle, setPlayerStyle] = useState(buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH));
   const playerRef = useRef(null);
+  const routeModeRef = useRef("hidden");
   const resizeStateRef = useRef(null);
   const resizeFrameRef = useRef(null);
   const isOnline = Boolean(currentStream);
-  const routeMode = getRouteMode(currentPath);
+  const routeMode = getRouteMode(currentPath, currentHostname);
   const isVisible = routeMode === "full" || (routeMode === "mini" && isOnline && !isMiniDismissed);
+
+  useEffect(() => {
+    routeModeRef.current = routeMode;
+  }, [routeMode]);
 
   useEffect(() => {
     setCurrentPath(pathname || window.location.pathname);
@@ -79,6 +90,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
+    setCurrentHostname(window.location.hostname);
 
     const savedWidth = Number(window.localStorage.getItem(MINI_PLAYER_SIZE_STORAGE_KEY));
 
@@ -98,8 +110,18 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [isOnline]);
 
   useEffect(() => {
-    function notifyPathChange() {
-      setCurrentPath(window.location.pathname);
+    function notifyPathChange(event) {
+      const nextPath = event.detail?.path || window.location.pathname;
+      const nextMode = getRouteMode(nextPath, window.location.hostname);
+
+      if (routeModeRef.current === "full" && nextMode === "mini") {
+        setIsSuppressingTransition(true);
+        setPlayerStyle(buildMiniStyle(miniPlayerWidth));
+        window.requestAnimationFrame(() => setIsSuppressingTransition(false));
+      }
+
+      setCurrentPath(nextPath);
+      setCurrentHostname(window.location.hostname);
     }
 
     window.addEventListener("popstate", notifyPathChange);
@@ -193,7 +215,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let frameId = 0;
 
     function updatePlayerPosition() {
@@ -276,6 +298,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   return (
     <div
       className={`persistent-twitch-player is-${routeMode} ${isVisible ? "" : "is-hidden"}`}
+      data-suppress-transition={isSuppressingTransition ? "true" : "false"}
       style={playerStyle}
       aria-hidden={!isVisible}
     >

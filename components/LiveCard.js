@@ -93,7 +93,6 @@ function LiveCard({
   const router = useRouter();
   const [showInfo, setShowInfo] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [copyLabel, setCopyLabel] = useState("Copiar ficha");
   const allTags = Array.isArray(live.tags) ? live.tags : [];
   const visibleTags = showAllTags ? allTags : allTags.slice(0, 4);
   const hiddenCount = Math.max(allTags.length - visibleTags.length, 0);
@@ -110,34 +109,10 @@ function LiveCard({
     router.push(detailPath);
   }
 
-  function handleKeyDown(event) {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      openDetail();
-    }
-  }
-
-  async function copyDetailLink(event) {
-    event.stopPropagation();
-
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}${detailPath}`);
-      setCopyLabel("Copiado");
-      window.setTimeout(() => setCopyLabel("Copiar ficha"), 1400);
-    } catch {
-      setCopyLabel("No se pudo copiar");
-      window.setTimeout(() => setCopyLabel("Copiar ficha"), 1400);
-    }
-  }
-
   return (
     <article
       className={`live-card visible ${isAdmin ? "is-admin" : ""} ${showThumbnail ? "has-thumb" : ""}`}
-      role="link"
-      tabIndex={0}
       data-live-id={live.id}
-      onClick={openDetail}
-      onKeyDown={handleKeyDown}
     >
       {isAdmin ? (
         <button
@@ -255,12 +230,6 @@ function LiveCard({
             </span>
           ) : null}
           {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
-        </div>
-
-        <div className="quick-actions" aria-label="Acciones rapidas">
-          <button type="button" className="quick-action-btn" onClick={copyDetailLink}>
-            {copyLabel}
-          </button>
         </div>
 
         <div className="links-container">
