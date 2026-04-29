@@ -126,11 +126,11 @@ body::before {
 
 .hamburger-button {
   position: fixed;
-  top: 0.8rem;
+  top: 0.85rem;
   left: 1rem;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(10, 11, 18, 0.88);
   backdrop-filter: blur(16px);
@@ -140,8 +140,10 @@ body::before {
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  z-index: 150;
-  transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+  z-index: 200;
+  transition: all var(--t-fast);
+
+  /*transition: background var(--t-fast), border-color var(--t-fast), transform var(--t-fast);*/
 }
 
 .sidebar-overlay {
@@ -176,7 +178,8 @@ body::before {
 }
 
 .app-shell:not(.is-sidebar-closed) .hamburger-button {
-  left: calc(236px - 3.6rem);
+  left: calc(236px - 2.85rem);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .sidebar-overlay {
@@ -255,13 +258,13 @@ body::before {
 
 .sidebar-brand-text {
   font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.95rem; /* Ligeramente más pequeño */
   font-weight: 900;
-  letter-spacing: 0.01em;
-  min-width: 0;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 120px; /* Evita que choque con el botón */
 }
 
 .sidebar-nav {
@@ -1162,6 +1165,11 @@ body::before {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
+}
+
+.watching-header, .main-header {
+  padding: 3.5rem 0 2.5rem;
+  text-align: center;
 }
 
 .header-badge .dot {
