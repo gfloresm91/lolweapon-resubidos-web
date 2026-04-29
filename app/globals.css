@@ -222,6 +222,8 @@ body::before {
   color: var(--text-main);
   text-decoration: none;
   margin-bottom: 1.4rem;
+  min-width: 0;
+  padding-right: 3rem;
 }
 
 .sidebar-brand-button {
@@ -256,6 +258,10 @@ body::before {
   font-size: 1rem;
   font-weight: 900;
   letter-spacing: 0.04em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-nav {
