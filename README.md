@@ -24,6 +24,7 @@ La aplicacion permite:
 - `React 19`
 - `Route Handlers` para la API
 - `react-hook-form` + `zod` para validaciones del admin
+- `lucide-react` para iconos de navegacion
 - `sonner` para toasts
 - persistencia local en JSON
 
@@ -222,6 +223,8 @@ data/
   tag-settings.local.json
 
 public/
+  brand/
+    lolweapon-logo.png
   imagenes/
 
 middleware.js
@@ -318,6 +321,8 @@ Al entrar al detalle desde una card:
 
 Menu lateral y footer:
 
+- el brand del menu lateral usa `public/brand/lolweapon-logo.png` y el texto `LOLWEAPON`
+- los items principales del menu usan iconos de `lucide-react`
 - las vistas principales muestran un footer persistente con el texto `Por fans para fans 💜 para Kala`
 - el menu lateral incluye accesos externos a YouTube, X, Instagram, Patreon y SpaceDrum mediante `components/SocialLinks.js`
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { Archive, BookOpenText, Eye, House } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import DetailTopbarActions from "@/components/DetailTopbarActions";
@@ -106,26 +107,36 @@ export default async function LiveDetailPage({ params }) {
       <div className="app-shell live-detail-app-shell">
         <aside id="main-sidebar" className="sidebar is-open" aria-label="Menu principal">
           <Link href="/inicio" className="sidebar-brand sidebar-brand-button" aria-label="Ir al inicio">
-            <span className="sidebar-brand-mark">LW</span>
-            <span className="sidebar-brand-text">Resubidos</span>
+            <span className="sidebar-brand-mark">
+              <img src="/brand/lolweapon-logo.png" alt="" />
+            </span>
+            <span className="sidebar-brand-text">LOLWEAPON</span>
           </Link>
 
           <nav className="sidebar-nav">
             <Link href="/inicio" className="sidebar-link">
-              <span className="sidebar-icon">IN</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <House />
+              </span>
               <span>Inicio</span>
             </Link>
             <Link href="/rastreador" className="sidebar-link is-active">
-              <span className="sidebar-icon">RD</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <Archive />
+              </span>
               <span>Rastreador de directos</span>
             </Link>
             <Link href="/viendo" className="sidebar-link">
-              <span className="sidebar-icon">VI</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <Eye />
+              </span>
               <span>Viendo</span>
             </Link>
             {process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true" ? (
               <Link href="/spacedrum" className="sidebar-link">
-                <span className="sidebar-icon">SD</span>
+                <span className="sidebar-icon" aria-hidden="true">
+                  <BookOpenText />
+                </span>
                 <span>SpaceDrum</span>
               </Link>
             ) : null}

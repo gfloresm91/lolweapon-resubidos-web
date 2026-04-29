@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Archive, BookOpenText, Eye, House } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
@@ -349,6 +350,21 @@ export default function HomePage({
   }, []);
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 899px)");
+
+    function syncCardDensity(event) {
+      if (event.matches) {
+        setCardDensity("comfortable");
+      }
+    }
+
+    syncCardDensity(mediaQuery);
+    mediaQuery.addEventListener("change", syncCardDensity);
+
+    return () => mediaQuery.removeEventListener("change", syncCardDensity);
+  }, []);
+
+  useEffect(() => {
     if (!hasMoreLives || !loadMoreRef.current) {
       return undefined;
     }
@@ -615,8 +631,10 @@ export default function HomePage({
             aria-label="Ir al inicio"
             onClick={() => selectView("home")}
           >
-            <span className="sidebar-brand-mark">LW</span>
-            <span className="sidebar-brand-text">Resubidos</span>
+            <span className="sidebar-brand-mark">
+              <img src="/brand/lolweapon-logo.png" alt="" />
+            </span>
+            <span className="sidebar-brand-text">LOLWEAPON</span>
           </button>
 
           <nav className="sidebar-nav">
@@ -625,7 +643,9 @@ export default function HomePage({
               className={`sidebar-link sidebar-link-button ${currentView === "home" ? "is-active" : ""}`}
               onClick={() => selectView("home")}
             >
-              <span className="sidebar-icon">IN</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <House />
+              </span>
               <span>Inicio</span>
             </button>
             <button
@@ -633,7 +653,9 @@ export default function HomePage({
               className={`sidebar-link sidebar-link-button ${currentView === "tracker" ? "is-active" : ""}`}
               onClick={() => selectView("tracker")}
             >
-              <span className="sidebar-icon">RD</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <Archive />
+              </span>
               <span>Rastreador de directos</span>
             </button>
             <button
@@ -641,7 +663,9 @@ export default function HomePage({
               className={`sidebar-link sidebar-link-button ${currentView === "watching" ? "is-active" : ""}`}
               onClick={() => selectView("watching")}
             >
-              <span className="sidebar-icon">VI</span>
+              <span className="sidebar-icon" aria-hidden="true">
+                <Eye />
+              </span>
               <span>Viendo</span>
             </button>
             {isSpaceDrumEnabled ? (
@@ -650,7 +674,9 @@ export default function HomePage({
                 className={`sidebar-link sidebar-link-button ${currentView === "spacedrum" ? "is-active" : ""}`}
                 onClick={() => selectView("spacedrum")}
               >
-                <span className="sidebar-icon">SD</span>
+                <span className="sidebar-icon" aria-hidden="true">
+                  <BookOpenText />
+                </span>
                 <span>SpaceDrum</span>
               </button>
             ) : null}
