@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { Archive, BookOpenText, Eye, House } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
 import SocialLinks from "@/components/SocialLinks";
@@ -105,7 +106,9 @@ export default async function LiveDetailPage({ params }) {
       <div className="bg-orb orb-3" aria-hidden="true" />
 
       <div className="app-shell live-detail-app-shell">
-        <aside id="main-sidebar" className="sidebar is-open" aria-label="Menu principal">
+        <DetailSidebarControls />
+
+        <aside id="main-sidebar" className="sidebar" aria-label="Menu principal">
           <Link href="/inicio" className="sidebar-brand sidebar-brand-button" aria-label="Ir al inicio">
             <span className="sidebar-brand-mark">
               <img src="/brand/lolweapon-logo.png" alt="" />

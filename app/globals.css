@@ -224,7 +224,7 @@ body::before {
   text-decoration: none;
   margin-bottom: 1.4rem;
   min-width: 0;
-  padding-right: 3rem;
+  padding-right: 2.35rem;
 }
 
 .sidebar-brand-button {
@@ -4637,14 +4637,6 @@ body::before {
 
   .persistent-footer {
     left: 0;
-  }
-
-  .live-detail-app-shell .sidebar {
-    display: none;
-  }
-
-  .live-detail-app-shell .topbar {
-    padding-left: 1rem;
   }
 
   .app-shell.is-sidebar-closed .topbar {
