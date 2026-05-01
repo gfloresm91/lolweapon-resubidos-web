@@ -26,6 +26,9 @@ coverage/
 # Local runtime data
 data/data.local.json
 data/animes.local.json
+data/anime-metadata.local.json
+data/tag-settings.local.json
+data/spacedrum.local.json
 
 # Logs
 *.log

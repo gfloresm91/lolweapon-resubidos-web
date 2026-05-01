@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { buildTagGroups, normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
 
 const DEFAULT_CATEGORY_ICON = "🏷️";
+const TAGS_PREVIEW_LIMIT = 16;
 
 function normalizeCategorySlug(label) {
   return String(label || "")
@@ -35,6 +36,7 @@ function buildCustomCategoryKey(label, existingCategories) {
 export default function TagPanel({
   isOpen,
   tags,
+  tagCounts = {},
   selectedTag,
   onClose,
   onSelectTag,
@@ -44,6 +46,7 @@ export default function TagPanel({
   const [overrides, setOverrides] = useState({});
   const [customCategories, setCustomCategories] = useState([]);
   const [collapsed, setCollapsed] = useState({});
+  const [expandedGroups, setExpandedGroups] = useState({});
   const [moveDialog, setMoveDialog] = useState(null);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryDraft, setCategoryDraft] = useState({ label: "", icon: DEFAULT_CATEGORY_ICON });
@@ -87,6 +90,7 @@ export default function TagPanel({
       setMoveDialog(null);
       setCategoryDialogOpen(false);
       setSearch("");
+      setExpandedGroups({});
     }
   }, [isOpen]);
 
@@ -128,6 +132,12 @@ export default function TagPanel({
     const filteredTags = tags.filter((tag) => tag.toLowerCase().includes(search.toLowerCase()));
     return buildTagGroups(filteredTags, overrides, categories);
   }, [categories, overrides, search, tags]);
+  const popularTags = useMemo(() => {
+    return [...tags]
+      .sort((left, right) => (tagCounts[right] || 0) - (tagCounts[left] || 0) || left.localeCompare(right))
+      .slice(0, 10);
+  }, [tagCounts, tags]);
+  const visibleTagCount = groups.reduce((total, group) => total + group.tags.length, 0);
 
   async function persistTagSettings(nextSettings) {
     const nextCategories = nextSettings.categories ?? customCategories;
@@ -232,19 +242,46 @@ export default function TagPanel({
   return (
     <>
       <div id="tag-panel-overlay" className="tag-panel-overlay visible" onClick={onClose} />
-      <aside id="tag-panel" className="tag-panel open">
+      <aside
+        id="tag-panel"
+        className="tag-panel open"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tag-panel-title"
+      >
         <div className="tag-panel-header">
-          <h2 className="tag-panel-title">🏷️ Explorar Tags</h2>
+          <div>
+            <span className="tag-panel-kicker">Filtro avanzado</span>
+            <h2 className="tag-panel-title" id="tag-panel-title">Explorar tags</h2>
+          </div>
           <button type="button" id="btn-close-tag-panel" className="tag-panel-close" onClick={onClose}>
             ✕
           </button>
+        </div>
+        <div className="tag-panel-summary">
+          {selectedTag ? (
+            <div className="tag-panel-selected">
+              <div>
+                <span>Tag activo</span>
+                <strong>{selectedTag}</strong>
+              </div>
+              <button type="button" onClick={() => onSelectTag("")}>
+                Limpiar
+              </button>
+            </div>
+          ) : (
+            <div className="tag-panel-empty-selection">
+              <span>Sin tag activo</span>
+              <strong>{tags.length} tags disponibles</strong>
+            </div>
+          )}
         </div>
         <div className="tag-panel-search-wrapper">
           <input
             type="search"
             id="tag-panel-search"
             className="tag-panel-search"
-            placeholder="🔍 Buscar tag..."
+            placeholder="Buscar tag..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -252,12 +289,38 @@ export default function TagPanel({
         <div id="tag-panel-body" className="tag-panel-body">
           {settingsError ? <p className="tag-settings-error">{settingsError}</p> : null}
 
+          {!search && popularTags.length ? (
+            <section className="tag-popular-section">
+              <div className="tag-popular-heading">
+                <span>Más usados</span>
+                <small>Accesos rápidos</small>
+              </div>
+              <div className="tag-popular-list">
+                {popularTags.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    className={`tag-popular-chip ${selectedTag === tag ? "is-active" : ""}`}
+                    onClick={() => {
+                      onSelectTag(tag);
+                      onClose();
+                    }}
+                  >
+                    <span>{tag}</span>
+                    <strong>{tagCounts[tag] || 0}</strong>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {groups.map((group) => (
             <section
               key={group.key}
               className={`tag-category ${collapsed[group.key] ? "collapsed" : ""}`}
             >
-              <div
+              <button
+                type="button"
                 className="tag-category-header"
                 onClick={() =>
                   setCollapsed((current) => ({
@@ -274,10 +337,10 @@ export default function TagPanel({
                   <span className="tag-category-count">{group.tags.length}</span>
                   <span className="tag-category-chevron">⌄</span>
                 </div>
-              </div>
+              </button>
 
               <div className="tag-category-tags">
-                {group.tags.map((tag) => {
+                {(search || expandedGroups[group.key] ? group.tags : group.tags.slice(0, TAGS_PREVIEW_LIMIT)).map((tag) => {
                   const isActive = selectedTag === tag;
 
                   return (
@@ -294,6 +357,7 @@ export default function TagPanel({
                         }}
                       >
                         {tag}
+                        <span>{tagCounts[tag] || 0}</span>
                       </button>
 
                       {isAdmin ? (
@@ -314,9 +378,33 @@ export default function TagPanel({
                     </div>
                   );
                 })}
+                {!search && group.tags.length > TAGS_PREVIEW_LIMIT ? (
+                  <button
+                    type="button"
+                    className="tag-category-more"
+                    onClick={() =>
+                      setExpandedGroups((current) => ({
+                        ...current,
+                        [group.key]: !current[group.key],
+                      }))
+                    }
+                  >
+                    {expandedGroups[group.key] ? "Ver menos" : `Ver todos (${group.tags.length})`}
+                  </button>
+                ) : null}
               </div>
             </section>
           ))}
+
+          {!visibleTagCount ? (
+            <div className="tag-panel-no-results">
+              <strong>Sin coincidencias</strong>
+              <span>Prueba con otro texto o limpia la búsqueda.</span>
+              <button type="button" onClick={() => setSearch("")}>
+                Limpiar búsqueda
+              </button>
+            </div>
+          ) : null}
 
           {isAdmin ? (
             <div className="tag-admin-actions">

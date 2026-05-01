@@ -160,8 +160,14 @@ export default function FiltersBar({
           onChange={(status) => onFiltersChange({ status })}
         />
 
-        <button type="button" id="btn-tag-panel" className="btn-tag-panel" onClick={onTagPanelOpen}>
-          🏷️ <span>Tags</span>
+        <button
+          type="button"
+          id="btn-tag-panel"
+          className={`btn-tag-panel ${selectedTag ? "is-active" : ""}`}
+          onClick={onTagPanelOpen}
+        >
+          <span className="btn-tag-panel-icon" aria-hidden="true">#</span>
+          <span className="btn-tag-panel-label">{selectedTag ? `Tag: ${selectedTag}` : "Tags"}</span>
         </button>
       </div>
 

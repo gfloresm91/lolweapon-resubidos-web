@@ -1,0 +1,744 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+const STATUS_OPTIONS = [
+  { key: "all", label: "Todos" },
+  { key: "watching", label: "Comprado" },
+  { key: "completed", label: "Terminados" },
+  { key: "purchased", label: "Entera" },
+  { key: "paused", label: "Pausados" },
+  { key: "pending", label: "Pendientes" },
+];
+
+const TRACKING_STATUS_OPTIONS = [
+  { key: "all", label: "Todos" },
+  { key: "purchased", label: "Entera" },
+  { key: "watching", label: "Caps comprados" },
+  { key: "unpaid", label: "Sin comprar" },
+];
+
+const EDIT_STATUS_OPTIONS = STATUS_OPTIONS.filter((option) => option.key !== "all");
+
+const emptyAnime = {
+  key: "",
+  tag: "",
+  title: "",
+  titleEs: "",
+  image: "",
+  description: "",
+  descriptionEs: "",
+  provider: "",
+  providerId: "",
+  providerUrl: "",
+  trackerUrl: "",
+  year: "",
+  episodes: "",
+  currentEpisode: "0",
+  purchased: "0",
+  format: "",
+  status: "",
+  watchStatus: "watching",
+  libraryEnabled: true,
+};
+
+const STATUS_LABELS = {
+  watching: "Comprado",
+  completed: "Terminado",
+  purchased: "Entera",
+  paused: "Pausado",
+  pending: "Pendiente",
+};
+
+const PAGE_CONFIG = {
+  active: {
+    badge: "Biblioteca anime",
+    titlePrefix: "Anime en",
+    titleHighlight: "Seguimiento",
+    subtitle: "Animes con temporada entera, capítulos comprados o pendientes de compra.",
+    empty: "No hay animes en seguimiento con ese filtro.",
+    statusOptions: TRACKING_STATUS_OPTIONS,
+    acceptsStatus: (status) => status === "purchased" || status === "watching",
+  },
+  completed: {
+    badge: "Biblioteca anime",
+    titlePrefix: "Anime",
+    titleHighlight: "Terminado",
+    subtitle: "Animes marcados como terminados y sus resubidos disponibles.",
+    empty: "No hay animes terminados con ese filtro.",
+    statusOptions: [{ key: "all", label: "Todos" }],
+    acceptsStatus: (status) => status === "completed",
+  },
+};
+
+function getStatusLabel(status) {
+  return STATUS_LABELS[status] || "Pendiente";
+}
+
+function getInitials(title) {
+  return String(title || "AN")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+const editableFields = [
+  "tag",
+  "title",
+  "titleEs",
+  "image",
+  "description",
+  "descriptionEs",
+  "provider",
+  "providerId",
+  "providerUrl",
+  "trackerUrl",
+  "year",
+  "episodes",
+  "currentEpisode",
+  "purchased",
+  "format",
+  "status",
+  "watchStatus",
+  "libraryEnabled",
+];
+
+function toEditableAnime(anime) {
+  return {
+    ...emptyAnime,
+    ...(anime || {}),
+    currentEpisode: anime?.currentEpisode || "0",
+    purchased: anime?.purchased || "0",
+    libraryEnabled: anime?.libraryEnabled !== false,
+  };
+}
+
+function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
+  const [form, setForm] = useState(() => toEditableAnime(anime));
+  const [imageFile, setImageFile] = useState(null);
+  const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm(toEditableAnime(anime));
+      setImageFile(null);
+      setIsFetchingMetadata(false);
+    }
+  }, [anime, isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function stepValue(value, step) {
+    if (String(value || "").toUpperCase() === "ENTERA") {
+      return step > 0 ? "ENTERA" : "0";
+    }
+
+    return String(Math.max((parseInt(value, 10) || 0) + step, 0));
+  }
+
+  function submit(event) {
+    event.preventDefault();
+
+    if (!form.title.trim()) {
+      toast.error("El titulo es obligatorio.");
+      return;
+    }
+
+    onSave({ ...form, imageFile });
+  }
+
+  async function fetchAniListMetadata() {
+    const search = [form.title, form.titleEs, form.tag].map((value) => String(value || "").trim()).find(Boolean);
+
+    if (!search) {
+      toast.error("Ingresa un titulo o tag para buscar en AniList.");
+      return;
+    }
+
+    setIsFetchingMetadata(true);
+
+    try {
+      const response = await fetch("/api/anime-library/anilist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ search }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        toast.error("Tu sesion de admin expiro. Vuelve a iniciar sesion.");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo buscar metadata en AniList.");
+      }
+
+      const metadata = data.metadata || {};
+      setForm((current) => ({
+        ...current,
+        title: metadata.title || current.title,
+        image: metadata.image || current.image,
+        description: metadata.description || current.description,
+        provider: metadata.provider || current.provider,
+        providerId: metadata.providerId || current.providerId,
+        providerUrl: metadata.providerUrl || current.providerUrl,
+        year: metadata.year || current.year,
+        episodes: metadata.episodes || current.episodes,
+        format: metadata.format || current.format,
+        status: metadata.status || current.status,
+      }));
+      setImageFile(null);
+      toast.success("Metadata cargada desde AniList. Revisa antes de guardar.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsFetchingMetadata(false);
+    }
+  }
+
+  const isCreating = !anime?.key;
+
+  return (
+    <div className="modal-backdrop">
+      <div className="modal-content anime-library-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="anime-library-modal-header">
+          <div>
+            <h2 className="modal-title">{isCreating ? "Añadir anime" : "Editar anime"}</h2>
+            <p className="modal-subtitle">{form.tag || form.title || "Nueva ficha de seguimiento"}</p>
+          </div>
+          <span className={`anime-library-status status-${form.watchStatus || "pending"}`}>
+            {getStatusLabel(form.watchStatus)}
+          </span>
+        </div>
+
+        <form className="modal-body" onSubmit={submit}>
+          <div className="anime-library-modal-grid">
+            <aside className="anime-library-modal-preview">
+              {form.image ? (
+                <img src={form.image} alt={form.title} />
+              ) : (
+                <div className="poster-placeholder">{getInitials(form.title)}</div>
+              )}
+              <a className="anime-library-provider-link" href={form.providerUrl || "#"} target="_blank" rel="noreferrer">
+                {form.providerUrl ? "Abrir ficha externa" : "Sin ficha externa"}
+              </a>
+              <button
+                type="button"
+                className="anime-library-metadata-button"
+                onClick={fetchAniListMetadata}
+                disabled={isSaving || isFetchingMetadata}
+              >
+                {isFetchingMetadata ? "Buscando..." : "Completar desde AniList"}
+              </button>
+            </aside>
+
+            <div className="anime-library-modal-fields">
+              <h3 className="modal-subtitle">Información principal</h3>
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Título</label>
+                  <input className="modal-input" value={form.title} onChange={(event) => updateField("title", event.target.value)} />
+                </div>
+                <div className="form-group-modal">
+                  <label>Título en español</label>
+                  <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group-modal">
+                <label>Tag del rastreador</label>
+                <input
+                  className="modal-input"
+                  placeholder="Ej: WorldTrigger"
+                  value={form.tag}
+                  onChange={(event) => updateField("tag", event.target.value)}
+                />
+              </div>
+
+              <div className="form-group-modal">
+                <label>Imagen por URL</label>
+                <input className="modal-input" value={form.image} onChange={(event) => updateField("image", event.target.value)} />
+                {form.image ? <p className="current-image-note">{form.image}</p> : null}
+              </div>
+
+              <div className="form-group-modal">
+                <label>Poster / Imagen local</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="modal-input"
+                  onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Estado biblioteca</label>
+                  <select className="modal-input" value={form.watchStatus} onChange={(event) => updateField("watchStatus", event.target.value)}>
+                    {EDIT_STATUS_OPTIONS.map((option) => (
+                      <option key={option.key} value={option.key}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group-modal">
+                  <label>Mostrar en biblioteca</label>
+                  <select
+                    className="modal-input"
+                    value={form.libraryEnabled ? "true" : "false"}
+                    onChange={(event) => updateField("libraryEnabled", event.target.value === "true")}
+                  >
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <hr className="modal-hr" />
+              <h3 className="modal-subtitle">Seguimiento</h3>
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Capítulo actual visto</label>
+                  <div className="anime-stepper">
+                    <button type="button" className="btn-step" onClick={() => updateField("currentEpisode", stepValue(form.currentEpisode, -1))}>
+                      -
+                    </button>
+                    <input
+                      type="text"
+                      className="modal-input anime-number-input"
+                      value={form.currentEpisode}
+                      onChange={(event) => updateField("currentEpisode", event.target.value)}
+                    />
+                    <button type="button" className="btn-step" onClick={() => updateField("currentEpisode", stepValue(form.currentEpisode, 1))}>
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-group-modal">
+                  <label>Capítulos comprados</label>
+                  <div className="anime-stepper">
+                    <button type="button" className="btn-step" onClick={() => updateField("purchased", stepValue(form.purchased, -1))}>
+                      -
+                    </button>
+                    <input
+                      type="text"
+                      className="modal-input anime-number-input"
+                      value={form.purchased}
+                      onChange={(event) => updateField("purchased", event.target.value)}
+                    />
+                    <button type="button" className="btn-step" onClick={() => updateField("purchased", stepValue(form.purchased, 1))}>
+                      +
+                    </button>
+                  </div>
+                  <button type="button" className="btn-entera" onClick={() => updateField("purchased", "ENTERA")}>
+                    ENTERA
+                  </button>
+                </div>
+              </div>
+
+              <hr className="modal-hr" />
+              <h3 className="modal-subtitle">Metadata</h3>
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Año</label>
+                  <input className="modal-input" value={form.year} onChange={(event) => updateField("year", event.target.value)} />
+                </div>
+                <div className="form-group-modal">
+                  <label>Episodios</label>
+                  <input className="modal-input" value={form.episodes} onChange={(event) => updateField("episodes", event.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Formato</label>
+                  <input className="modal-input" value={form.format} onChange={(event) => updateField("format", event.target.value)} />
+                </div>
+                <div className="form-group-modal">
+                  <label>Estado AniList</label>
+                  <input className="modal-input" value={form.status} onChange={(event) => updateField("status", event.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group-modal">
+                <label>Sinopsis español</label>
+                <textarea
+                  className="modal-input textarea-links anime-library-textarea"
+                  value={form.descriptionEs}
+                  onChange={(event) => updateField("descriptionEs", event.target.value)}
+                />
+              </div>
+
+              <div className="form-group-modal">
+                <label>Sinopsis original</label>
+                <textarea
+                  className="modal-input textarea-links anime-library-textarea"
+                  value={form.description}
+                  onChange={(event) => updateField("description", event.target.value)}
+                />
+              </div>
+
+              <hr className="modal-hr" />
+              <h3 className="modal-subtitle">Proveedor</h3>
+              <div className="form-row">
+                <div className="form-group-modal">
+                  <label>Provider</label>
+                  <input className="modal-input" value={form.provider} onChange={(event) => updateField("provider", event.target.value)} />
+                </div>
+                <div className="form-group-modal">
+                  <label>Provider ID</label>
+                  <input className="modal-input" value={form.providerId} onChange={(event) => updateField("providerId", event.target.value)} />
+                </div>
+              </div>
+
+          <div className="form-group-modal">
+            <label>Provider URL</label>
+            <input className="modal-input" value={form.providerUrl} onChange={(event) => updateField("providerUrl", event.target.value)} />
+          </div>
+
+          <div className="form-group-modal">
+            <label>URL resubidos</label>
+            <input className="modal-input" value={form.trackerUrl} onChange={(event) => updateField("trackerUrl", event.target.value)} />
+          </div>
+            </div>
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn-modal btn-modal-secondary" onClick={onClose} disabled={isSaving}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-modal btn-modal-primary" disabled={isSaving}>
+              {isSaving ? "Guardando..." : "Guardar"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function isFullSeason(anime) {
+  return String(anime?.purchased || "").trim().toUpperCase() === "ENTERA" || anime?.watchStatus === "purchased";
+}
+
+function getPurchasedCount(anime) {
+  return parseInt(anime?.purchased, 10) || 0;
+}
+
+function getPurchaseLabel(anime) {
+  if (isFullSeason(anime)) {
+    return "Entera";
+  }
+
+  const purchasedCount = getPurchasedCount(anime);
+  return purchasedCount > 0 ? `${purchasedCount} cap${purchasedCount > 1 ? "s" : ""}` : "Sin comprar";
+}
+
+export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin = false, mode = "active" }) {
+  const [animes, setAnimes] = useState(initialAnimes);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [editingAnime, setEditingAnime] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const pageConfig = PAGE_CONFIG[mode] || PAGE_CONFIG.active;
+
+  useEffect(() => {
+    setAnimes(initialAnimes);
+  }, [initialAnimes]);
+
+  useEffect(() => {
+    setStatusFilter("all");
+  }, [mode]);
+
+  const pageAnimes = useMemo(() => {
+    return animes.filter((anime) => pageConfig.acceptsStatus(anime.watchStatus || "pending"));
+  }, [animes, pageConfig]);
+
+  const stats = useMemo(() => {
+    const counts = pageAnimes.reduce((acc, anime) => {
+      const status = anime.watchStatus || "pending";
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {});
+    const fullSeasons = pageAnimes.filter((anime) => isFullSeason(anime)).length;
+    const purchasedEpisodes = pageAnimes
+      .filter((anime) => !isFullSeason(anime))
+      .reduce((sum, anime) => sum + getPurchasedCount(anime), 0);
+    const partiallyPurchased = pageAnimes
+      .filter((anime) => !isFullSeason(anime) && getPurchasedCount(anime) > 0)
+      .length;
+    const pendingPurchases = pageAnimes
+      .filter((anime) => !isFullSeason(anime) && getPurchasedCount(anime) === 0)
+      .length;
+
+    return {
+      total: pageAnimes.length,
+      watching: counts.watching || 0,
+      completed: counts.completed || 0,
+      purchased: counts.purchased || 0,
+      pending: counts.pending || 0,
+      fullSeasons,
+      partiallyPurchased,
+      purchasedEpisodes,
+      pendingPurchases,
+    };
+  }, [pageAnimes]);
+
+  const statItems = mode === "active"
+    ? [
+        { value: stats.total, label: "Total Animes", color: "purple" },
+        { value: stats.fullSeasons, label: "Temporada Entera", color: "green" },
+        { value: stats.partiallyPurchased, label: "Con Caps Comprados", color: "blue", detail: `${stats.purchasedEpisodes} caps en total` },
+        { value: stats.pendingPurchases, label: "Sin Comprar", color: "orange" },
+      ]
+    : [
+        { value: stats.total, label: "Total", color: "purple" },
+        { value: stats.total, label: "Terminados", color: "green" },
+      ];
+
+  const filteredAnimes = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    return pageAnimes.filter((anime) => {
+      const status = anime.watchStatus || "pending";
+      const statusMatch = statusFilter === "all"
+        || (statusFilter === "purchased" && isFullSeason(anime))
+        || (statusFilter === "watching" && !isFullSeason(anime) && getPurchasedCount(anime) > 0)
+        || (statusFilter === "unpaid" && !isFullSeason(anime) && getPurchasedCount(anime) === 0)
+        || (mode !== "active" && status === statusFilter);
+      const searchMatch = !query || [
+        anime.title,
+        anime.titleEs,
+        anime.tag,
+      ].filter(Boolean).join(" ").toLowerCase().includes(query);
+
+      return statusMatch && searchMatch;
+    });
+  }, [pageAnimes, search, statusFilter]);
+
+  async function uploadImage(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "No se pudo subir la imagen");
+    }
+
+    return data.path;
+  }
+
+  async function saveAnimeMetadata(form) {
+    setIsSaving(true);
+
+    try {
+      const anime = {};
+      let imagePath = form.image || "";
+
+      if (form.imageFile) {
+        imagePath = await uploadImage(form.imageFile);
+      }
+
+      for (const field of editableFields) {
+        anime[field] = form[field];
+      }
+
+      anime.image = imagePath;
+
+      const response = await fetch("/api/anime-library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upsert", key: form.key, anime }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        toast.error("Tu sesion de admin expiro. Vuelve a iniciar sesion.");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo guardar la metadata.");
+      }
+
+      setAnimes(data.animes || []);
+      setEditingAnime(null);
+      toast.success(form.key ? "Metadata guardada correctamente." : "Anime creado correctamente.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <header className="watching-header anime-library-header">
+        <div className="header-badge">
+          <span className="dot" />
+          {pageConfig.badge}
+        </div>
+        <h1 className="title">
+          {pageConfig.titlePrefix} <span className="text-gradient">{pageConfig.titleHighlight}</span>
+        </h1>
+        <p className="subtitle">{pageConfig.subtitle}</p>
+      </header>
+
+      <section className="watching-stats">
+        {statItems.map((item) => (
+          <div className="watching-stat" key={item.label}>
+            <span className={`watching-stat-value ${item.color}`}>{item.value}</span>
+            <span className="watching-stat-label">{item.label}</span>
+            {item.detail ? <span className="watching-stat-detail">{item.detail}</span> : null}
+          </div>
+        ))}
+      </section>
+
+      {isAdmin && mode === "active" ? (
+        <section className="tracker-actions" aria-label="Acciones de biblioteca anime">
+          <div>
+            <span className="tracker-actions-label">Administración</span>
+            <p className="tracker-actions-copy">Gestiona animes en seguimiento antes o después de crear sus tags.</p>
+          </div>
+          <button type="button" className="tracker-action-primary" onClick={() => setEditingAnime({})}>
+            <span className="tracker-action-icon">+</span>
+            Añadir anime
+          </button>
+        </section>
+      ) : null}
+
+      <div className="watching-controls">
+        <input
+          type="search"
+          className="search-input"
+          placeholder="Buscar anime o tag..."
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        {pageConfig.statusOptions.length > 1 ? (
+          <>
+            {pageConfig.statusOptions.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`watching-filter-btn ${statusFilter === option.key ? "active" : ""}`}
+                onClick={() => setStatusFilter(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </>
+        ) : null}
+      </div>
+
+      <main>
+        {filteredAnimes.length ? (
+          <div className="anime-grid anime-library-grid">
+            {filteredAnimes.map((anime) => {
+              const fullSeason = isFullSeason(anime);
+              const purchasedCount = getPurchasedCount(anime);
+              const purchaseLabel = getPurchaseLabel(anime);
+              const synopsis = anime.descriptionEs || anime.description;
+              const compactMeta = [
+                `${anime.resubidosCount} resubido${anime.resubidosCount === 1 ? "" : "s"}`,
+                anime.lastDate ? `Último: ${anime.lastDate}` : null,
+              ].filter(Boolean);
+              const hoverMeta = [
+                anime.year,
+                anime.episodes ? `${anime.episodes} eps` : null,
+                anime.format,
+              ].filter(Boolean).join(" · ");
+
+              return (
+                <article
+                  key={anime.key}
+                  className={`anime-card anime-library-card ${isAdmin ? "is-admin" : ""}`}
+                  onClick={isAdmin ? () => setEditingAnime(anime) : undefined}
+                >
+                  {isAdmin ? <span className="anime-edit-indicator">Editar</span> : null}
+                  <div className="poster-container anime-library-poster">
+                    {anime.image ? (
+                      <img src={anime.image} alt={anime.title} className="poster-img" loading="lazy" />
+                    ) : (
+                      <div className="poster-placeholder">{getInitials(anime.title)}</div>
+                    )}
+                    <div className="poster-overlay" />
+                    {mode === "completed" ? (
+                      <span className={`anime-library-status status-${anime.watchStatus || "pending"}`}>
+                        {getStatusLabel(anime.watchStatus)}
+                      </span>
+                    ) : null}
+                    <div className="title-overlay">
+                      <h2 className="anime-title">{anime.titleEs || anime.title}</h2>
+                    </div>
+                    {synopsis || hoverMeta ? (
+                      <div className="anime-library-hover-info">
+                        {hoverMeta ? <p className="anime-library-hover-meta">{hoverMeta}</p> : null}
+                        {synopsis ? <p className="anime-library-hover-description">{synopsis}</p> : null}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="anime-card-body anime-library-body">
+                    <div className="anime-library-progress-line">
+                      <span>Cap. {anime.currentEpisode || "0"} actual</span>
+                      <span className="anime-library-progress-separator" />
+                      {fullSeason ? (
+                        <span className="badge-entera">Entera</span>
+                      ) : (
+                        <span className={`badge-count ${purchasedCount === 0 ? "zero" : ""}`}>
+                          {purchaseLabel}
+                        </span>
+                      )}
+                    </div>
+                    <div className="anime-library-meta">
+                      <span>{compactMeta.join(" · ")}</span>
+                      <span className="anime-library-tag-pill">{anime.tag}</span>
+                    </div>
+                    <a
+                      href={anime.trackerUrl}
+                      className="anime-tracker-button"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Ver resubidos
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-state-icon">AN</div>
+            <div className="empty-state-text">{pageConfig.empty}</div>
+          </div>
+        )}
+      </main>
+
+      <footer className="site-footer">Metadata editable en data/anime-metadata.json</footer>
+
+      <AnimeLibraryModal
+        anime={editingAnime}
+        isOpen={Boolean(editingAnime)}
+        isSaving={isSaving}
+        onClose={() => setEditingAnime(null)}
+        onSave={saveAnimeMetadata}
+      />
+    </>
+  );
+}

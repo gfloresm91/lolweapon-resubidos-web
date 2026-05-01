@@ -8,6 +8,7 @@ La aplicacion permite:
 - explorar el archivo historico por busqueda, año, estado y tags
 - abrir una pagina de detalle por resubido con player OK.RU, selector de partes y links relacionados
 - seguir la lista de animes en la pagina `Viendo`
+- administrar una `Biblioteca de anime` separada entre animes en seguimiento y terminados
 - publicar una sección de manga `SpaceDrum` con ficha y lector
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - reproducir embeds de `OK.RU` sin salir de la app cuando el link lo permite
@@ -15,6 +16,7 @@ La aplicacion permite:
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
 - administrar categorias globales de tags desde la interfaz admin
+- crear y editar fichas de anime con metadata de AniList bajo demanda
 - guardar los cambios sobre un dataset base o sobre un dataset local opcional
 - subir miniaturas desde la interfaz admin
 
@@ -101,9 +103,12 @@ npm run dev
 npm run build
 npm run start
 npm run lint
+npm run enrich:anime
 ```
 
 Nota: en `Next.js 15`, `next lint` está deprecado. Si el proyecto no tiene una configuración ESLint creada, `npm run lint` puede abrir un asistente interactivo de configuración. Para verificación no interactiva, `npm run build` compila, valida tipos y recolecta las rutas.
+
+`npm run enrich:anime` consulta AniList para completar metadata faltante en `data/anime-metadata.json`. Es una herramienta de mantenimiento masivo; para administración diaria se recomienda usar el botón `Completar desde AniList` dentro del modal de la Biblioteca de anime.
 
 ## Variables de entorno
 
@@ -155,6 +160,9 @@ Notas:
 app/
   api/
     animes/route.js
+    anime-library/
+      route.js
+      anilist/route.js
     lives/route.js
     login/route.js
     logout/route.js
@@ -178,6 +186,10 @@ app/
   rastreador/
     page.js
     [id]/page.js
+  biblioteca-anime/
+    page.js
+    en-seguimiento/page.js
+    terminados/page.js
   spacedrum/page.js
   viendo/page.js
   globals.css
@@ -189,6 +201,7 @@ components/
   FiltersBar.js
   HomeDashboard.js
   HomePage.js
+  AnimeLibraryPage.js
   LiveCard.js
   LoreModal.js
   OkruWatchPlayer.js
@@ -201,6 +214,7 @@ components/
 
 lib/
   animeData.js
+  animeLibrary.js
   animes.js
   auth.js
   data.js
@@ -217,6 +231,8 @@ data/
   data.local.json
   animes.json
   animes.local.json
+  anime-metadata.json
+  anime-metadata.local.json
   spacedrum.json
   spacedrum.local.json
   tag-settings.json
@@ -238,6 +254,8 @@ Rutas internas:
 
 - `/inicio`: hub principal con Twitch, últimos directos y YouTube.
 - `/rastreador`: archivo de directos/resubidos.
+- `/biblioteca-anime/en-seguimiento`: biblioteca de animes en seguimiento, comprados o pendientes de compra.
+- `/biblioteca-anime/terminados`: biblioteca de animes terminados.
 - `/spacedrum`: ficha y lector del manga SpaceDrum.
 - `/viendo`: seguimiento de animes.
 
@@ -310,6 +328,25 @@ Al entrar al detalle desde una card:
 - muestra un boton `Ver resubidos` por anime que abre el rastreador en una pestaña nueva
 - si hay sesion admin, permite crear, editar, borrar y subir poster de animes
 - si hay sesion admin, permite guardar una URL personalizada hacia el rastreador por anime
+
+`/biblioteca-anime/en-seguimiento`:
+
+- reemplaza gradualmente la experiencia de `/viendo`
+- carga fichas desde `data/anime-metadata.json` o `data/anime-metadata.local.json`
+- cruza esas fichas con los tags categorizados como `Anime` en `data/tag-settings.json`
+- muestra indicadores consistentes por cantidad de animes: total, temporada entera, con caps comprados y sin comprar
+- muestra el total de capitulos comprados como detalle secundario del indicador correspondiente
+- permite filtrar por `Entera`, `Caps comprados` y `Sin comprar`
+- muestra cards horizontales con imagen, titulo, capitulo actual, estado de compra y acceso `Ver resubidos`
+- si hay sesion admin, permite crear y editar fichas, subir poster, actualizar capitulo actual, marcar capitulos comprados o `ENTERA`
+- si hay sesion admin, permite completar metadata desde AniList sin guardar automaticamente; el admin revisa y luego guarda
+- evita duplicados al crear manualmente una ficha y luego categorizar su tag como anime, usando tag/titulo normalizados
+
+`/biblioteca-anime/terminados`:
+
+- lista las fichas de anime con estado `Terminado`
+- conserva el badge superior de estado en la card
+- usa la misma metadata y deduplicacion de la biblioteca de anime
 
 `/spacedrum`:
 
@@ -472,6 +509,25 @@ Comportamiento:
 
 La resolución de lectura y escritura vive en `lib/animeData.js`.
 
+La Biblioteca de anime usa:
+
+```text
+data/anime-metadata.json
+data/anime-metadata.local.json
+```
+
+Comportamiento:
+
+- si existe `data/anime-metadata.local.json`, la app lee y escribe ahí
+- si no existe, la app usa `data/anime-metadata.json`
+- `GET /api/anime-library` devuelve la biblioteca armada desde metadata, tags anime y registros del rastreador
+- `POST /api/anime-library` esta protegido y permite crear o actualizar fichas
+- `POST /api/anime-library/anilist` esta protegido y consulta AniList para rellenar campos del formulario
+- la metadata creada manualmente puede existir antes de que exista un tag del rastreador
+- si luego se crea un tag y se categoriza como `Anime`, la biblioteca deduplica por tag/titulo normalizado para evitar cards duplicadas
+
+La resolución de lectura, escritura, cruce con tags y deduplicación vive en `lib/animeLibrary.js`.
+
 La pagina `SpaceDrum` usa:
 
 ```text
@@ -559,6 +615,48 @@ Cada registro de `Viendo` sigue esta forma:
 - `purchased` puede ser un numero o `ENTERA`
 - `image` puede apuntar a una imagen versionada en `public/imagenes`
 - `tracker_url` es opcional; si no existe, el boton `Ver resubidos` usa `/rastreador?search=<nombre-del-anime>`
+
+Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sigue esta forma:
+
+```json
+{
+  "worldtrigger": {
+    "tag": "WorldTrigger",
+    "title": "World Trigger",
+    "titleEs": "",
+    "image": "/imagenes/world-trigger.jpg",
+    "description": "Sinopsis original.",
+    "descriptionEs": "",
+    "provider": "anilist",
+    "providerId": 20729,
+    "providerUrl": "https://anilist.co/anime/20729",
+    "trackerUrl": "/rastreador?tag=WorldTrigger",
+    "year": 2014,
+    "episodes": 73,
+    "currentEpisode": "71",
+    "purchased": "0",
+    "format": "TV",
+    "status": "FINISHED",
+    "watchStatus": "watching",
+    "libraryEnabled": true
+  }
+}
+```
+
+### Reglas practicas para la Biblioteca de anime
+
+- `tag` conecta la ficha con los tags del rastreador
+- si `trackerUrl` está vacio, se usa `/rastreador?tag=<tag>`
+- `currentEpisode` indica el capitulo actual visto
+- `purchased` puede ser `0`, un numero de capitulos comprados o `ENTERA`
+- `watchStatus` controla en que pagina aparece:
+  - `watching`: En seguimiento
+  - `purchased`: En seguimiento; se considera temporada entera
+  - `completed`: Terminados
+  - `paused` o `pending`: estados disponibles para administración futura
+- `libraryEnabled=false` oculta la ficha de la biblioteca
+- las fichas creadas desde la web se guardan por `POST /api/anime-library`
+- el boton `Completar desde AniList` solo rellena el formulario; no guarda cambios hasta presionar `Guardar`
 
 El archivo `data/spacedrum.json` sigue esta forma:
 
@@ -653,6 +751,52 @@ Respuesta exitosa:
 ### `GET /api/animes`
 
 - devuelve el dataset normalizado de la pagina `Viendo`
+
+### `GET /api/anime-library`
+
+- devuelve la Biblioteca de anime armada desde `data/anime-metadata.json`, tags categorizados como anime y registros del rastreador
+- incluye fichas sin resubidos si están habilitadas en metadata
+- deduplica entradas manuales y entradas provenientes de tags por tag/titulo normalizado
+
+### `POST /api/anime-library`
+
+Endpoint protegido.
+
+Acciones soportadas:
+
+- `upsert`
+- `update`
+
+Ejemplo:
+
+```json
+{
+  "action": "upsert",
+  "key": "worldtrigger",
+  "anime": {
+    "tag": "WorldTrigger",
+    "title": "World Trigger",
+    "currentEpisode": "71",
+    "purchased": "0",
+    "watchStatus": "watching",
+    "libraryEnabled": true
+  }
+}
+```
+
+### `POST /api/anime-library/anilist`
+
+Endpoint protegido.
+
+- consulta AniList por titulo o tag
+- devuelve metadata para rellenar el formulario de la Biblioteca de anime
+- no escribe archivos por si solo
+
+Ejemplo:
+
+```json
+{ "search": "World Trigger" }
+```
 
 ### `GET /api/tags`
 

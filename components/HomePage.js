@@ -1,11 +1,12 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Archive, BookOpenText, Eye, House } from "lucide-react";
+import { Archive, CheckCircle2, CircleDot, Eye, House } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
 import AdminModal from "@/components/AdminModal";
+import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
@@ -72,10 +73,13 @@ function buildId() {
 
 const INITIAL_VISIBLE_COUNT = 80;
 const LOAD_MORE_COUNT = 80;
+const EMPTY_LIST = [];
 const VIEW_LABELS = {
   home: "Inicio",
   tracker: "Rastreador de directos",
   watching: "Viendo",
+  animeLibraryTracking: "Biblioteca de anime",
+  animeLibraryCompleted: "Anime terminados",
   spacedrum: "SpaceDrum",
 };
 
@@ -83,6 +87,8 @@ const VIEW_PATHS = {
   home: "/inicio",
   tracker: "/rastreador",
   watching: "/viendo",
+  animeLibraryTracking: "/biblioteca-anime/en-seguimiento",
+  animeLibraryCompleted: "/biblioteca-anime/terminados",
   spacedrum: "/spacedrum",
 };
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
@@ -93,10 +99,11 @@ function getViewFromPath(pathname) {
 
 export default function HomePage({
   activeView = "home",
-  initialLives = [],
-  initialAnimes = [],
+  initialLives = EMPTY_LIST,
+  initialAnimes = EMPTY_LIST,
+  initialAnimeLibrary = EMPTY_LIST,
   initialSpaceDrum = null,
-  initialYoutubeVideos = [],
+  initialYoutubeVideos = EMPTY_LIST,
   initialTwitchStream = null,
   initialTwitchProfile = null,
   initialTwitchChannelInfo = null,
@@ -110,6 +117,7 @@ export default function HomePage({
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [animes, setAnimes] = useState(initialAnimes);
+  const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [filters, setFilters] = useState({ search: "", year: "all", month: "all", status: "all" });
@@ -132,6 +140,10 @@ export default function HomePage({
   useEffect(() => {
     setLives(initialLives);
   }, [initialLives]);
+
+  useEffect(() => {
+    setAnimeLibrary(initialAnimeLibrary);
+  }, [initialAnimeLibrary]);
 
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
@@ -179,6 +191,14 @@ export default function HomePage({
   const availableMonths = useMemo(() => getAvailableMonths(lives, filters.year), [filters.year, lives]);
   const allStatuses = useMemo(() => getAllStatuses(lives), [lives]);
   const allTags = useMemo(() => getAllTags(lives), [lives]);
+  const tagCounts = useMemo(() => {
+    return lives.reduce((counts, live) => {
+      (Array.isArray(live.tags) ? live.tags : []).forEach((tag) => {
+        counts[tag] = (counts[tag] || 0) + 1;
+      });
+      return counts;
+    }, {});
+  }, [lives]);
 
   useEffect(() => {
     function handlePopState() {
@@ -298,6 +318,29 @@ export default function HomePage({
       isMounted = false;
     };
   }, [currentView, lives.length]);
+
+  useEffect(() => {
+    if (!["animeLibraryTracking", "animeLibraryCompleted"].includes(currentView) || animeLibrary.length) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadAnimeLibrary() {
+      const response = await fetch("/api/anime-library", { cache: "no-store" });
+      const data = await response.json();
+
+      if (isMounted && response.ok) {
+        setAnimeLibrary(data.animes || []);
+      }
+    }
+
+    loadAnimeLibrary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [animeLibrary.length, currentView]);
 
   useEffect(() => {
     if (skipVisibleResetRef.current) {
@@ -668,6 +711,31 @@ export default function HomePage({
               </span>
               <span>Viendo</span>
             </button>
+            <div className="sidebar-section">
+              <span className="sidebar-section-label">Biblioteca de anime</span>
+              <div className="sidebar-section-links" aria-label="Biblioteca de anime">
+                <button
+                  type="button"
+                  className={`sidebar-link sidebar-link-button sidebar-section-link ${currentView === "animeLibraryTracking" ? "is-active" : ""}`}
+                  onClick={() => selectView("animeLibraryTracking")}
+                >
+                  <span className="sidebar-icon" aria-hidden="true">
+                    <CircleDot />
+                  </span>
+                  <span>En seguimiento</span>
+                </button>
+                <button
+                  type="button"
+                  className={`sidebar-link sidebar-link-button sidebar-section-link ${currentView === "animeLibraryCompleted" ? "is-active" : ""}`}
+                  onClick={() => selectView("animeLibraryCompleted")}
+                >
+                  <span className="sidebar-icon" aria-hidden="true">
+                    <CheckCircle2 />
+                  </span>
+                  <span>Terminados</span>
+                </button>
+              </div>
+            </div>
             {isSpaceDrumEnabled ? (
               <button
                 type="button"
@@ -899,6 +967,14 @@ export default function HomePage({
               <WatchingPage initialAnimes={animes} isAdmin={isAdmin} />
             ) : null}
 
+            {currentView === "animeLibraryTracking" ? (
+              <AnimeLibraryPage animes={animeLibrary} isAdmin={isAdmin} mode="active" />
+            ) : null}
+
+            {currentView === "animeLibraryCompleted" ? (
+              <AnimeLibraryPage animes={animeLibrary} isAdmin={isAdmin} mode="completed" />
+            ) : null}
+
             {isSpaceDrumEnabled && currentView === "spacedrum" ? (
               <SpaceDrumPage data={initialSpaceDrum} />
             ) : null}
@@ -935,6 +1011,7 @@ export default function HomePage({
       <TagPanel
         isOpen={isTagPanelOpen}
         tags={allTags}
+        tagCounts={tagCounts}
         selectedTag={selectedTag}
         onClose={() => setIsTagPanelOpen(false)}
         onSelectTag={setSelectedTag}
