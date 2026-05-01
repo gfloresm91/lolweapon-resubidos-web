@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Archive, CheckCircle2, CircleDot, Eye, House } from "lucide-react";
+import { Archive, BookOpenText, CheckCircle2, CircleDot, Eye, House } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
