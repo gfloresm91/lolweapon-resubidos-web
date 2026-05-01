@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
-import { buildAnimeLibrary, updateAnimeMetadataEntry } from "@/lib/animeLibrary";
+import { ensureAuthorized, SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
+import { buildAnimeLibrary, hideAnimeMetadataEntry, updateAnimeMetadataEntry } from "@/lib/animeLibrary";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const animes = await buildAnimeLibrary();
+export async function GET(request) {
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const includeHidden = validateSessionToken(token);
+  const animes = await buildAnimeLibrary({ includeHidden });
   return NextResponse.json({ animes });
 }
 
@@ -21,7 +23,13 @@ export async function POST(request) {
 
   if ((payload?.action === "update" || payload?.action === "upsert") && payload.anime) {
     await updateAnimeMetadataEntry(payload.key, payload.anime);
-    const animes = await buildAnimeLibrary();
+    const animes = await buildAnimeLibrary({ includeHidden: true });
+    return NextResponse.json({ success: true, animes });
+  }
+
+  if (payload?.action === "delete" && payload.key) {
+    await hideAnimeMetadataEntry(payload.key);
+    const animes = await buildAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }
 

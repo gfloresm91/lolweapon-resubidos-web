@@ -10,7 +10,7 @@ export default async function AnimeLibraryTrackingPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const isAdmin = validateSessionToken(token);
-  const animeLibrary = await buildAnimeLibrary();
+  const animeLibrary = await buildAnimeLibrary({ includeHidden: isAdmin });
 
   return (
     <HomePage

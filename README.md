@@ -337,7 +337,8 @@ Al entrar al detalle desde una card:
 - muestra indicadores consistentes por cantidad de animes: total, temporada entera, con caps comprados y sin comprar
 - muestra el total de capitulos comprados como detalle secundario del indicador correspondiente
 - permite filtrar por `Entera`, `Caps comprados` y `Sin comprar`
-- muestra cards horizontales con imagen, titulo, capitulo actual, estado de compra y acceso `Ver resubidos`
+- muestra cards horizontales con imagen, titulo, progreso visto, estado de compra y acceso `Ver resubidos`
+- calcula la barra de progreso con `currentEpisode / episodes`; si `episodes` está vacio, solo muestra el capitulo actual
 - si hay sesion admin, permite crear y editar fichas, subir poster, actualizar capitulo actual, marcar capitulos comprados o `ENTERA`
 - si hay sesion admin, permite completar metadata desde AniList sin guardar automaticamente; el admin revisa y luego guarda
 - evita duplicados al crear manualmente una ficha y luego categorizar su tag como anime, usando tag/titulo normalizados
@@ -648,6 +649,7 @@ Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sig
 - `tag` conecta la ficha con los tags del rastreador
 - si `trackerUrl` está vacio, se usa `/rastreador?tag=<tag>`
 - `currentEpisode` indica el capitulo actual visto
+- `episodes` indica el total de episodios y se usa junto a `currentEpisode` para la barra de progreso
 - `purchased` puede ser `0`, un numero de capitulos comprados o `ENTERA`
 - `watchStatus` controla en que pagina aparece:
   - `watching`: En seguimiento

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import ConfirmModal from "@/components/ConfirmModal";
+
 const STATUS_OPTIONS = [
   { key: "all", label: "Todos" },
   { key: "watching", label: "Comprado" },
@@ -117,7 +119,7 @@ function toEditableAnime(anime) {
   };
 }
 
-function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
+function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(() => toEditableAnime(anime));
   const [imageFile, setImageFile] = useState(null);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
@@ -155,6 +157,36 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
     }
 
     onSave({ ...form, imageFile });
+  }
+
+  function restoreAnime() {
+    onSave({ ...form, imageFile, libraryEnabled: true });
+  }
+
+  function updateMobileStatus(status) {
+    if (status === "purchased") {
+      setForm((current) => ({
+        ...current,
+        watchStatus: "purchased",
+        purchased: "ENTERA",
+      }));
+      return;
+    }
+
+    if (status === "watching") {
+      setForm((current) => ({
+        ...current,
+        watchStatus: "watching",
+        purchased: String(current.purchased || "").toUpperCase() === "ENTERA" ? "0" : current.purchased,
+      }));
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      watchStatus: status,
+      purchased: String(current.purchased || "").toUpperCase() === "ENTERA" ? "0" : current.purchased,
+    }));
   }
 
   async function fetchAniListMetadata() {
@@ -208,6 +240,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
   }
 
   const isCreating = !anime?.key;
+  const isMobilePurchased = form.watchStatus === "purchased" || String(form.purchased || "").toUpperCase() === "ENTERA";
 
   return (
     <div className="modal-backdrop">
@@ -217,8 +250,8 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
             <h2 className="modal-title">{isCreating ? "Añadir anime" : "Editar anime"}</h2>
             <p className="modal-subtitle">{form.tag || form.title || "Nueva ficha de seguimiento"}</p>
           </div>
-          <span className={`anime-library-status status-${form.watchStatus || "pending"}`}>
-            {getStatusLabel(form.watchStatus)}
+          <span className={`anime-library-status status-${form.libraryEnabled === false ? "hidden" : form.watchStatus || "pending"}`}>
+            {form.libraryEnabled === false ? "Oculto" : getStatusLabel(form.watchStatus)}
           </span>
         </div>
 
@@ -230,12 +263,12 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
               ) : (
                 <div className="poster-placeholder">{getInitials(form.title)}</div>
               )}
-              <a className="anime-library-provider-link" href={form.providerUrl || "#"} target="_blank" rel="noreferrer">
+              <a className="anime-library-provider-link anime-library-mobile-hidden" href={form.providerUrl || "#"} target="_blank" rel="noreferrer">
                 {form.providerUrl ? "Abrir ficha externa" : "Sin ficha externa"}
               </a>
               <button
                 type="button"
-                className="anime-library-metadata-button"
+                className="anime-library-metadata-button anime-library-mobile-hidden"
                 onClick={fetchAniListMetadata}
                 disabled={isSaving || isFetchingMetadata}
               >
@@ -244,19 +277,28 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
             </aside>
 
             <div className="anime-library-modal-fields">
-              <h3 className="modal-subtitle">Información principal</h3>
+              <h3 className="modal-subtitle anime-library-mobile-hidden">Información principal</h3>
               <div className="form-row">
                 <div className="form-group-modal">
                   <label>Título</label>
                   <input className="modal-input" value={form.title} onChange={(event) => updateField("title", event.target.value)} />
                 </div>
-                <div className="form-group-modal">
+                <div className="form-group-modal anime-library-mobile-hidden">
                   <label>Título en español</label>
                   <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
                 </div>
               </div>
 
-              <div className="form-group-modal">
+              <button
+                type="button"
+                className="anime-library-metadata-button anime-library-mobile-only"
+                onClick={fetchAniListMetadata}
+                disabled={isSaving || isFetchingMetadata}
+              >
+                {isFetchingMetadata ? "Buscando..." : "Completar desde AniList"}
+              </button>
+
+              <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Tag del rastreador</label>
                 <input
                   className="modal-input"
@@ -266,7 +308,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 />
               </div>
 
-              <div className="form-group-modal">
+              <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Imagen por URL</label>
                 <input className="modal-input" value={form.image} onChange={(event) => updateField("image", event.target.value)} />
                 {form.image ? <p className="current-image-note">{form.image}</p> : null}
@@ -282,7 +324,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 />
               </div>
 
-              <div className="form-row">
+              <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Estado biblioteca</label>
                   <select className="modal-input" value={form.watchStatus} onChange={(event) => updateField("watchStatus", event.target.value)}>
@@ -305,7 +347,8 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
               </div>
 
               <hr className="modal-hr" />
-              <h3 className="modal-subtitle">Seguimiento</h3>
+              <h3 className="modal-subtitle anime-library-mobile-hidden">Seguimiento</h3>
+              <h3 className="modal-subtitle anime-library-mobile-only anime-library-mobile-section-title">Capítulo Actual</h3>
               <div className="form-row">
                 <div className="form-group-modal">
                   <label>Capítulo actual visto</label>
@@ -341,15 +384,40 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                       +
                     </button>
                   </div>
-                  <button type="button" className="btn-entera" onClick={() => updateField("purchased", "ENTERA")}>
-                    ENTERA
-                  </button>
                 </div>
               </div>
 
-              <hr className="modal-hr" />
-              <h3 className="modal-subtitle">Metadata</h3>
-              <div className="form-row">
+              <div className="anime-library-mobile-status">
+                <h3 className="modal-subtitle">Estado</h3>
+                <button
+                  type="button"
+                  className="anime-library-switch-row"
+                  onClick={() => updateMobileStatus("watching")}
+                >
+                  <span>Comprado</span>
+                  <span className={`anime-library-switch ${form.watchStatus === "watching" && !isMobilePurchased ? "is-on" : ""}`} />
+                </button>
+                <button
+                  type="button"
+                  className="anime-library-switch-row"
+                  onClick={() => updateMobileStatus("completed")}
+                >
+                  <span>Terminados</span>
+                  <span className={`anime-library-switch ${form.watchStatus === "completed" ? "is-on" : ""}`} />
+                </button>
+                <button
+                  type="button"
+                  className="anime-library-switch-row"
+                  onClick={() => updateMobileStatus("purchased")}
+                >
+                  <span>Entera</span>
+                  <span className={`anime-library-switch ${isMobilePurchased ? "is-on" : ""}`} />
+                </button>
+              </div>
+
+              <hr className="modal-hr anime-library-mobile-hidden" />
+              <h3 className="modal-subtitle anime-library-mobile-hidden">Metadata</h3>
+              <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Año</label>
                   <input className="modal-input" value={form.year} onChange={(event) => updateField("year", event.target.value)} />
@@ -360,7 +428,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 </div>
               </div>
 
-              <div className="form-row">
+              <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Formato</label>
                   <input className="modal-input" value={form.format} onChange={(event) => updateField("format", event.target.value)} />
@@ -371,7 +439,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 </div>
               </div>
 
-              <div className="form-group-modal">
+              <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Sinopsis español</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
@@ -380,7 +448,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 />
               </div>
 
-              <div className="form-group-modal">
+              <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Sinopsis original</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
@@ -389,9 +457,9 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 />
               </div>
 
-              <hr className="modal-hr" />
-              <h3 className="modal-subtitle">Proveedor</h3>
-              <div className="form-row">
+              <hr className="modal-hr anime-library-mobile-hidden" />
+              <h3 className="modal-subtitle anime-library-mobile-hidden">Proveedor</h3>
+              <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Provider</label>
                   <input className="modal-input" value={form.provider} onChange={(event) => updateField("provider", event.target.value)} />
@@ -402,12 +470,12 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
                 </div>
               </div>
 
-          <div className="form-group-modal">
+          <div className="form-group-modal anime-library-mobile-hidden">
             <label>Provider URL</label>
             <input className="modal-input" value={form.providerUrl} onChange={(event) => updateField("providerUrl", event.target.value)} />
           </div>
 
-          <div className="form-group-modal">
+          <div className="form-group-modal anime-library-mobile-hidden">
             <label>URL resubidos</label>
             <input className="modal-input" value={form.trackerUrl} onChange={(event) => updateField("trackerUrl", event.target.value)} />
           </div>
@@ -415,6 +483,16 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave }) {
           </div>
 
           <div className="modal-actions">
+            {!isCreating && form.libraryEnabled !== false ? (
+              <button type="button" className="btn-modal btn-modal-danger" onClick={() => onDelete(anime.key)} disabled={isSaving}>
+                Eliminar de biblioteca
+              </button>
+            ) : null}
+            {!isCreating && form.libraryEnabled === false ? (
+              <button type="button" className="btn-modal btn-modal-primary" onClick={restoreAnime} disabled={isSaving}>
+                Restaurar
+              </button>
+            ) : null}
             <button type="button" className="btn-modal btn-modal-secondary" onClick={onClose} disabled={isSaving}>
               Cancelar
             </button>
@@ -445,12 +523,28 @@ function getPurchaseLabel(anime) {
   return purchasedCount > 0 ? `${purchasedCount} cap${purchasedCount > 1 ? "s" : ""}` : "Sin comprar";
 }
 
+function getEpisodeProgress(anime) {
+  const current = Math.max(parseInt(anime?.currentEpisode, 10) || 0, 0);
+  const total = Math.max(parseInt(anime?.episodes, 10) || 0, 0);
+
+  if (!total) {
+    return { current, total, percent: 0 };
+  }
+
+  return {
+    current,
+    total,
+    percent: Math.min(Math.round((current / total) * 100), 100),
+  };
+}
+
 export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin = false, mode = "active" }) {
   const [animes, setAnimes] = useState(initialAnimes);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
   const pageConfig = PAGE_CONFIG[mode] || PAGE_CONFIG.active;
 
   useEffect(() => {
@@ -462,28 +556,35 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
   }, [mode]);
 
   const pageAnimes = useMemo(() => {
-    return animes.filter((anime) => pageConfig.acceptsStatus(anime.watchStatus || "pending"));
-  }, [animes, pageConfig]);
+    return animes.filter((anime) => {
+      if (anime.libraryEnabled === false) {
+        return isAdmin && mode === "active";
+      }
+
+      return pageConfig.acceptsStatus(anime.watchStatus || "pending");
+    });
+  }, [animes, isAdmin, mode, pageConfig]);
 
   const stats = useMemo(() => {
-    const counts = pageAnimes.reduce((acc, anime) => {
+    const visiblePageAnimes = pageAnimes.filter((anime) => anime.libraryEnabled !== false);
+    const counts = visiblePageAnimes.reduce((acc, anime) => {
       const status = anime.watchStatus || "pending";
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {});
-    const fullSeasons = pageAnimes.filter((anime) => isFullSeason(anime)).length;
-    const purchasedEpisodes = pageAnimes
+    const fullSeasons = visiblePageAnimes.filter((anime) => isFullSeason(anime)).length;
+    const purchasedEpisodes = visiblePageAnimes
       .filter((anime) => !isFullSeason(anime))
       .reduce((sum, anime) => sum + getPurchasedCount(anime), 0);
-    const partiallyPurchased = pageAnimes
+    const partiallyPurchased = visiblePageAnimes
       .filter((anime) => !isFullSeason(anime) && getPurchasedCount(anime) > 0)
       .length;
-    const pendingPurchases = pageAnimes
+    const pendingPurchases = visiblePageAnimes
       .filter((anime) => !isFullSeason(anime) && getPurchasedCount(anime) === 0)
       .length;
 
     return {
-      total: pageAnimes.length,
+      total: visiblePageAnimes.length,
       watching: counts.watching || 0,
       completed: counts.completed || 0,
       purchased: counts.purchased || 0,
@@ -492,6 +593,7 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
       partiallyPurchased,
       purchasedEpisodes,
       pendingPurchases,
+      hidden: pageAnimes.filter((anime) => anime.libraryEnabled === false).length,
     };
   }, [pageAnimes]);
 
@@ -511,6 +613,18 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
     const query = search.trim().toLowerCase();
 
     return pageAnimes.filter((anime) => {
+      if (statusFilter === "hidden") {
+        return anime.libraryEnabled === false && (!query || [
+          anime.title,
+          anime.titleEs,
+          anime.tag,
+        ].filter(Boolean).join(" ").toLowerCase().includes(query));
+      }
+
+      if (anime.libraryEnabled === false) {
+        return false;
+      }
+
       const status = anime.watchStatus || "pending";
       const statusMatch = statusFilter === "all"
         || (statusFilter === "purchased" && isFullSeason(anime))
@@ -525,7 +639,7 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
 
       return statusMatch && searchMatch;
     });
-  }, [pageAnimes, search, statusFilter]);
+  }, [mode, pageAnimes, search, statusFilter]);
 
   async function uploadImage(file) {
     const formData = new FormData();
@@ -587,6 +701,37 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
     }
   }
 
+  async function hideAnimeMetadata(key) {
+    setIsSaving(true);
+
+    try {
+      const response = await fetch("/api/anime-library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", key }),
+      });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        toast.error("Tu sesion de admin expiro. Vuelve a iniciar sesion.");
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo ocultar el anime.");
+      }
+
+      setAnimes(data.animes || []);
+      setEditingAnime(null);
+      setPendingDeleteKey(null);
+      toast.success("Anime ocultado de la biblioteca.");
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <>
       <header className="watching-header anime-library-header">
@@ -633,7 +778,10 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
         />
         {pageConfig.statusOptions.length > 1 ? (
           <>
-            {pageConfig.statusOptions.map((option) => (
+            {[
+              ...pageConfig.statusOptions,
+              ...(isAdmin && mode === "active" ? [{ key: "hidden", label: `Ocultos (${stats.hidden})` }] : []),
+            ].map((option) => (
               <button
                 key={option.key}
                 type="button"
@@ -655,10 +803,7 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
               const purchasedCount = getPurchasedCount(anime);
               const purchaseLabel = getPurchaseLabel(anime);
               const synopsis = anime.descriptionEs || anime.description;
-              const compactMeta = [
-                `${anime.resubidosCount} resubido${anime.resubidosCount === 1 ? "" : "s"}`,
-                anime.lastDate ? `Último: ${anime.lastDate}` : null,
-              ].filter(Boolean);
+              const episodeProgress = getEpisodeProgress(anime);
               const hoverMeta = [
                 anime.year,
                 anime.episodes ? `${anime.episodes} eps` : null,
@@ -679,14 +824,23 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                       <div className="poster-placeholder">{getInitials(anime.title)}</div>
                     )}
                     <div className="poster-overlay" />
-                    {mode === "completed" ? (
-                      <span className={`anime-library-status status-${anime.watchStatus || "pending"}`}>
-                        {getStatusLabel(anime.watchStatus)}
+                    {mode === "completed" || anime.libraryEnabled === false ? (
+                      <span className={`anime-library-status status-${anime.libraryEnabled === false ? "hidden" : anime.watchStatus || "pending"}`}>
+                        {anime.libraryEnabled === false ? "Oculto" : getStatusLabel(anime.watchStatus)}
                       </span>
                     ) : null}
                     <div className="title-overlay">
                       <h2 className="anime-title">{anime.titleEs || anime.title}</h2>
                     </div>
+                    {episodeProgress.total ? (
+                      <div
+                        className="anime-library-watch-progress"
+                        aria-label={`Progreso visto ${episodeProgress.current} de ${episodeProgress.total} episodios`}
+                        title={`${episodeProgress.current}/${episodeProgress.total} episodios vistos`}
+                      >
+                        <span style={{ width: `${episodeProgress.percent}%` }} />
+                      </div>
+                    ) : null}
                     {synopsis || hoverMeta ? (
                       <div className="anime-library-hover-info">
                         {hoverMeta ? <p className="anime-library-hover-meta">{hoverMeta}</p> : null}
@@ -696,7 +850,10 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                   </div>
                   <div className="anime-card-body anime-library-body">
                     <div className="anime-library-progress-line">
-                      <span>Cap. {anime.currentEpisode || "0"} actual</span>
+                      <span>
+                        Cap. {episodeProgress.current}
+                        {episodeProgress.total ? ` de ${episodeProgress.total}` : " actual"}
+                      </span>
                       <span className="anime-library-progress-separator" />
                       {fullSeason ? (
                         <span className="badge-entera">Entera</span>
@@ -706,12 +863,15 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                         </span>
                       )}
                     </div>
-                    <div className="anime-library-meta">
-                      <span>{compactMeta.join(" · ")}</span>
-                      <span className="anime-library-tag-pill">{anime.tag}</span>
-                    </div>
+                    {anime.tag ? (
+                      <div className="anime-library-meta">
+                        <span className="anime-library-tag-pill">{anime.tag}</span>
+                      </div>
+                    ) : null}
                     <a
                       href={anime.trackerUrl}
+                      target="_blank"
+                      rel="noreferrer"
                       className="anime-tracker-button"
                       onClick={(event) => event.stopPropagation()}
                     >
@@ -738,6 +898,19 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
         isSaving={isSaving}
         onClose={() => setEditingAnime(null)}
         onSave={saveAnimeMetadata}
+        onDelete={(key) => setPendingDeleteKey(key)}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteKey)}
+        title="Ocultar anime"
+        description="El anime se ocultará de la biblioteca. Si viene de un tag del rastreador, no volverá a aparecer mientras siga deshabilitado."
+        confirmLabel="Sí, ocultar"
+        cancelLabel="Cancelar"
+        tone="danger"
+        isLoading={isSaving}
+        onCancel={() => setPendingDeleteKey(null)}
+        onConfirm={() => hideAnimeMetadata(pendingDeleteKey)}
       />
     </>
   );
