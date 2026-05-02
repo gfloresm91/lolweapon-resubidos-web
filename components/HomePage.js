@@ -166,6 +166,10 @@ export default function HomePage({
     setAnimeLibrary(initialAnimeLibrary);
   }, [initialAnimeLibrary]);
 
+  useEffect(() => {
+    setCurrentView(activeView);
+  }, [activeView]);
+
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
     toast.error(message || "Tu sesion de admin ya no es valida. Vuelve a iniciar sesion.");
@@ -222,12 +226,18 @@ export default function HomePage({
   }, [lives]);
 
   useEffect(() => {
-    function handlePopState() {
-      setCurrentView(getViewFromPath(window.location.pathname));
+    function handlePathChange(event) {
+      const nextPath = event.detail?.path || window.location.pathname;
+      setCurrentView(getViewFromPath(nextPath));
     }
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("popstate", handlePathChange);
+    window.addEventListener("kala:navigation", handlePathChange);
+
+    return () => {
+      window.removeEventListener("popstate", handlePathChange);
+      window.removeEventListener("kala:navigation", handlePathChange);
+    };
   }, []);
 
   useEffect(() => {
