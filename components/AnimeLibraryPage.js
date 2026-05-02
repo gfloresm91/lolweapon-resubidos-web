@@ -367,11 +367,11 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
               <h3 className="modal-subtitle anime-library-mobile-hidden">Información principal</h3>
               <div className="form-row">
                 <div className="form-group-modal">
-                  <label>Título</label>
+                  <label>Título AniList</label>
                   <input className="modal-input" value={form.title} onChange={(event) => updateField("title", event.target.value)} />
                 </div>
                 <div className="form-group-modal anime-library-mobile-hidden">
-                  <label>Título en español</label>
+                  <label>Título personalizado</label>
                   <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
                 </div>
               </div>
@@ -535,7 +535,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
               </div>
 
               <div className="form-group-modal anime-library-mobile-hidden">
-                <label>Sinopsis español</label>
+                <label>Sinopsis personalizada</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
                   value={form.descriptionEs}
@@ -544,7 +544,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
               </div>
 
               <div className="form-group-modal anime-library-mobile-hidden">
-                <label>Sinopsis original</label>
+                <label>Sinopsis AniList</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
                   value={form.description}
