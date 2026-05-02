@@ -666,7 +666,12 @@ function getSortablePurchasedEpisodes(anime) {
   return getPurchasedCount(anime);
 }
 
-export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin = false, mode = "active" }) {
+export default function AnimeLibraryPage({
+  animes: initialAnimes = [],
+  isAdmin = false,
+  isLoading = false,
+  mode = "active",
+}) {
   const [animes, setAnimes] = useState(initialAnimes);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -953,7 +958,12 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
       </div>
 
       <main>
-        {filteredAnimes.length ? (
+        {isLoading ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">AN</div>
+            <div className="empty-state-text">Cargando biblioteca...</div>
+          </div>
+        ) : filteredAnimes.length ? (
           <div className="anime-grid anime-library-grid">
             {filteredAnimes.map((anime) => {
               const fullSeason = isFullSeason(anime);

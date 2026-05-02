@@ -113,6 +113,7 @@ export default function HomePage({
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
+  const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [filters, setFilters] = useState({ search: "", year: "all", month: "all", status: "all" });
@@ -299,11 +300,19 @@ export default function HomePage({
     let isMounted = true;
 
     async function loadAnimeLibrary() {
-      const response = await fetch("/api/anime-library", { cache: "no-store" });
-      const data = await response.json();
+      setIsAnimeLibraryLoading(true);
 
-      if (isMounted && response.ok) {
-        setAnimeLibrary(data.animes || []);
+      try {
+        const response = await fetch("/api/anime-library", { cache: "no-store" });
+        const data = await response.json();
+
+        if (isMounted && response.ok) {
+          setAnimeLibrary(data.animes || []);
+        }
+      } finally {
+        if (isMounted) {
+          setIsAnimeLibraryLoading(false);
+        }
       }
     }
 
@@ -926,11 +935,21 @@ export default function HomePage({
             ) : null}
 
             {currentView === "animeLibraryTracking" ? (
-              <AnimeLibraryPage animes={animeLibrary} isAdmin={isAdmin} mode="active" />
+              <AnimeLibraryPage
+                animes={animeLibrary}
+                isAdmin={isAdmin}
+                isLoading={isAnimeLibraryLoading}
+                mode="active"
+              />
             ) : null}
 
             {currentView === "animeLibraryCompleted" ? (
-              <AnimeLibraryPage animes={animeLibrary} isAdmin={isAdmin} mode="completed" />
+              <AnimeLibraryPage
+                animes={animeLibrary}
+                isAdmin={isAdmin}
+                isLoading={isAnimeLibraryLoading}
+                mode="completed"
+              />
             ) : null}
 
             {isSpaceDrumEnabled && currentView === "spacedrum" ? (
