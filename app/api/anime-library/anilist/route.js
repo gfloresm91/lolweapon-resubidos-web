@@ -33,7 +33,7 @@ const query = `
 `;
 
 function getAniListIdFromUrl(value) {
-  const match = String(value || "").match(/anilist\.co\/anime\/(\d+)(?:\/|$)/i);
+  const match = String(value || "").match(/anilist\.co\/anime\/(\d+)(?:[/?#]|$)/i);
   return match ? Number(match[1]) : null;
 }
 
@@ -75,9 +75,15 @@ export async function POST(request) {
   const search = String(payload?.search || "").trim();
   const providerUrl = String(payload?.providerUrl || "").trim();
   const providerId = payload?.providerId ? Number(payload.providerId) : null;
-  const aniListId = Number.isFinite(providerId) && providerId > 0
-    ? providerId
-    : getAniListIdFromUrl(providerUrl);
+  const urlAniListId = getAniListIdFromUrl(providerUrl);
+  const aniListId = urlAniListId || (Number.isFinite(providerId) && providerId > 0 ? providerId : null);
+
+  if (providerUrl && !urlAniListId) {
+    return NextResponse.json(
+      { success: false, error: "La URL de AniList debe tener formato https://anilist.co/anime/ID/." },
+      { status: 400 },
+    );
+  }
 
   if (!search && !aniListId) {
     return NextResponse.json(
