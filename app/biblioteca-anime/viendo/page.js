@@ -6,7 +6,7 @@ import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function AnimeLibraryTrackingPage() {
+export default async function AnimeLibraryWatchingPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const isAdmin = validateSessionToken(token);

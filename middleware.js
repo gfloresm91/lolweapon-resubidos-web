@@ -13,7 +13,7 @@ export function middleware(request) {
     }
 
     if (hostname === viendoHost) {
-      return NextResponse.rewrite(new URL("/viendo", request.url));
+      return NextResponse.rewrite(new URL("/biblioteca-anime/viendo", request.url));
     }
   }
 

@@ -7,8 +7,7 @@ La aplicacion permite:
 - mostrar un inicio con player/chat de Twitch, metadata del canal, ultimos directos y ultimos videos de YouTube
 - explorar el archivo historico por busqueda, año, estado y tags
 - abrir una pagina de detalle por resubido con player OK.RU, selector de partes y links relacionados
-- seguir la lista de animes en la pagina `Viendo`
-- administrar una `Biblioteca de anime` separada entre animes en seguimiento y terminados
+- administrar una `Biblioteca de anime` separada entre animes en `Viendo` y terminados
 - publicar una sección de manga `SpaceDrum` con ficha y lector
 - visualizar enlaces por plataforma (`OK.RU`, `Telegram`, `Patreon`)
 - reproducir embeds de `OK.RU` sin salir de la app cuando el link lo permite
@@ -66,14 +65,16 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```text
 data/data.json
-data/animes.json
+data/anime-metadata.json
+data/tag-settings.json
 ```
 
 Opcional, si quieres trabajar sin modificar los archivos versionados:
 
 ```bash
 cp data/data.json data/data.local.json
-cp data/animes.json data/animes.local.json
+cp data/anime-metadata.json data/anime-metadata.local.json
+cp data/tag-settings.json data/tag-settings.local.json
 ```
 
 Si existe un archivo `.local.json`, la app lo usará en lugar del archivo base equivalente para leer y guardar cambios.
@@ -121,7 +122,7 @@ El proyecto usa estas variables:
 - `RESUBIDOS_HOST`
   Host que debe cargar `/rastreador` cuando se visita la raíz. Ejemplo QA: `resubidos-qa.lolweapon.com`.
 - `VIENDO_HOST`
-  Host que debe cargar `/viendo` cuando se visita la raíz. Ejemplo QA: `viendo-qa.lolweapon.com`.
+  Host que debe cargar `/biblioteca-anime/viendo` cuando se visita la raíz. Ejemplo QA: `viendo-qa.lolweapon.com`.
 - `TWITCH_CLIENT_ID`
   Client ID de la aplicación de Twitch.
 - `TWITCH_CLIENT_SECRET`
@@ -159,7 +160,6 @@ Notas:
 ```text
 app/
   api/
-    animes/route.js
     anime-library/
       route.js
       anilist/route.js
@@ -188,10 +188,9 @@ app/
     [id]/page.js
   biblioteca-anime/
     page.js
-    en-seguimiento/page.js
+    viendo/page.js
     terminados/page.js
   spacedrum/page.js
-  viendo/page.js
   globals.css
 
 components/
@@ -210,12 +209,9 @@ components/
   StatsBar.js
   TagPanel.js
   TagsInput.js
-  WatchingPage.js
 
 lib/
-  animeData.js
   animeLibrary.js
-  animes.js
   auth.js
   data.js
   lives.js
@@ -229,8 +225,6 @@ lib/
 data/
   data.json
   data.local.json
-  animes.json
-  animes.local.json
   anime-metadata.json
   anime-metadata.local.json
   spacedrum.json
@@ -254,15 +248,14 @@ Rutas internas:
 
 - `/inicio`: hub principal con Twitch, últimos directos y YouTube.
 - `/rastreador`: archivo de directos/resubidos.
-- `/biblioteca-anime/en-seguimiento`: biblioteca de animes en seguimiento, comprados o pendientes de compra.
+- `/biblioteca-anime/viendo`: biblioteca de animes en seguimiento, comprados o pendientes de compra.
 - `/biblioteca-anime/terminados`: biblioteca de animes terminados.
 - `/spacedrum`: ficha y lector del manga SpaceDrum.
-- `/viendo`: seguimiento de animes.
 
 En producción, el middleware reescribe la raíz según el dominio:
 
 - `${RESUBIDOS_HOST}/` carga `/rastreador`.
-- `${VIENDO_HOST}/` carga `/viendo`.
+- `${VIENDO_HOST}/` carga `/biblioteca-anime/viendo`.
 
 ### Frontend publico
 
@@ -320,18 +313,8 @@ Al entrar al detalle desde una card:
 - el rastreador guarda temporalmente filtros, tag, cantidad visible, scroll y card actual en `sessionStorage`
 - al volver con `Volver al rastreador`, restaura el estado y vuelve a la posición aproximada de la card
 
-`/viendo`:
+`/biblioteca-anime/viendo`:
 
-- carga el dataset de animes
-- muestra estadisticas de animes, temporadas enteras, capitulos comprados y pendientes
-- permite buscar y filtrar por estado de compra
-- muestra un boton `Ver resubidos` por anime que abre el rastreador en una pestaña nueva
-- si hay sesion admin, permite crear, editar, borrar y subir poster de animes
-- si hay sesion admin, permite guardar una URL personalizada hacia el rastreador por anime
-
-`/biblioteca-anime/en-seguimiento`:
-
-- reemplaza gradualmente la experiencia de `/viendo`
 - carga fichas desde `data/anime-metadata.json` o `data/anime-metadata.local.json`
 - cruza esas fichas con los tags categorizados como `Anime` en `data/tag-settings.json`
 - muestra indicadores consistentes por cantidad de animes: total, temporada entera, con caps comprados y sin comprar
@@ -495,20 +478,6 @@ Al leer y guardar, el proyecto normaliza los datos con `lib/lives.js` para toler
 - arrays invalidos
 - links vacios
 - registros incompletos o heredados del archivo historico
-
-La pagina `Viendo` usa la misma estrategia con:
-
-```text
-data/animes.json
-data/animes.local.json
-```
-
-Comportamiento:
-
-- si existe `data/animes.local.json`, la app lee y escribe ahí
-- si no existe, la app usa `data/animes.json`
-
-La resolución de lectura y escritura vive en `lib/animeData.js`.
 
 La Biblioteca de anime usa:
 
@@ -750,10 +719,6 @@ Respuesta exitosa:
 
 - devuelve el dataset normalizado
 
-### `GET /api/animes`
-
-- devuelve el dataset normalizado de la pagina `Viendo`
-
 ### `GET /api/anime-library`
 
 - devuelve la Biblioteca de anime armada desde `data/anime-metadata.json`, tags categorizados como anime y registros del rastreador
@@ -848,28 +813,6 @@ Ejemplo:
   ],
   "overrides": {
     "reaccionvideos": "custom-reacciones"
-  }
-}
-```
-
-### `POST /api/animes`
-
-Endpoint protegido.
-
-Acciones soportadas:
-
-- `replace`
-- `upsert`
-- `delete`
-
-Ejemplo `upsert`:
-
-```json
-{
-  "action": "upsert",
-  "anime": {
-    "id": "anime_123",
-    "name": "Nuevo anime"
   }
 }
 ```
@@ -971,7 +914,7 @@ Cuando se crea un registro automático:
 
 ## Imagenes y archivos versionados
 
-Las imagenes base usadas por `data/animes.json` pueden vivir en:
+Las imagenes base usadas por la Biblioteca de anime pueden vivir en:
 
 ```text
 public/imagenes/
@@ -1047,12 +990,12 @@ Importante:
 
 ## Flujo de trabajo recomendado
 
-1. Haz backup de `data/data.json`, `data/animes.json` y `data/tag-settings.json`
+1. Haz backup de `data/data.json`, `data/anime-metadata.json` y `data/tag-settings.json`
 2. Si no quieres tocar el dataset versionado, crea una copia local:
 
 ```bash
 cp data/data.json data/data.local.json
-cp data/animes.json data/animes.local.json
+cp data/anime-metadata.json data/anime-metadata.local.json
 cp data/tag-settings.json data/tag-settings.local.json
 ```
 
@@ -1065,8 +1008,8 @@ cp data/tag-settings.json data/tag-settings.local.json
 ```text
 data/data.local.json
 data/data.json
-data/animes.local.json
-data/animes.json
+data/anime-metadata.local.json
+data/anime-metadata.json
 data/tag-settings.local.json
 data/tag-settings.json
 ```
@@ -1243,7 +1186,7 @@ Ideas naturales para seguir mejorándolo:
 - formulario propio para reportar links caidos en vez de `mailto`
 - tests de interaccion para el player OK.RU y restauracion del rastreador
 - confirmaciones más detalladas para cambios destructivos
-- tests para `lib/lives.js`, `lib/data.js`, `lib/animes.js`, `lib/animeData.js` y `lib/tagSettings.js`
+- tests para `lib/lives.js`, `lib/data.js`, `lib/animeLibrary.js` y `lib/tagSettings.js`
 
 ## Licencia
 

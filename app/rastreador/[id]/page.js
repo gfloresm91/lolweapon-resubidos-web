@@ -129,7 +129,7 @@ export default async function LiveDetailPage({ params }) {
               </span>
               <span>Rastreador de directos</span>
             </Link>
-            <Link href="/viendo" className="sidebar-link">
+            <Link href="/biblioteca-anime/viendo" className="sidebar-link">
               <span className="sidebar-icon" aria-hidden="true">
                 <Eye />
               </span>

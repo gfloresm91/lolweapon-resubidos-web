@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, Eye, House } from "lucide-react";
+import { Archive, BookOpenText, CheckCircle2, CircleDot, House } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
@@ -16,7 +16,6 @@ import SocialLinks from "@/components/SocialLinks";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
-import WatchingPage from "@/components/WatchingPage";
 
 function getAllTags(lives) {
   return Array.from(
@@ -77,8 +76,7 @@ const EMPTY_LIST = [];
 const VIEW_LABELS = {
   home: "Inicio",
   tracker: "Rastreador de directos",
-  watching: "Viendo",
-  animeLibraryTracking: "Biblioteca de anime",
+  animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Anime terminados",
   spacedrum: "SpaceDrum",
 };
@@ -86,8 +84,7 @@ const VIEW_LABELS = {
 const VIEW_PATHS = {
   home: "/inicio",
   tracker: "/rastreador",
-  watching: "/viendo",
-  animeLibraryTracking: "/biblioteca-anime/en-seguimiento",
+  animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
   spacedrum: "/spacedrum",
 };
@@ -100,7 +97,6 @@ function getViewFromPath(pathname) {
 export default function HomePage({
   activeView = "home",
   initialLives = EMPTY_LIST,
-  initialAnimes = EMPTY_LIST,
   initialAnimeLibrary = EMPTY_LIST,
   initialSpaceDrum = null,
   initialYoutubeVideos = EMPTY_LIST,
@@ -116,7 +112,6 @@ export default function HomePage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
-  const [animes, setAnimes] = useState(initialAnimes);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
@@ -272,29 +267,6 @@ export default function HomePage({
       window.sessionStorage.removeItem(TRACKER_RETURN_STATE_KEY);
     }
   }, [currentView]);
-
-  useEffect(() => {
-    if (currentView !== "watching" || animes.length) {
-      return undefined;
-    }
-
-    let isMounted = true;
-
-    async function loadAnimes() {
-      const response = await fetch("/api/animes", { cache: "no-store" });
-      const data = await response.json();
-
-      if (isMounted && response.ok) {
-        setAnimes(data.animes || []);
-      }
-    }
-
-    loadAnimes();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [animes.length, currentView]);
 
   useEffect(() => {
     if (currentView !== "tracker" || lives.length) {
@@ -701,16 +673,6 @@ export default function HomePage({
               </span>
               <span>Rastreador de directos</span>
             </button>
-            <button
-              type="button"
-              className={`sidebar-link sidebar-link-button ${currentView === "watching" ? "is-active" : ""}`}
-              onClick={() => selectView("watching")}
-            >
-              <span className="sidebar-icon" aria-hidden="true">
-                <Eye />
-              </span>
-              <span>Viendo</span>
-            </button>
             <div className="sidebar-section">
               <span className="sidebar-section-label">Biblioteca de anime</span>
               <div className="sidebar-section-links" aria-label="Biblioteca de anime">
@@ -722,7 +684,7 @@ export default function HomePage({
                   <span className="sidebar-icon" aria-hidden="true">
                     <CircleDot />
                   </span>
-                  <span>En seguimiento</span>
+                  <span>Viendo</span>
                 </button>
                 <button
                   type="button"
@@ -961,10 +923,6 @@ export default function HomePage({
 
         <footer className="site-footer">Archivo VODs · Desarrollado para mantener la historia</footer>
               </>
-            ) : null}
-
-            {currentView === "watching" ? (
-              <WatchingPage initialAnimes={animes} isAdmin={isAdmin} />
             ) : null}
 
             {currentView === "animeLibraryTracking" ? (
