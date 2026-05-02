@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { ensureAuthorized, SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
-import { buildAnimeLibrary, hideAnimeMetadataEntry, updateAnimeMetadataEntry } from "@/lib/animeLibrary";
+import {
+  buildAnimeLibrary,
+  deleteAnimeMetadataEntry,
+  hideAnimeMetadataEntry,
+  updateAnimeMetadataEntry,
+} from "@/lib/animeLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +34,12 @@ export async function POST(request) {
 
   if (payload?.action === "delete" && payload.key) {
     await hideAnimeMetadataEntry(payload.key);
+    const animes = await buildAnimeLibrary({ includeHidden: true });
+    return NextResponse.json({ success: true, animes });
+  }
+
+  if (payload?.action === "remove" && payload.key) {
+    await deleteAnimeMetadataEntry(payload.key);
     const animes = await buildAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }

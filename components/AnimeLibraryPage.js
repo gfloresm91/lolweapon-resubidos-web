@@ -201,19 +201,26 @@ function toEditableAnime(anime) {
     ...emptyAnime,
     ...(anime || {}),
     currentEpisode: anime?.currentEpisode || "0",
-    purchased: anime?.purchased || "0",
+    purchased: anime?.watchStatus === "purchased" ? "ENTERA" : anime?.purchased || "0",
     libraryEnabled: anime?.libraryEnabled !== false,
   };
+}
+
+function getRestorablePurchasedValue(anime) {
+  const value = String(anime?.purchased || "").trim();
+  return value && value.toUpperCase() !== "ENTERA" ? value : "0";
 }
 
 function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(() => toEditableAnime(anime));
   const [imageFile, setImageFile] = useState(null);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
+  const restorablePurchasedRef = useRef(getRestorablePurchasedValue(anime));
 
   useEffect(() => {
     if (isOpen) {
       setForm(toEditableAnime(anime));
+      restorablePurchasedRef.current = getRestorablePurchasedValue(anime);
       setImageFile(null);
       setIsFetchingMetadata(false);
     }
@@ -243,36 +250,39 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
       return;
     }
 
-    onSave({ ...form, imageFile });
+    onSave({
+      ...form,
+      purchased: form.watchStatus === "purchased" ? "ENTERA" : form.purchased,
+      imageFile,
+    });
   }
 
   function restoreAnime() {
     onSave({ ...form, imageFile, libraryEnabled: true });
   }
 
-  function updateMobileStatus(status) {
+  function updateWatchStatus(status) {
     if (status === "purchased") {
-      setForm((current) => ({
-        ...current,
-        watchStatus: "purchased",
-        purchased: "ENTERA",
-      }));
-      return;
-    }
+      setForm((current) => {
+        if (String(current.purchased || "").trim().toUpperCase() !== "ENTERA") {
+          restorablePurchasedRef.current = String(current.purchased || "0");
+        }
 
-    if (status === "watching") {
-      setForm((current) => ({
-        ...current,
-        watchStatus: "watching",
-        purchased: String(current.purchased || "").toUpperCase() === "ENTERA" ? "0" : current.purchased,
-      }));
+        return {
+          ...current,
+          watchStatus: "purchased",
+          purchased: "ENTERA",
+        };
+      });
       return;
     }
 
     setForm((current) => ({
       ...current,
       watchStatus: status,
-      purchased: String(current.purchased || "").toUpperCase() === "ENTERA" ? "0" : current.purchased,
+      purchased: String(current.purchased || "").toUpperCase() === "ENTERA"
+        ? restorablePurchasedRef.current
+        : current.purchased,
     }));
   }
 
@@ -327,6 +337,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
   }
 
   const isCreating = !anime?.key;
+  const isPersistedHidden = !isCreating && anime?.libraryEnabled === false;
   const isMobilePurchased = form.watchStatus === "purchased" || String(form.purchased || "").toUpperCase() === "ENTERA";
 
   return (
@@ -385,6 +396,20 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 {isFetchingMetadata ? "Buscando..." : "Completar desde AniList"}
               </button>
 
+              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field anime-library-mobile-field-after-action">
+                <label>Título personalizado</label>
+                <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
+              </div>
+
+              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field">
+                <label>Sinopsis personalizada</label>
+                <textarea
+                  className="modal-input textarea-links anime-library-textarea"
+                  value={form.descriptionEs}
+                  onChange={(event) => updateField("descriptionEs", event.target.value)}
+                />
+              </div>
+
               <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Tag del rastreador</label>
                 <input
@@ -414,7 +439,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
               <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Estado biblioteca</label>
-                  <select className="modal-input" value={form.watchStatus} onChange={(event) => updateField("watchStatus", event.target.value)}>
+                  <select className="modal-input" value={form.watchStatus} onChange={(event) => updateWatchStatus(event.target.value)}>
                     {EDIT_STATUS_OPTIONS.map((option) => (
                       <option key={option.key} value={option.key}>{option.label}</option>
                     ))}
@@ -479,7 +504,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 <button
                   type="button"
                   className="anime-library-switch-row"
-                  onClick={() => updateMobileStatus("watching")}
+                  onClick={() => updateWatchStatus("watching")}
                 >
                   <span>Comprado</span>
                   <span className={`anime-library-switch ${form.watchStatus === "watching" && !isMobilePurchased ? "is-on" : ""}`} />
@@ -487,7 +512,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 <button
                   type="button"
                   className="anime-library-switch-row"
-                  onClick={() => updateMobileStatus("completed")}
+                  onClick={() => updateWatchStatus("completed")}
                 >
                   <span>Terminados</span>
                   <span className={`anime-library-switch ${form.watchStatus === "completed" ? "is-on" : ""}`} />
@@ -495,7 +520,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 <button
                   type="button"
                   className="anime-library-switch-row"
-                  onClick={() => updateMobileStatus("purchased")}
+                  onClick={() => updateWatchStatus("purchased")}
                 >
                   <span>Entera</span>
                   <span className={`anime-library-switch ${isMobilePurchased ? "is-on" : ""}`} />
@@ -503,7 +528,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 <button
                   type="button"
                   className="anime-library-switch-row"
-                  onClick={() => updateMobileStatus("dropped")}
+                  onClick={() => updateWatchStatus("dropped")}
                 >
                   <span>Dropeado</span>
                   <span className={`anime-library-switch ${form.watchStatus === "dropped" ? "is-on" : ""}`} />
@@ -578,12 +603,12 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
           </div>
 
           <div className="modal-actions">
-            {!isCreating && form.libraryEnabled !== false ? (
+            {isPersistedHidden ? (
               <button type="button" className="btn-modal btn-modal-danger" onClick={() => onDelete(anime.key)} disabled={isSaving}>
-                Eliminar de biblioteca
+                Eliminar definitivamente
               </button>
             ) : null}
-            {!isCreating && form.libraryEnabled === false ? (
+            {isPersistedHidden ? (
               <button type="button" className="btn-modal btn-modal-primary" onClick={restoreAnime} disabled={isSaving}>
                 Restaurar
               </button>
@@ -602,7 +627,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
 }
 
 function isFullSeason(anime) {
-  return String(anime?.purchased || "").trim().toUpperCase() === "ENTERA";
+  return anime?.watchStatus === "purchased";
 }
 
 function getPurchasedCount(anime) {
@@ -830,14 +855,14 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
     }
   }
 
-  async function hideAnimeMetadata(key) {
+  async function deleteAnimeMetadata(key) {
     setIsSaving(true);
 
     try {
       const response = await fetch("/api/anime-library", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", key }),
+        body: JSON.stringify({ action: "remove", key }),
       });
       const data = await response.json();
 
@@ -847,13 +872,13 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
       }
 
       if (!response.ok || !data.success) {
-        throw new Error(data.error || "No se pudo ocultar el anime.");
+        throw new Error(data.error || "No se pudo eliminar el anime.");
       }
 
       setAnimes(data.animes || []);
       setEditingAnime(null);
       setPendingDeleteKey(null);
-      toast.success("Anime ocultado de la biblioteca.");
+      toast.success("Anime eliminado definitivamente.");
     } catch (error) {
       toast.error(error.message);
     } finally {
@@ -1048,14 +1073,14 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
 
       <ConfirmModal
         isOpen={Boolean(pendingDeleteKey)}
-        title="Ocultar anime"
-        description="El anime se ocultará de la biblioteca. Si viene de un tag del rastreador, no volverá a aparecer mientras siga deshabilitado."
-        confirmLabel="Sí, ocultar"
+        title="Eliminar anime"
+        description="Esta entrada se borrará del archivo de metadata. Si viene de un tag del rastreador, podría volver a aparecer como ficha generada."
+        confirmLabel="Sí, eliminar"
         cancelLabel="Cancelar"
         tone="danger"
         isLoading={isSaving}
         onCancel={() => setPendingDeleteKey(null)}
-        onConfirm={() => hideAnimeMetadata(pendingDeleteKey)}
+        onConfirm={() => deleteAnimeMetadata(pendingDeleteKey)}
       />
     </>
   );

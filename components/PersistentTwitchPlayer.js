@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { House, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
 const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
@@ -69,8 +70,20 @@ function buildHiddenStyle(width) {
   };
 }
 
+function tryMutedAutoplay(player) {
+  try {
+    player?.setMuted?.(true);
+  } catch {}
+
+  try {
+    const playResult = player?.play?.();
+    playResult?.catch?.(() => {});
+  } catch {}
+}
+
 export default function PersistentTwitchPlayer({ twitchLogin }) {
   const pathname = usePathname();
+  const router = useRouter();
   const twitchChannel = twitchLogin || "kalathraslolweapon";
   const [currentPath, setCurrentPath] = useState("");
   const [currentHostname, setCurrentHostname] = useState("");
@@ -148,17 +161,6 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
     let isCancelled = false;
 
-    function tryMutedAutoplay(player) {
-      try {
-        player.setMuted(true);
-      } catch {}
-
-      try {
-        const playResult = player.play();
-        playResult?.catch?.(() => {});
-      } catch {}
-    }
-
     loadTwitchEmbedScript()
       .then(() => {
         if (isCancelled || !window.Twitch?.Player) {
@@ -195,6 +197,24 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       playerRef.current = null;
     };
   }, [twitchChannel, twitchParent]);
+
+  useEffect(() => {
+    if (!isVisible || !playerRef.current) {
+      return undefined;
+    }
+
+    let frameId = window.requestAnimationFrame(() => {
+      tryMutedAutoplay(playerRef.current);
+    });
+    const timeoutIds = [250, 900, 1800].map((delay) => (
+      window.setTimeout(() => tryMutedAutoplay(playerRef.current), delay)
+    ));
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    };
+  }, [isVisible, routeMode, isOnline]);
 
   useEffect(() => {
     let isMounted = true;
@@ -318,6 +338,11 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     resizeStateRef.current = null;
   }
 
+  function goToHome() {
+    setIsMiniDismissed(false);
+    router.push("/inicio");
+  }
+
   return (
     <div
       className={`persistent-twitch-player is-${routeMode} ${isVisible ? "" : "is-hidden"}`}
@@ -327,8 +352,23 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     >
       {routeMode === "mini" ? (
         <>
-          <button type="button" className="mini-player-close" onClick={() => setIsMiniDismissed(true)}>
-            Cerrar
+          <button
+            type="button"
+            className="mini-player-action mini-player-close"
+            aria-label="Cerrar mini player"
+            title="Cerrar mini player"
+            onClick={() => setIsMiniDismissed(true)}
+          >
+            <X aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="mini-player-action mini-player-home"
+            aria-label="Volver al inicio"
+            title="Volver al inicio"
+            onClick={goToHome}
+          >
+            <House aria-hidden="true" />
           </button>
           <button
             type="button"

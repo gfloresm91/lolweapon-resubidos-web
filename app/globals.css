@@ -674,40 +674,57 @@ body::before {
   display: none;
 }
 
-.mini-player-close {
+.mini-player-action {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 2;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  padding: 0.28rem 0.58rem;
-  background: rgba(6, 7, 11, 0.76);
-  color: var(--text-secondary);
-  font-family: var(--font-outfit), sans-serif;
-  font-size: 0.68rem;
-  font-weight: 800;
+  top: 0.85rem;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 5px;
+  padding: 0;
+  background: rgba(238, 242, 247, 0.72);
+  color: #111318;
   cursor: pointer;
-  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
 }
 
-.mini-player-close:hover,
-.mini-player-close:focus-visible {
-  border-color: rgba(167, 139, 250, 0.4);
-  background: rgba(167, 139, 250, 0.18);
-  color: #fff;
+.mini-player-action svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2;
+}
+
+.mini-player-close {
+  left: 0.85rem;
+}
+
+.mini-player-home {
+  right: 0.85rem;
+}
+
+.mini-player-action:hover,
+.mini-player-action:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.9);
+  color: #05060a;
   outline: none;
+  transform: translateY(-1px);
 }
 
 .mini-player-resize {
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   z-index: 2;
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: var(--radius-md) 0 0 0;
+  border-radius: 0 0 0 var(--radius-md);
   background: transparent;
   cursor: nwse-resize;
   touch-action: none;
@@ -5467,6 +5484,14 @@ body::before {
 
   .anime-library-mobile-only {
     width: 100%;
+  }
+
+  .anime-library-mobile-field {
+    display: block;
+  }
+
+  .anime-library-mobile-field-after-action {
+    margin-top: 1rem;
   }
 
   .anime-library-mobile-section-title {
