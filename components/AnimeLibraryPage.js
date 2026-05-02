@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import ConfirmModal from "@/components/ConfirmModal";
@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
   { key: "purchased", label: "Entera" },
   { key: "paused", label: "Pausados" },
   { key: "pending", label: "Pendientes" },
+  { key: "dropped", label: "Dropeados" },
 ];
 
 const TRACKING_STATUS_OPTIONS = [
@@ -19,6 +20,13 @@ const TRACKING_STATUS_OPTIONS = [
   { key: "purchased", label: "Entera" },
   { key: "watching", label: "Caps comprados" },
   { key: "unpaid", label: "Sin comprar" },
+];
+
+const CAPS_SORT_OPTIONS = [
+  { value: "purchased-desc", label: "Más caps comprados" },
+  { value: "purchased-asc", label: "Menos caps comprados" },
+  { value: "episodes-desc", label: "Más episodios" },
+  { value: "episodes-asc", label: "Menos episodios" },
 ];
 
 const EDIT_STATUS_OPTIONS = STATUS_OPTIONS.filter((option) => option.key !== "all");
@@ -51,7 +59,15 @@ const STATUS_LABELS = {
   purchased: "Entera",
   paused: "Pausado",
   pending: "Pendiente",
+  dropped: "Dropeado",
 };
+
+const COMPLETED_STATUS_OPTIONS = [
+  { key: "all", label: "Todos" },
+  { key: "completed", label: "Terminados" },
+  { key: "paused", label: "Pausados" },
+  { key: "dropped", label: "Dropeados" },
+];
 
 const PAGE_CONFIG = {
   active: {
@@ -67,10 +83,10 @@ const PAGE_CONFIG = {
     badge: "Biblioteca anime",
     titlePrefix: "Anime",
     titleHighlight: "Terminado",
-    subtitle: "Animes marcados como terminados y sus resubidos disponibles.",
+    subtitle: "Animes terminados, pausados, pendientes o dropeados fuera del seguimiento activo.",
     empty: "No hay animes terminados con ese filtro.",
-    statusOptions: [{ key: "all", label: "Todos" }],
-    acceptsStatus: (status) => status === "completed",
+    statusOptions: COMPLETED_STATUS_OPTIONS,
+    acceptsStatus: (status) => ["completed", "paused", "pending", "dropped"].includes(status),
   },
 };
 
@@ -86,6 +102,77 @@ function getInitials(title) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+function AnimeLibrarySortSelect({ value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectRef = useRef(null);
+  const selectedOption = CAPS_SORT_OPTIONS.find((option) => option.value === value) || CAPS_SORT_OPTIONS[0];
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    function handlePointerDown(event) {
+      if (!selectRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  function selectOption(nextValue) {
+    onChange(nextValue);
+    setIsOpen(false);
+  }
+
+  return (
+    <div ref={selectRef} className="filter-select anime-library-sort-select">
+      <button
+        type="button"
+        className={`filter-select-button ${isOpen ? "is-open" : ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span className="filter-select-label">Orden</span>
+        <strong>{selectedOption.label}</strong>
+        <span className="filter-select-chevron" aria-hidden="true">⌄</span>
+      </button>
+
+      {isOpen ? (
+        <div className="filter-select-menu" role="listbox" aria-label="Orden">
+          {CAPS_SORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`filter-select-option ${option.value === value ? "is-selected" : ""}`}
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => selectOption(option.value)}
+            >
+              <span>{option.label}</span>
+              {option.value === value ? <span aria-hidden="true">✓</span> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 const editableFields = [
@@ -413,6 +500,14 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <span>Entera</span>
                   <span className={`anime-library-switch ${isMobilePurchased ? "is-on" : ""}`} />
                 </button>
+                <button
+                  type="button"
+                  className="anime-library-switch-row"
+                  onClick={() => updateMobileStatus("dropped")}
+                >
+                  <span>Dropeado</span>
+                  <span className={`anime-library-switch ${form.watchStatus === "dropped" ? "is-on" : ""}`} />
+                </button>
               </div>
 
               <hr className="modal-hr anime-library-mobile-hidden" />
@@ -538,10 +633,20 @@ function getEpisodeProgress(anime) {
   };
 }
 
+function getSortablePurchasedEpisodes(anime) {
+  if (isFullSeason(anime)) {
+    const totalEpisodes = Math.max(parseInt(anime?.episodes, 10) || 0, 0);
+    return totalEpisodes || Number.MAX_SAFE_INTEGER;
+  }
+
+  return getPurchasedCount(anime);
+}
+
 export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin = false, mode = "active" }) {
   const [animes, setAnimes] = useState(initialAnimes);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [capsSort, setCapsSort] = useState("purchased-desc");
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
@@ -589,6 +694,8 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
       completed: counts.completed || 0,
       purchased: counts.purchased || 0,
       pending: counts.pending || 0,
+      paused: counts.paused || 0,
+      dropped: counts.dropped || 0,
       fullSeasons,
       partiallyPurchased,
       purchasedEpisodes,
@@ -606,13 +713,15 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
       ]
     : [
         { value: stats.total, label: "Total", color: "purple" },
-        { value: stats.total, label: "Terminados", color: "green" },
+        { value: stats.completed, label: "Terminados", color: "green" },
+        { value: stats.paused, label: "Pausados", color: "orange" },
+        { value: stats.dropped, label: "Dropeados", color: "red" },
       ];
 
   const filteredAnimes = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return pageAnimes.filter((anime) => {
+    const results = pageAnimes.filter((anime) => {
       if (statusFilter === "hidden") {
         return anime.libraryEnabled === false && (!query || [
           anime.title,
@@ -639,7 +748,28 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
 
       return statusMatch && searchMatch;
     });
-  }, [mode, pageAnimes, search, statusFilter]);
+
+    if (mode !== "active") {
+      return results;
+    }
+
+    return [...results].sort((left, right) => {
+      const isEpisodeSort = capsSort.startsWith("episodes");
+      const leftValue = isEpisodeSort
+        ? Math.max(parseInt(left?.episodes, 10) || 0, 0)
+        : getSortablePurchasedEpisodes(left);
+      const rightValue = isEpisodeSort
+        ? Math.max(parseInt(right?.episodes, 10) || 0, 0)
+        : getSortablePurchasedEpisodes(right);
+      const direction = capsSort.endsWith("asc") ? 1 : -1;
+
+      if (leftValue !== rightValue) {
+        return (leftValue - rightValue) * direction;
+      }
+
+      return (left.title || "").localeCompare(right.title || "");
+    });
+  }, [capsSort, mode, pageAnimes, search, statusFilter]);
 
   async function uploadImage(file) {
     const formData = new FormData();
@@ -793,6 +923,9 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
             ))}
           </>
         ) : null}
+        {mode === "active" ? (
+          <AnimeLibrarySortSelect value={capsSort} onChange={setCapsSort} />
+        ) : null}
       </div>
 
       <main>
@@ -804,6 +937,11 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
               const purchaseLabel = getPurchaseLabel(anime);
               const synopsis = anime.descriptionEs || anime.description;
               const episodeProgress = getEpisodeProgress(anime);
+              const archiveMeta = [
+                anime.year,
+                anime.episodes ? `${anime.episodes} eps` : null,
+                anime.format,
+              ].filter(Boolean);
               const hoverMeta = [
                 anime.year,
                 anime.episodes ? `${anime.episodes} eps` : null,
@@ -834,7 +972,7 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                     </div>
                     {episodeProgress.total ? (
                       <div
-                        className="anime-library-watch-progress"
+                        className={`anime-library-watch-progress ${mode === "completed" ? "archive-progress" : ""}`}
                         aria-label={`Progreso visto ${episodeProgress.current} de ${episodeProgress.total} episodios`}
                         title={`${episodeProgress.current}/${episodeProgress.total} episodios vistos`}
                       >
@@ -849,20 +987,33 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                     ) : null}
                   </div>
                   <div className="anime-card-body anime-library-body">
-                    <div className="anime-library-progress-line">
-                      <span>
-                        Cap. {episodeProgress.current}
-                        {episodeProgress.total ? ` de ${episodeProgress.total}` : " actual"}
-                      </span>
-                      <span className="anime-library-progress-separator" />
-                      {fullSeason ? (
-                        <span className="badge-entera">Entera</span>
-                      ) : (
-                        <span className={`badge-count ${purchasedCount === 0 ? "zero" : ""}`}>
-                          {purchaseLabel}
+                    {mode === "completed" ? (
+                      <div className="anime-library-archive-meta">
+                        {archiveMeta.length ? (
+                          <span>{archiveMeta.join(" · ")}</span>
+                        ) : (
+                          <span>Metadata pendiente</span>
+                        )}
+                        {episodeProgress.total ? (
+                          <span>Visto: {episodeProgress.current}/{episodeProgress.total}</span>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="anime-library-progress-line">
+                        <span>
+                          Cap. {episodeProgress.current}
+                          {episodeProgress.total ? ` de ${episodeProgress.total}` : " actual"}
                         </span>
-                      )}
-                    </div>
+                        <span className="anime-library-progress-separator" />
+                        {fullSeason ? (
+                          <span className="badge-entera">Entera</span>
+                        ) : (
+                          <span className={`badge-count ${purchasedCount === 0 ? "zero" : ""}`}>
+                            {purchaseLabel}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {anime.tag ? (
                       <div className="anime-library-meta">
                         <span className="anime-library-tag-pill">{anime.tag}</span>

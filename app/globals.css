@@ -1267,6 +1267,10 @@ body::before {
   color: var(--orange);
 }
 
+.watching-stat-value.red {
+  color: #f87171;
+}
+
 .watching-stat-label {
   color: var(--text-muted);
   font-size: 0.7rem;
@@ -1313,6 +1317,10 @@ body::before {
   background: rgba(167, 139, 250, 0.14);
   border-color: rgba(167, 139, 250, 0.35);
   color: var(--purple-light);
+}
+
+.anime-library-sort-select {
+  min-width: 210px;
 }
 
 .anime-grid {
@@ -1564,6 +1572,16 @@ body::before {
   box-shadow: 0 0 16px rgba(248, 113, 113, 0.55);
 }
 
+.anime-library-watch-progress.archive-progress {
+  height: 3px;
+  opacity: 0.65;
+}
+
+.anime-library-watch-progress.archive-progress span {
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.9), rgba(96, 165, 250, 0.9));
+  box-shadow: none;
+}
+
 .anime-library-status {
   position: absolute;
   top: 0.75rem;
@@ -1603,15 +1621,21 @@ body::before {
 }
 
 .anime-library-status.status-paused {
-  border-color: rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.15);
-  color: #fca5a5;
+  border-color: rgba(251, 146, 60, 0.35);
+  background: rgba(251, 146, 60, 0.15);
+  color: var(--orange);
 }
 
 .anime-library-status.status-pending {
   border-color: rgba(167, 139, 250, 0.28);
   background: rgba(167, 139, 250, 0.13);
   color: var(--purple-light);
+}
+
+.anime-library-status.status-dropped {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.15);
+  color: #fca5a5;
 }
 
 .anime-library-status.status-hidden {
@@ -1696,6 +1720,27 @@ body::before {
   border-color: rgba(52, 211, 153, 0.32);
   background: rgba(52, 211, 153, 0.14);
   color: var(--green);
+}
+
+.anime-library-archive-meta {
+  display: flex;
+  min-height: 58px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.anime-library-archive-meta span:last-child {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .anime-library-meta {
