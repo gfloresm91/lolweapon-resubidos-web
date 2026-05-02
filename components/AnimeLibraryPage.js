@@ -1014,11 +1014,6 @@ export default function AnimeLibraryPage({ animes: initialAnimes = [], isAdmin =
                         )}
                       </div>
                     )}
-                    {anime.tag ? (
-                      <div className="anime-library-meta">
-                        <span className="anime-library-tag-pill">{anime.tag}</span>
-                      </div>
-                    ) : null}
                     <a
                       href={anime.trackerUrl}
                       target="_blank"
