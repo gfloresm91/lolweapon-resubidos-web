@@ -1,18 +1,17 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, House } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
 import AdminModal from "@/components/AdminModal";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
+import AppSidebar from "@/components/AppSidebar";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
-import SocialLinks from "@/components/SocialLinks";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
@@ -644,87 +643,13 @@ export default function HomePage({
           />
         ) : null}
 
-        <aside
+        <AppSidebar
           id="main-sidebar"
-          className={`sidebar ${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
-          aria-label="Menu principal"
-        >
-          <button
-            type="button"
-            className="sidebar-brand sidebar-brand-button"
-            aria-label="Ir al inicio"
-            onClick={() => selectView("home")}
-          >
-            <span className="sidebar-brand-mark">
-              <img src="/brand/lolweapon-logo.png" alt="" />
-            </span>
-            <span className="sidebar-brand-text">LOLWEAPON</span>
-          </button>
-
-          <nav className="sidebar-nav">
-            <button
-              type="button"
-              className={`sidebar-link sidebar-link-button ${currentView === "home" ? "is-active" : ""}`}
-              onClick={() => selectView("home")}
-            >
-              <span className="sidebar-icon" aria-hidden="true">
-                <House />
-              </span>
-              <span>Inicio</span>
-            </button>
-            <button
-              type="button"
-              className={`sidebar-link sidebar-link-button ${currentView === "tracker" ? "is-active" : ""}`}
-              onClick={() => selectView("tracker")}
-            >
-              <span className="sidebar-icon" aria-hidden="true">
-                <Archive />
-              </span>
-              <span>Rastreador de directos</span>
-            </button>
-            <div className="sidebar-section">
-              <span className="sidebar-section-label">Biblioteca de anime</span>
-              <div className="sidebar-section-links" aria-label="Biblioteca de anime">
-                <button
-                  type="button"
-                  className={`sidebar-link sidebar-link-button sidebar-section-link ${currentView === "animeLibraryTracking" ? "is-active" : ""}`}
-                  onClick={() => selectView("animeLibraryTracking")}
-                >
-                  <span className="sidebar-icon" aria-hidden="true">
-                    <CircleDot />
-                  </span>
-                  <span>Viendo</span>
-                </button>
-                <button
-                  type="button"
-                  className={`sidebar-link sidebar-link-button sidebar-section-link ${currentView === "animeLibraryCompleted" ? "is-active" : ""}`}
-                  onClick={() => selectView("animeLibraryCompleted")}
-                >
-                  <span className="sidebar-icon" aria-hidden="true">
-                    <CheckCircle2 />
-                  </span>
-                  <span>Terminados</span>
-                </button>
-              </div>
-            </div>
-            {isSpaceDrumEnabled ? (
-              <button
-                type="button"
-                className={`sidebar-link sidebar-link-button ${currentView === "spacedrum" ? "is-active" : ""}`}
-                onClick={() => selectView("spacedrum")}
-              >
-                <span className="sidebar-icon" aria-hidden="true">
-                  <BookOpenText />
-                </span>
-                <span>SpaceDrum</span>
-              </button>
-            ) : null}
-          </nav>
-          <div className="sidebar-social-block">
-            <span>Redes oficiales</span>
-            <SocialLinks compact />
-          </div>
-        </aside>
+          activeView={currentView}
+          className={`${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
+          isSpaceDrumEnabled={isSpaceDrumEnabled}
+          onSelect={selectView}
+        />
 
         <div className="content-shell">
           <header className="topbar" aria-label="Barra superior">

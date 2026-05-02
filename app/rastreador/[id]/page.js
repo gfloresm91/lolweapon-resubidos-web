@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Archive, BookOpenText, Eye, House } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import AppSidebar from "@/components/AppSidebar";
 import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
-import SocialLinks from "@/components/SocialLinks";
 import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
 import { readLives } from "@/lib/data";
 
@@ -108,47 +107,10 @@ export default async function LiveDetailPage({ params }) {
       <div className="app-shell live-detail-app-shell">
         <DetailSidebarControls />
 
-        <aside id="main-sidebar" className="sidebar" aria-label="Menu principal">
-          <Link href="/inicio" className="sidebar-brand sidebar-brand-button" aria-label="Ir al inicio">
-            <span className="sidebar-brand-mark">
-              <img src="/brand/lolweapon-logo.png" alt="" />
-            </span>
-            <span className="sidebar-brand-text">LOLWEAPON</span>
-          </Link>
-
-          <nav className="sidebar-nav">
-            <Link href="/inicio" className="sidebar-link">
-              <span className="sidebar-icon" aria-hidden="true">
-                <House />
-              </span>
-              <span>Inicio</span>
-            </Link>
-            <Link href="/rastreador" className="sidebar-link is-active">
-              <span className="sidebar-icon" aria-hidden="true">
-                <Archive />
-              </span>
-              <span>Rastreador de directos</span>
-            </Link>
-            <Link href="/biblioteca-anime/viendo" className="sidebar-link">
-              <span className="sidebar-icon" aria-hidden="true">
-                <Eye />
-              </span>
-              <span>Viendo</span>
-            </Link>
-            {process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true" ? (
-              <Link href="/spacedrum" className="sidebar-link">
-                <span className="sidebar-icon" aria-hidden="true">
-                  <BookOpenText />
-                </span>
-                <span>SpaceDrum</span>
-              </Link>
-            ) : null}
-          </nav>
-          <div className="sidebar-social-block">
-            <span>Redes oficiales</span>
-            <SocialLinks compact />
-          </div>
-        </aside>
+        <AppSidebar
+          activeView="tracker"
+          isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
+        />
 
         <div className="content-shell">
           <header className="topbar" aria-label="Barra superior">
