@@ -9,6 +9,7 @@ const MAX_RATE_LIMIT_RETRIES = 3;
 const args = new Set(process.argv.slice(2));
 const isDryRun = args.has("--dry-run");
 const shouldForceImages = args.has("--force-images");
+const shouldRefreshTitles = args.has("--refresh-titles");
 const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
 const limit = limitArg ? Number(limitArg.split("=")[1]) : Infinity;
 
@@ -86,7 +87,7 @@ function cleanDescription(value) {
 }
 
 function getDisplayTitle(media) {
-  return media?.title?.english || media?.title?.romaji || media?.title?.native || "";
+  return media?.title?.romaji || media?.title?.english || media?.title?.native || "";
 }
 
 function buildSearchCandidates(key, item) {
@@ -109,6 +110,24 @@ function shouldReplaceTitle(item, key) {
   }
 
   return compactTitle(currentTitle) === compactTitle(titleFromTag(item.tag || key));
+}
+
+function shouldReplaceTitleWithProvider(item, key, media) {
+  if (shouldReplaceTitle(item, key)) {
+    return true;
+  }
+
+  const currentTitle = compactTitle(item.title);
+  const romajiTitle = compactTitle(media?.title?.romaji);
+
+  if (!currentTitle || !romajiTitle || currentTitle === romajiTitle) {
+    return false;
+  }
+
+  return [
+    media?.title?.english,
+    media?.title?.native,
+  ].map(compactTitle).some((title) => title && title === currentTitle);
 }
 
 async function searchAnime(search) {
@@ -190,6 +209,7 @@ for (const [key, item] of entries) {
     || !item.status
     || !item.description
     || !item.image
+    || shouldRefreshTitles
     || shouldReplaceTitle(item, key);
 
   if (!needsMetadata) {
@@ -217,7 +237,7 @@ for (const [key, item] of entries) {
     const providerTitle = getDisplayTitle(media);
     const providerImage = media.coverImage?.extraLarge || media.coverImage?.large || "";
 
-    if (providerTitle && shouldReplaceTitle(item, key)) {
+    if (providerTitle && shouldReplaceTitleWithProvider(item, key, media)) {
       nextItem.title = providerTitle;
     }
 

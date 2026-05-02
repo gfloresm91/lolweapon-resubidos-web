@@ -41,7 +41,7 @@ function cleanDescription(value) {
 }
 
 function getDisplayTitle(media) {
-  return media?.title?.english || media?.title?.romaji || media?.title?.native || "";
+  return media?.title?.romaji || media?.title?.english || media?.title?.native || "";
 }
 
 function toMetadata(media) {
