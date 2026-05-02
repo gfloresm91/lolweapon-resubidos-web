@@ -886,6 +886,7 @@ export default function HomePage({
                 isAdmin={isAdmin}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
+                onAnimesChange={setAnimeLibrary}
               />
             ) : null}
 
@@ -895,6 +896,7 @@ export default function HomePage({
                 isAdmin={isAdmin}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
+                onAnimesChange={setAnimeLibrary}
               />
             ) : null}
 

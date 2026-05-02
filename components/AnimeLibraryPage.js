@@ -706,6 +706,7 @@ export default function AnimeLibraryPage({
   isAdmin = false,
   isLoading = false,
   mode = "active",
+  onAnimesChange,
 }) {
   const [animes, setAnimes] = useState(initialAnimes);
   const [search, setSearch] = useState("");
@@ -905,7 +906,9 @@ export default function AnimeLibraryPage({
         throw new Error(data.error || "No se pudo guardar la metadata.");
       }
 
-      setAnimes(data.animes || []);
+      const nextAnimes = data.animes || [];
+      setAnimes(nextAnimes);
+      onAnimesChange?.(nextAnimes);
       setEditingAnime(null);
       toast.success(form.key ? "Metadata guardada correctamente." : "Anime creado correctamente.");
     } catch (error) {
@@ -935,7 +938,9 @@ export default function AnimeLibraryPage({
         throw new Error(data.error || "No se pudo eliminar el anime.");
       }
 
-      setAnimes(data.animes || []);
+      const nextAnimes = data.animes || [];
+      setAnimes(nextAnimes);
+      onAnimesChange?.(nextAnimes);
       setEditingAnime(null);
       setPendingDeleteKey(null);
       toast.success("Anime eliminado definitivamente.");
