@@ -88,9 +88,31 @@ const VIEW_PATHS = {
   spacedrum: "/spacedrum",
 };
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
+const DEFAULT_TRACKER_FILTERS = { search: "", year: "all", month: "all", status: "all" };
 
 function getViewFromPath(pathname) {
   return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
+}
+
+function getTrackerStateFromSearchParams(searchParams) {
+  return {
+    filters: {
+      search: searchParams.get("search") || searchParams.get("q") || "",
+      year: searchParams.get("year") || "all",
+      month: searchParams.get("month") || "all",
+      status: searchParams.get("status") || "all",
+    },
+    selectedTag: searchParams.get("tag") || "",
+  };
+}
+
+function areTrackerFiltersEqual(left, right) {
+  return (
+    left.search === right.search &&
+    left.year === right.year &&
+    left.month === right.month &&
+    left.status === right.status
+  );
 }
 
 export default function HomePage({
@@ -115,8 +137,12 @@ export default function HomePage({
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
-  const [filters, setFilters] = useState({ search: "", year: "all", month: "all", status: "all" });
-  const [selectedTag, setSelectedTag] = useState("");
+  const [filters, setFilters] = useState(() =>
+    activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams).filters : DEFAULT_TRACKER_FILTERS,
+  );
+  const [selectedTag, setSelectedTag] = useState(() =>
+    activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams).selectedTag : "",
+  );
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
   const [isLoreOpen, setIsLoreOpen] = useState(false);
   const [editingLive, setEditingLive] = useState(null);
@@ -209,25 +235,10 @@ export default function HomePage({
       return;
     }
 
-    const querySearch = searchParams.get("search") || searchParams.get("q");
-    const queryYear = searchParams.get("year");
-    const queryMonth = searchParams.get("month");
-    const queryStatus = searchParams.get("status");
-    const queryTag = searchParams.get("tag");
+    const queryState = getTrackerStateFromSearchParams(searchParams);
 
-    if (querySearch || queryYear || queryMonth || queryStatus) {
-      setFilters((current) => ({
-        ...current,
-        search: querySearch ?? current.search,
-        year: queryYear || current.year,
-        month: queryMonth || current.month,
-        status: queryStatus || current.status,
-      }));
-    }
-
-    if (queryTag !== null) {
-      setSelectedTag(queryTag);
-    }
+    setFilters((current) => (areTrackerFiltersEqual(current, queryState.filters) ? current : queryState.filters));
+    setSelectedTag((current) => (current === queryState.selectedTag ? current : queryState.selectedTag));
   }, [currentView, searchParams]);
 
   useEffect(() => {

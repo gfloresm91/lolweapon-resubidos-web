@@ -81,6 +81,16 @@ function tryMutedAutoplay(player) {
   } catch {}
 }
 
+function stopPlayerPlayback(player) {
+  try {
+    player?.setMuted?.(true);
+  } catch {}
+
+  try {
+    player?.pause?.();
+  } catch {}
+}
+
 export default function PersistentTwitchPlayer({ twitchLogin }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -129,6 +139,12 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       setIsMiniDismissed(false);
     }
   }, [isOnline]);
+
+  useEffect(() => {
+    if (routeMode !== "mini" && isMiniDismissed) {
+      setIsMiniDismissed(false);
+    }
+  }, [isMiniDismissed, routeMode]);
 
   useEffect(() => {
     function notifyPathChange(event) {
@@ -184,11 +200,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
     return () => {
       isCancelled = true;
-
-      try {
-        playerRef.current?.setMuted?.(true);
-        playerRef.current?.pause?.();
-      } catch {}
+      stopPlayerPlayback(playerRef.current);
 
       if (typeof playerRef.current?.destroy === "function") {
         playerRef.current.destroy();
@@ -197,6 +209,14 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       playerRef.current = null;
     };
   }, [twitchChannel, twitchParent]);
+
+  useEffect(() => {
+    if (isVisible || !playerRef.current) {
+      return;
+    }
+
+    stopPlayerPlayback(playerRef.current);
+  }, [isVisible]);
 
   useEffect(() => {
     if (!isVisible || !playerRef.current) {
@@ -343,6 +363,11 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     router.push("/inicio");
   }
 
+  function closeMiniPlayer() {
+    stopPlayerPlayback(playerRef.current);
+    setIsMiniDismissed(true);
+  }
+
   return (
     <div
       className={`persistent-twitch-player is-${routeMode} ${isVisible ? "" : "is-hidden"}`}
@@ -357,7 +382,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
             className="mini-player-action mini-player-close"
             aria-label="Cerrar mini player"
             title="Cerrar mini player"
-            onClick={() => setIsMiniDismissed(true)}
+            onClick={closeMiniPlayer}
           >
             <X aria-hidden="true" />
           </button>
