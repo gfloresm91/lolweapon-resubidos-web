@@ -305,9 +305,11 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
 
   async function fetchAniListMetadata() {
     const search = [form.title, form.titleEs, form.tag].map((value) => String(value || "").trim()).find(Boolean);
+    const providerUrl = String(form.providerUrl || "").trim();
+    const providerId = String(form.providerId || "").trim();
 
-    if (!search) {
-      toast.error("Ingresa un titulo o tag para buscar en AniList.");
+    if (!search && !providerUrl && !providerId) {
+      toast.error("Ingresa un titulo, tag o URL de AniList.");
       return;
     }
 
@@ -317,7 +319,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
       const response = await fetch("/api/anime-library/anilist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ search }),
+        body: JSON.stringify({ providerId, providerUrl, search }),
       });
       const data = await response.json();
 
@@ -402,6 +404,16 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <label>Título personalizado</label>
                   <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
                 </div>
+              </div>
+
+              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field">
+                <label>URL AniList</label>
+                <input
+                  className="modal-input"
+                  placeholder="https://anilist.co/anime/19/MONSTER/"
+                  value={form.providerUrl}
+                  onChange={(event) => updateField("providerUrl", event.target.value)}
+                />
               </div>
 
               <button

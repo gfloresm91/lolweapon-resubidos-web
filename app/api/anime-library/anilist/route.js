@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 
 const query = `
-  query SearchAnime($search: String!) {
-    Media(search: $search, type: ANIME) {
+  query SearchAnime($search: String, $id: Int) {
+    Media(search: $search, id: $id, type: ANIME) {
       id
       idMal
       siteUrl
@@ -31,6 +31,11 @@ const query = `
     }
   }
 `;
+
+function getAniListIdFromUrl(value) {
+  const match = String(value || "").match(/anilist\.co\/anime\/(\d+)(?:\/|$)/i);
+  return match ? Number(match[1]) : null;
+}
 
 function cleanDescription(value) {
   return String(value || "")
@@ -68,10 +73,15 @@ export async function POST(request) {
 
   const payload = await request.json();
   const search = String(payload?.search || "").trim();
+  const providerUrl = String(payload?.providerUrl || "").trim();
+  const providerId = payload?.providerId ? Number(payload.providerId) : null;
+  const aniListId = Number.isFinite(providerId) && providerId > 0
+    ? providerId
+    : getAniListIdFromUrl(providerUrl);
 
-  if (!search) {
+  if (!search && !aniListId) {
     return NextResponse.json(
-      { success: false, error: "Debes indicar un titulo para buscar en AniList." },
+      { success: false, error: "Debes indicar un titulo, tag o URL de AniList." },
       { status: 400 },
     );
   }
@@ -84,7 +94,7 @@ export async function POST(request) {
     },
     body: JSON.stringify({
       query,
-      variables: { search },
+      variables: aniListId ? { id: aniListId } : { search },
     }),
   });
   const data = await response.json();
