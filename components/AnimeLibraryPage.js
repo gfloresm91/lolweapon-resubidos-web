@@ -29,6 +29,15 @@ const CAPS_SORT_OPTIONS = [
   { value: "episodes-asc", label: "Menos episodios" },
 ];
 
+const ALPHA_SORT_OPTIONS = [
+  { value: "title-asc", label: "A-Z" },
+  { value: "title-desc", label: "Z-A" },
+  { value: "episodes-desc", label: "Más episodios" },
+  { value: "episodes-asc", label: "Menos episodios" },
+  { value: "year-desc", label: "Más recientes" },
+  { value: "year-asc", label: "Más antiguos" },
+];
+
 const EDIT_STATUS_OPTIONS = STATUS_OPTIONS.filter((option) => option.key !== "all");
 
 const emptyAnime = {
@@ -104,10 +113,10 @@ function getInitials(title) {
     .toUpperCase();
 }
 
-function AnimeLibrarySortSelect({ value, onChange }) {
+function AnimeLibrarySortSelect({ options = CAPS_SORT_OPTIONS, value, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef(null);
-  const selectedOption = CAPS_SORT_OPTIONS.find((option) => option.value === value) || CAPS_SORT_OPTIONS[0];
+  const selectedOption = options.find((option) => option.value === value) || options[0];
 
   useEffect(() => {
     if (!isOpen) {
@@ -156,7 +165,7 @@ function AnimeLibrarySortSelect({ value, onChange }) {
 
       {isOpen ? (
         <div className="filter-select-menu" role="listbox" aria-label="Orden">
-          {CAPS_SORT_OPTIONS.map((option) => (
+          {options.map((option) => (
             <button
               key={option.value}
               type="button"
@@ -197,13 +206,21 @@ const editableFields = [
 ];
 
 function toEditableAnime(anime) {
-  return {
+  const editableAnime = {
     ...emptyAnime,
     ...(anime || {}),
     currentEpisode: anime?.currentEpisode || "0",
     purchased: anime?.watchStatus === "purchased" ? "ENTERA" : anime?.purchased || "0",
     libraryEnabled: anime?.libraryEnabled !== false,
   };
+
+  for (const field of editableFields) {
+    if (field !== "libraryEnabled") {
+      editableAnime[field] = editableAnime[field] ?? "";
+    }
+  }
+
+  return editableAnime;
 }
 
 function getRestorablePurchasedValue(anime) {
@@ -666,6 +683,12 @@ function getSortablePurchasedEpisodes(anime) {
   return getPurchasedCount(anime);
 }
 
+function getNewAnimeDraft(mode) {
+  return {
+    watchStatus: mode === "completed" ? "completed" : "watching",
+  };
+}
+
 export default function AnimeLibraryPage({
   animes: initialAnimes = [],
   isAdmin = false,
@@ -675,7 +698,7 @@ export default function AnimeLibraryPage({
   const [animes, setAnimes] = useState(initialAnimes);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [capsSort, setCapsSort] = useState("purchased-desc");
+  const [sortOption, setSortOption] = useState(mode === "completed" ? "title-asc" : "purchased-desc");
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
@@ -687,12 +710,13 @@ export default function AnimeLibraryPage({
 
   useEffect(() => {
     setStatusFilter("all");
+    setSortOption(mode === "completed" ? "title-asc" : "purchased-desc");
   }, [mode]);
 
   const pageAnimes = useMemo(() => {
     return animes.filter((anime) => {
       if (anime.libraryEnabled === false) {
-        return isAdmin && mode === "active";
+        return isAdmin;
       }
 
       return pageConfig.acceptsStatus(anime.watchStatus || "pending");
@@ -778,19 +802,38 @@ export default function AnimeLibraryPage({
       return statusMatch && searchMatch;
     });
 
-    if (mode !== "active") {
-      return results;
+    if (mode === "completed") {
+      const direction = sortOption.endsWith("desc") ? -1 : 1;
+
+      if (sortOption.startsWith("episodes") || sortOption.startsWith("year")) {
+        const field = sortOption.startsWith("episodes") ? "episodes" : "year";
+
+        return [...results].sort((left, right) => {
+          const leftValue = Math.max(parseInt(left?.[field], 10) || 0, 0);
+          const rightValue = Math.max(parseInt(right?.[field], 10) || 0, 0);
+
+          if (leftValue !== rightValue) {
+            return (leftValue - rightValue) * direction;
+          }
+
+          return (left.titleEs || left.title || "").localeCompare(right.titleEs || right.title || "");
+        });
+      }
+
+      return [...results].sort((left, right) => (
+        (left.titleEs || left.title || "").localeCompare(right.titleEs || right.title || "") * direction
+      ));
     }
 
     return [...results].sort((left, right) => {
-      const isEpisodeSort = capsSort.startsWith("episodes");
+      const isEpisodeSort = sortOption.startsWith("episodes");
       const leftValue = isEpisodeSort
         ? Math.max(parseInt(left?.episodes, 10) || 0, 0)
         : getSortablePurchasedEpisodes(left);
       const rightValue = isEpisodeSort
         ? Math.max(parseInt(right?.episodes, 10) || 0, 0)
         : getSortablePurchasedEpisodes(right);
-      const direction = capsSort.endsWith("asc") ? 1 : -1;
+      const direction = sortOption.endsWith("asc") ? 1 : -1;
 
       if (leftValue !== rightValue) {
         return (leftValue - rightValue) * direction;
@@ -798,7 +841,7 @@ export default function AnimeLibraryPage({
 
       return (left.title || "").localeCompare(right.title || "");
     });
-  }, [capsSort, mode, pageAnimes, search, statusFilter]);
+  }, [mode, pageAnimes, search, sortOption, statusFilter]);
 
   async function uploadImage(file) {
     const formData = new FormData();
@@ -914,13 +957,15 @@ export default function AnimeLibraryPage({
         ))}
       </section>
 
-      {isAdmin && mode === "active" ? (
+      {isAdmin ? (
         <section className="tracker-actions" aria-label="Acciones de biblioteca anime">
           <div>
             <span className="tracker-actions-label">Administración</span>
-            <p className="tracker-actions-copy">Gestiona animes en seguimiento antes o después de crear sus tags.</p>
+            <p className="tracker-actions-copy">
+              Gestiona animes {mode === "completed" ? "terminados" : "en seguimiento"} antes o después de crear sus tags.
+            </p>
           </div>
-          <button type="button" className="tracker-action-primary" onClick={() => setEditingAnime({})}>
+          <button type="button" className="tracker-action-primary" onClick={() => setEditingAnime(getNewAnimeDraft(mode))}>
             <span className="tracker-action-icon">+</span>
             Añadir anime
           </button>
@@ -939,7 +984,7 @@ export default function AnimeLibraryPage({
           <>
             {[
               ...pageConfig.statusOptions,
-              ...(isAdmin && mode === "active" ? [{ key: "hidden", label: `Ocultos (${stats.hidden})` }] : []),
+              ...(isAdmin ? [{ key: "hidden", label: `Ocultos (${stats.hidden})` }] : []),
             ].map((option) => (
               <button
                 key={option.key}
@@ -952,9 +997,11 @@ export default function AnimeLibraryPage({
             ))}
           </>
         ) : null}
-        {mode === "active" ? (
-          <AnimeLibrarySortSelect value={capsSort} onChange={setCapsSort} />
-        ) : null}
+        <AnimeLibrarySortSelect
+          options={mode === "completed" ? ALPHA_SORT_OPTIONS : CAPS_SORT_OPTIONS}
+          value={sortOption}
+          onChange={setSortOption}
+        />
       </div>
 
       <main>
