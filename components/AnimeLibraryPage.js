@@ -602,7 +602,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
 }
 
 function isFullSeason(anime) {
-  return String(anime?.purchased || "").trim().toUpperCase() === "ENTERA" || anime?.watchStatus === "purchased";
+  return String(anime?.purchased || "").trim().toUpperCase() === "ENTERA";
 }
 
 function getPurchasedCount(anime) {
@@ -635,8 +635,7 @@ function getEpisodeProgress(anime) {
 
 function getSortablePurchasedEpisodes(anime) {
   if (isFullSeason(anime)) {
-    const totalEpisodes = Math.max(parseInt(anime?.episodes, 10) || 0, 0);
-    return totalEpisodes || Number.MAX_SAFE_INTEGER;
+    return Number.MAX_SAFE_INTEGER;
   }
 
   return getPurchasedCount(anime);
