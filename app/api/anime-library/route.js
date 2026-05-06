@@ -2,18 +2,18 @@ import { NextResponse } from "next/server";
 
 import { ensureAuthorized, SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
 import {
-  buildAnimeLibrary,
-  deleteAnimeMetadataEntry,
-  hideAnimeMetadataEntry,
-  updateAnimeMetadataEntry,
-} from "@/lib/animeLibrary";
+  getAnimeLibrary,
+  hideAnimeMetadata,
+  removeAnimeMetadata,
+  upsertAnimeMetadata,
+} from "@/lib/repositories/animeLibraryRepository";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const includeHidden = validateSessionToken(token);
-  const animes = await buildAnimeLibrary({ includeHidden });
+  const animes = await getAnimeLibrary({ includeHidden });
   return NextResponse.json({ animes });
 }
 
@@ -27,20 +27,20 @@ export async function POST(request) {
   const payload = await request.json();
 
   if ((payload?.action === "update" || payload?.action === "upsert") && payload.anime) {
-    await updateAnimeMetadataEntry(payload.key, payload.anime);
-    const animes = await buildAnimeLibrary({ includeHidden: true });
+    await upsertAnimeMetadata(payload.key, payload.anime);
+    const animes = await getAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }
 
   if (payload?.action === "delete" && payload.key) {
-    await hideAnimeMetadataEntry(payload.key);
-    const animes = await buildAnimeLibrary({ includeHidden: true });
+    await hideAnimeMetadata(payload.key);
+    const animes = await getAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }
 
   if (payload?.action === "remove" && payload.key) {
-    await deleteAnimeMetadataEntry(payload.key);
-    const animes = await buildAnimeLibrary({ includeHidden: true });
+    await removeAnimeMetadata(payload.key);
+    const animes = await getAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }
 

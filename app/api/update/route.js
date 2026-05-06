@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { ensureAuthorized } from "@/lib/auth";
-import { readLives, writeLives } from "@/lib/data";
-import { normalizeLive, normalizeLives, sortLives } from "@/lib/lives";
+import { deleteLive, getLiveStatuses, upsertLive, writeLives } from "@/lib/repositories/liveRepository";
+import { normalizeLives, sortLives } from "@/lib/lives";
 
 export async function POST(request) {
   const unauthorizedResponse = await ensureAuthorized(request);
@@ -12,34 +12,28 @@ export async function POST(request) {
 
   const payload = await request.json();
   const action = payload?.action;
-  const existingLives = await readLives();
 
   if (action === "replace" && Array.isArray(payload.lives)) {
     const nextLives = sortLives(normalizeLives(payload.lives));
     await writeLives(nextLives);
-    return NextResponse.json({ success: true, lives: nextLives });
+    const statuses = await getLiveStatuses();
+    return NextResponse.json({ success: true, lives: nextLives, statuses });
   }
 
   if (action === "upsert" && payload.live) {
-    const nextLives = [...existingLives];
-    const normalizedLive = normalizeLive(payload.live);
-    const index = nextLives.findIndex((live) => live.id === normalizedLive.id);
-
-    if (index >= 0) {
-      nextLives[index] = normalizedLive;
-    } else {
-      nextLives.unshift(normalizedLive);
-    }
-
-    const sortedLives = sortLives(nextLives);
-    await writeLives(sortedLives);
-    return NextResponse.json({ success: true, lives: sortedLives });
+    const [sortedLives, statuses] = await Promise.all([
+      upsertLive(payload.live),
+      getLiveStatuses(),
+    ]);
+    return NextResponse.json({ success: true, lives: sortedLives, statuses });
   }
 
   if (action === "delete" && payload.id) {
-    const nextLives = existingLives.filter((live) => live.id !== payload.id);
-    await writeLives(nextLives);
-    return NextResponse.json({ success: true, lives: nextLives });
+    const [nextLives, statuses] = await Promise.all([
+      deleteLive(payload.id),
+      getLiveStatuses(),
+    ]);
+    return NextResponse.json({ success: true, lives: nextLives, statuses });
   }
 
   return NextResponse.json(

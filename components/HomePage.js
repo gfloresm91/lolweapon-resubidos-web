@@ -15,6 +15,7 @@ import LoreModal from "@/components/LoreModal";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
+import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
 function getAllTags(lives) {
   return Array.from(
@@ -118,6 +119,7 @@ function areTrackerFiltersEqual(left, right) {
 export default function HomePage({
   activeView = "home",
   initialLives = EMPTY_LIST,
+  initialLiveStatuses = LIVE_STATUS_OPTIONS,
   initialAnimeLibrary = EMPTY_LIST,
   initialSpaceDrum = null,
   initialYoutubeVideos = EMPTY_LIST,
@@ -133,6 +135,7 @@ export default function HomePage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
+  const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
   const [currentView, setCurrentView] = useState(activeView);
@@ -161,6 +164,10 @@ export default function HomePage({
   useEffect(() => {
     setLives(initialLives);
   }, [initialLives]);
+
+  useEffect(() => {
+    setLiveStatuses(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
+  }, [initialLiveStatuses]);
 
   useEffect(() => {
     setAnimeLibrary(initialAnimeLibrary);
@@ -302,6 +309,7 @@ export default function HomePage({
 
       if (isMounted && response.ok) {
         setLives(data.lives || []);
+        setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
       }
     }
 
@@ -490,6 +498,7 @@ export default function HomePage({
       }
 
       setLives(data.lives);
+      setLiveStatuses(data.statuses || liveStatuses);
       setEditingLive(null);
       toast.success("Cambios guardados correctamente.");
     } catch (error) {
@@ -522,6 +531,7 @@ export default function HomePage({
       }
 
       setLives(data.lives);
+      setLiveStatuses(data.statuses || liveStatuses);
       setEditingLive(null);
       setPendingDeleteId(null);
       toast.success("Directo eliminado correctamente.");
@@ -538,6 +548,7 @@ export default function HomePage({
 
     if (response.ok) {
       setLives(data.lives || []);
+      setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
     }
   }
 
@@ -917,6 +928,7 @@ export default function HomePage({
         onSave={persistLive}
         onDelete={(id) => setPendingDeleteId(id)}
         isSaving={isSaving}
+        statuses={liveStatuses}
       />
 
       <ConfirmModal

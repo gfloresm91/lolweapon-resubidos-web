@@ -6,12 +6,13 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import TagsInput from "@/components/TagsInput";
+import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
 const emptyLive = {
   title: "",
   year: "2026",
   date: "",
-  status: "Completo",
+  status: DEFAULT_LIVE_STATUS_LABEL,
   tags: [],
   links: {
     telegram: [],
@@ -67,7 +68,7 @@ function fromDateInputValue(date) {
   return `${day}/${month}/${year}`;
 }
 
-export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, isSaving }) {
+export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, isSaving, statuses = LIVE_STATUS_OPTIONS }) {
   const [imageFile, setImageFile] = useState(null);
   const {
     control,
@@ -81,7 +82,7 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
       title: "",
       year: "2026",
       date: "",
-      status: "Completo",
+      status: DEFAULT_LIVE_STATUS_LABEL,
       tags: [],
       additional_info: "",
       links: {
@@ -118,7 +119,7 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
       title: source.title || "",
       year: source.year || "2026",
       date: toDateInputValue(source.date),
-      status: source.status || "Completo",
+      status: source.status || DEFAULT_LIVE_STATUS_LABEL,
       tags: Array.isArray(source.tags) ? source.tags : [],
       additional_info: source.additional_info || "",
       links: {
@@ -186,11 +187,11 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
             <div className="form-group-modal">
               <label>Estado</label>
               <select id="live-status" className="modal-input" {...register("status")}>
-                <option value="Completo">Completo</option>
-                <option value="Pendiente">Pendiente</option>
-                <option value="Lost media">Lost media</option>
-                <option value="Subiendo">Subiendo</option>
-                <option value="Incompleto">Incompleto</option>
+                {(statuses.length ? statuses : LIVE_STATUS_OPTIONS).map((status) => (
+                  <option key={status.code || status.label} value={status.label}>
+                    {status.label}
+                  </option>
+                ))}
               </select>
               {errors.status ? <p className="field-error">{errors.status.message}</p> : null}
             </div>

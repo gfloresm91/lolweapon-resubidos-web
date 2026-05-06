@@ -6,8 +6,9 @@ import AppSidebar from "@/components/AppSidebar";
 import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
+import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
-import { readLives } from "@/lib/data";
+import { readLives } from "@/lib/repositories/liveRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ function StatusBadge({ status }) {
   if (normalized.includes("lost")) className = "status-badge status-badge--lost";
   if (normalized.includes("subiendo")) className = "status-badge status-badge--subiendo";
 
-  return <span className={className}>{status || "Pendiente"}</span>;
+  return <span className={className}>{status || PENDING_LIVE_STATUS_LABEL}</span>;
 }
 
 function parseLiveSortDate(value) {

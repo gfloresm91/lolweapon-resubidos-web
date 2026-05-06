@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
+
 function parseDate(value) {
   const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
   return `${year}-${month}-${day}`;
@@ -29,7 +31,7 @@ function RecentLiveCard({ live }) {
     <article className="home-live-card">
       <div className="home-live-meta">
         <span>{live.date || "Sin fecha"}</span>
-        <span>{live.status || "Pendiente"}</span>
+        <span>{live.status || PENDING_LIVE_STATUS_LABEL}</span>
       </div>
       <h3>{live.title || "Sin titulo"}</h3>
       <div className="home-live-tags">

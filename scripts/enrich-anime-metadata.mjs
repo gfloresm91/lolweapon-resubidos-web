@@ -1,4 +1,12 @@
+import "dotenv/config";
+
 import { access, readFile, writeFile } from "node:fs/promises";
+
+import {
+  createPrismaClient,
+  readPostgresAnimeMetadata,
+  saveAnimeRecord,
+} from "./anime-db-utils.mjs";
 
 const ANILIST_ENDPOINT = "https://graphql.anilist.co";
 const BASE_METADATA_FILE = "data/anime-metadata.json";
@@ -12,6 +20,7 @@ const shouldForceImages = args.has("--force-images");
 const shouldRefreshTitles = args.has("--refresh-titles");
 const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
 const limit = limitArg ? Number(limitArg.split("=")[1]) : Infinity;
+const shouldUsePostgres = process.env.DATA_SOURCE === "postgres";
 
 const query = `
   query SearchAnime($search: String!) {
@@ -60,6 +69,41 @@ async function resolveMetadataFile() {
   }
 
   return BASE_METADATA_FILE;
+}
+
+async function loadMetadata() {
+  if (!shouldUsePostgres) {
+    const metadataFile = await resolveMetadataFile();
+    const rawMetadata = await readFile(metadataFile, "utf8");
+
+    return {
+      source: metadataFile,
+      metadata: JSON.parse(rawMetadata),
+      prisma: null,
+    };
+  }
+
+  const prisma = createPrismaClient();
+  return {
+    source: "postgres:Anime",
+    metadata: await readPostgresAnimeMetadata(prisma),
+    prisma,
+  };
+}
+
+async function persistMetadataUpdate({ metadata, metadataFile, prisma, key, item }) {
+  metadata[key] = item;
+
+  if (isDryRun) {
+    return;
+  }
+
+  if (shouldUsePostgres) {
+    await saveAnimeRecord(prisma, key, item);
+    return;
+  }
+
+  await writeFile(metadataFile, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 }
 
 function titleFromTag(tag) {
@@ -183,90 +227,90 @@ async function findAnime(key, item) {
   return { media: null, search: candidates[0] || key };
 }
 
-const metadataFile = await resolveMetadataFile();
+const { source: metadataFile, metadata, prisma } = await loadMetadata();
 console.log(`Usando metadata: ${metadataFile}`);
 
-const rawMetadata = await readFile(metadataFile, "utf8");
-const metadata = JSON.parse(rawMetadata);
 const entries = Object.entries(metadata);
 let enriched = 0;
 let skipped = 0;
 let failed = 0;
 let attempted = 0;
 
-for (const [key, item] of entries) {
-  if (item.libraryEnabled === false) {
-    skipped += 1;
-    continue;
-  }
-
-  const needsMetadata = !item.providerId
-    || !item.provider
-    || !item.providerUrl
-    || !item.year
-    || !item.episodes
-    || !item.format
-    || !item.status
-    || !item.description
-    || !item.image
-    || shouldRefreshTitles
-    || shouldReplaceTitle(item, key);
-
-  if (!needsMetadata) {
-    skipped += 1;
-    continue;
-  }
-
-  if (attempted >= limit) {
-    break;
-  }
-
-  attempted += 1;
-
-  try {
-    const { media, search } = await findAnime(key, item);
-
-    if (!media) {
-      failed += 1;
-      console.log(`- Sin resultado: ${item.tag || key}`);
-      await sleep(DEFAULT_DELAY_MS);
+try {
+  for (const [key, item] of entries) {
+    if (item.libraryEnabled === false) {
+      skipped += 1;
       continue;
     }
 
-    const nextItem = { ...item };
-    const providerTitle = getDisplayTitle(media);
-    const providerImage = media.coverImage?.extraLarge || media.coverImage?.large || "";
+    const needsMetadata = !item.providerId
+      || !item.provider
+      || !item.providerUrl
+      || !item.year
+      || !item.episodes
+      || !item.format
+      || !item.status
+      || !item.description
+      || !item.image
+      || shouldRefreshTitles
+      || shouldReplaceTitle(item, key);
 
-    if (providerTitle && shouldReplaceTitleWithProvider(item, key, media)) {
-      nextItem.title = providerTitle;
+    if (!needsMetadata) {
+      skipped += 1;
+      continue;
     }
 
-    if (providerImage && (shouldForceImages || !nextItem.image)) {
-      nextItem.image = providerImage;
+    if (attempted >= limit) {
+      break;
     }
 
-    nextItem.description = nextItem.description || cleanDescription(media.description);
-    nextItem.provider = "anilist";
-    nextItem.providerId = media.id;
-    nextItem.providerUrl = media.siteUrl || `https://anilist.co/anime/${media.id}`;
-    nextItem.year = nextItem.year || media.startDate?.year || null;
-    nextItem.episodes = nextItem.episodes || media.episodes || null;
-    nextItem.format = nextItem.format || media.format || "";
-    nextItem.status = nextItem.status || media.status || "";
+    attempted += 1;
 
-    metadata[key] = nextItem;
-    enriched += 1;
-    console.log(`✓ ${item.tag || key} -> ${providerTitle || media.id} (${search})`);
-  } catch (error) {
-    failed += 1;
-    console.log(`! ${item.tag || key}: ${error.message}`);
+    try {
+      const { media, search } = await findAnime(key, item);
+
+      if (!media) {
+        failed += 1;
+        console.log(`- Sin resultado: ${item.tag || key}`);
+        await sleep(DEFAULT_DELAY_MS);
+        continue;
+      }
+
+      const nextItem = { ...item };
+      const providerTitle = getDisplayTitle(media);
+      const providerImage = media.coverImage?.extraLarge || media.coverImage?.large || "";
+
+      if (providerTitle && shouldReplaceTitleWithProvider(item, key, media)) {
+        nextItem.title = providerTitle;
+      }
+
+      if (providerImage && (shouldForceImages || !nextItem.image)) {
+        nextItem.image = providerImage;
+      }
+
+      nextItem.description = nextItem.description || cleanDescription(media.description);
+      nextItem.provider = "anilist";
+      nextItem.providerId = media.id;
+      nextItem.providerUrl = media.siteUrl || `https://anilist.co/anime/${media.id}`;
+      nextItem.year = nextItem.year || media.startDate?.year || null;
+      nextItem.episodes = nextItem.episodes || media.episodes || null;
+      nextItem.format = nextItem.format || media.format || "";
+      nextItem.status = nextItem.status || media.status || "";
+
+      await persistMetadataUpdate({ metadata, metadataFile, prisma, key, item: nextItem });
+      enriched += 1;
+      console.log(`✓ ${item.tag || key} -> ${providerTitle || media.id} (${search})`);
+    } catch (error) {
+      failed += 1;
+      console.log(`! ${item.tag || key}: ${error.message}`);
+    }
+
+    await sleep(DEFAULT_DELAY_MS);
   }
-
-  await sleep(DEFAULT_DELAY_MS);
-}
-
-if (!isDryRun) {
-  await writeFile(metadataFile, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+} finally {
+  if (prisma) {
+    await prisma.$disconnect();
+  }
 }
 
 console.log("");

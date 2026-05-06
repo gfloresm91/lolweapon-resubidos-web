@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Anime {
+  id                 Int                       @id @default(autoincrement())
+  key                String                    @unique
+  title              String
+  titleEs            String?
+  image              String?
+  description        String?
+  descriptionEs      String?
+  year               Int?
+  episodes           Int?
+  formatId           Int?
+  releaseStatusId    Int?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  format             AnimeFormat?              @relation(fields: [formatId], references: [id])
+  releaseStatus      AnimeReleaseStatus?       @relation(fields: [releaseStatusId], references: [id])
+  libraryEntry       AnimeLibraryEntry?
+  externalReferences AnimeExternalReference[]
+
+  @@index([formatId])
+  @@index([releaseStatusId])
+  @@index([year])
+}
+
+model AnimeLibraryEntry {
+  id                Int               @id @default(autoincrement())
+  animeId           Int               @unique
+  watchStatusId     Int
+  trackerTagId      Int?
+  currentEpisode    Int?
+  purchasedEpisodes Int?
+  isFullSeason      Boolean           @default(false)
+  libraryEnabled    Boolean           @default(true)
+  trackerUrl        String?
+  deletedAt         DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  anime             Anime             @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  watchStatus       AnimeWatchStatus  @relation(fields: [watchStatusId], references: [id])
+  trackerTag        Tag?              @relation("AnimeLibraryTrackerTag", fields: [trackerTagId], references: [id])
+
+  @@index([watchStatusId])
+  @@index([trackerTagId])
+  @@index([libraryEnabled])
+  @@index([isFullSeason])
+  @@index([deletedAt])
+}
+
+model AnimeExternalReference {
+  id              Int              @id @default(autoincrement())
+  animeId         Int
+  providerId      Int
+  providerMediaId Int?
+  url             String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  anime           Anime            @relation(fields: [animeId], references: [id], onDelete: Cascade)
+  provider        ExternalProvider @relation(fields: [providerId], references: [id])
+
+  @@unique([animeId, providerId])
+  @@unique([providerId, providerMediaId])
+  @@index([animeId])
+  @@index([providerId])
+}
+
+model ExternalProvider {
+  id         Int                       @id @default(autoincrement())
+  code       String                    @unique
+  name       String
+  baseUrl    String?
+  isActive   Boolean                   @default(true)
+  sortOrder  Int                       @default(0)
+
+  references AnimeExternalReference[]
+}
+
+model AnimeFormat {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  animes    Anime[]
+}
+
+model AnimeReleaseStatus {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  animes    Anime[]
+}
+
+model AnimeWatchStatus {
+  id             Int                 @id @default(autoincrement())
+  code           String              @unique
+  label          String
+  isActive       Boolean             @default(true)
+  sortOrder      Int                 @default(0)
+
+  libraryEntries AnimeLibraryEntry[]
+}
+
+model TagCategory {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  icon      String?
+  isCustom  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  tags      Tag[]
+}
+
+model Tag {
+  id                    Int                 @id @default(autoincrement())
+  name                  String
+  slug                  String              @unique
+  categoryId            Int?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  category              TagCategory?        @relation(fields: [categoryId], references: [id])
+  animeLibraryEntries   AnimeLibraryEntry[] @relation("AnimeLibraryTrackerTag")
+  lives                 LiveTag[]
+
+  @@index([categoryId])
+}
+
+model Live {
+  id             Int        @id @default(autoincrement())
+  legacyId       String     @unique
+  title          String
+  date           DateTime?
+  year           Int?
+  statusId       Int?
+  image          String?
+  additionalInfo String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  status         LiveStatus? @relation(fields: [statusId], references: [id])
+  tags           LiveTag[]
+  links          LiveLink[]
+
+  @@index([statusId])
+  @@index([year])
+  @@index([date])
+}
+
+model LiveStatus {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+
+  lives     Live[]
+}
+
+model LiveTag {
+  liveId   Int
+  tagId    Int
+  position Int @default(0)
+
+  live     Live @relation(fields: [liveId], references: [id], onDelete: Cascade)
+  tag      Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([liveId, tagId])
+  @@index([tagId])
+}
+
+model LiveLink {
+  id         Int          @id @default(autoincrement())
+  liveId     Int
+  platformId Int
+  url        String
+  label      String?
+  position   Int          @default(0)
+
+  live       Live         @relation(fields: [liveId], references: [id], onDelete: Cascade)
+  platform   LinkPlatform @relation(fields: [platformId], references: [id])
+
+  @@index([liveId])
+  @@index([platformId])
+}
+
+model LinkPlatform {
+  id        Int        @id @default(autoincrement())
+  code      String     @unique
+  label     String
+  isActive  Boolean    @default(true)
+  sortOrder Int        @default(0)
+
+  links     LiveLink[]
+}
+
+model SpaceDrum {
+  id          Int                 @id @default(autoincrement())
+  key         String              @unique
+  title       String
+  subtitle    String?
+  status      String?
+  coverImage  String?
+  heroImage   String?
+  description String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  meta        SpaceDrumMeta[]
+  links       SpaceDrumLink[]
+  chapters    SpaceDrumChapter[]
+}
+
+model SpaceDrumMeta {
+  id          Int       @id @default(autoincrement())
+  spaceDrumId Int
+  label       String
+  value       String
+  position    Int       @default(0)
+
+  spaceDrum   SpaceDrum @relation(fields: [spaceDrumId], references: [id], onDelete: Cascade)
+
+  @@index([spaceDrumId])
+}
+
+model SpaceDrumLink {
+  id          Int       @id @default(autoincrement())
+  spaceDrumId Int
+  label       String
+  url         String
+  position    Int       @default(0)
+
+  spaceDrum   SpaceDrum @relation(fields: [spaceDrumId], references: [id], onDelete: Cascade)
+
+  @@index([spaceDrumId])
+}
+
+model SpaceDrumChapter {
+  id          Int              @id @default(autoincrement())
+  spaceDrumId Int
+  legacyId    String
+  title       String
+  releaseDate String?
+  summary     String?
+  position    Int              @default(0)
+
+  spaceDrum   SpaceDrum        @relation(fields: [spaceDrumId], references: [id], onDelete: Cascade)
+  pages       SpaceDrumPage[]
+
+  @@unique([spaceDrumId, legacyId])
+  @@index([spaceDrumId])
+}
+
+model SpaceDrumPage {
+  id        Int              @id @default(autoincrement())
+  chapterId Int
+  image     String
+  alt       String?
+  position  Int              @default(0)
+
+  chapter   SpaceDrumChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId])
+}

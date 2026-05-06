@@ -29,6 +29,9 @@ data/animes.local.json
 data/anime-metadata.local.json
 data/tag-settings.local.json
 data/spacedrum.local.json
+data/*.export.json
+backups/
+docker-compose.prod.yml
 
 # Logs
 *.log
@@ -46,6 +49,7 @@ Thumbs.db
 
 # TypeScript / tooling
 *.tsbuildinfo
+lib/generated/
 
 # Local tunnels
 .cloudflared/

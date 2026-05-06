@@ -16,7 +16,7 @@ La aplicacion permite:
 - administrar el archivo desde una interfaz protegida por login
 - administrar categorias globales de tags desde la interfaz admin
 - crear y editar fichas de anime con metadata de AniList bajo demanda
-- guardar los cambios sobre un dataset base o sobre un dataset local opcional
+- guardar los cambios en JSON local o en Postgres normalizado, segun `DATA_SOURCE`
 - subir miniaturas desde la interfaz admin
 
 ## Stack
@@ -27,12 +27,14 @@ La aplicacion permite:
 - `react-hook-form` + `zod` para validaciones del admin
 - `lucide-react` para iconos de navegacion
 - `sonner` para toasts
-- persistencia local en JSON
+- `Prisma` + `PostgreSQL` para persistencia normalizada
+- modo JSON para desarrollo local, fallback y exportaciones
 
 ## Requisitos
 
 - `Node.js 20+` recomendado
 - `npm`
+- `Docker` opcional, recomendado para levantar Postgres local o en el droplet
 
 ## Instalacion
 
@@ -53,6 +55,7 @@ cp .env.example .env
 ```env
 ADMIN_PASSWORD=tu-password
 ADMIN_SESSION_TOKEN=un-token-largo-y-privado
+DATA_SOURCE=json
 ```
 
 Sugerencia para generar `ADMIN_SESSION_TOKEN`:
@@ -61,12 +64,13 @@ Sugerencia para generar `ADMIN_SESSION_TOKEN`:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-4. Coloca tus datasets base en:
+4. Para trabajar en modo JSON, coloca tus datasets base en:
 
 ```text
 data/data.json
 data/anime-metadata.json
 data/tag-settings.json
+data/spacedrum.json
 ```
 
 Opcional, si quieres trabajar sin modificar los archivos versionados:
@@ -75,17 +79,32 @@ Opcional, si quieres trabajar sin modificar los archivos versionados:
 cp data/data.json data/data.local.json
 cp data/anime-metadata.json data/anime-metadata.local.json
 cp data/tag-settings.json data/tag-settings.local.json
+cp data/spacedrum.json data/spacedrum.local.json
 ```
 
 Si existe un archivo `.local.json`, la app lo usará en lugar del archivo base equivalente para leer y guardar cambios.
 
-5. Levanta el entorno de desarrollo:
+5. Para trabajar en modo Postgres local, levanta la base de datos e importa la data:
+
+```bash
+docker compose up -d postgres
+npm run db:generate
+npm run db:migrate:deploy
+DATA_SOURCE=postgres npm run db:import:anime
+DATA_SOURCE=postgres npm run db:import:lives
+DATA_SOURCE=postgres npm run db:import:tags
+DATA_SOURCE=postgres npm run db:import:spacedrum
+```
+
+En este modo `.env` debe incluir `DATA_SOURCE=postgres` y `DATABASE_URL`.
+
+6. Levanta el entorno de desarrollo:
 
 ```bash
 npm run dev
 ```
 
-6. Abre:
+7. Abre:
 
 ```text
 http://localhost:3000
@@ -104,17 +123,52 @@ npm run dev
 npm run build
 npm run start
 npm run lint
+npm run audit:data
+npm run db:generate
+npm run db:migrate
+npm run db:migrate:deploy
+npm run db:studio
+npm run db:import:anime
+npm run db:export:anime
+npm run db:import:lives
+npm run db:export:lives
+npm run db:import:tags
+npm run db:export:tags
+npm run db:import:spacedrum
+npm run db:export:spacedrum
+npm run db:backup
+npm run db:restore
 npm run enrich:anime
 ```
 
 Nota: en `Next.js 15`, `next lint` está deprecado. Si el proyecto no tiene una configuración ESLint creada, `npm run lint` puede abrir un asistente interactivo de configuración. Para verificación no interactiva, `npm run build` compila, valida tipos y recolecta las rutas.
 
-`npm run enrich:anime` consulta AniList para completar metadata faltante en `data/anime-metadata.json`. Es una herramienta de mantenimiento masivo; para administración diaria se recomienda usar el botón `Completar desde AniList` dentro del modal de la Biblioteca de anime.
+`npm run audit:data` valida la fuente activa. Con `DATA_SOURCE=json` revisa archivos JSON; con `DATA_SOURCE=postgres` revisa la BD.
+
+Los scripts `db:import:*` cargan datos desde JSON hacia Postgres. Los scripts `db:export:*` escriben archivos `.export.json` de seguridad y no sobreescriben los JSON fuente.
+
+`npm run enrich:anime` consulta AniList para completar metadata faltante. En modo JSON actualiza el archivo activo; en modo Postgres actualiza la biblioteca en BD. Es una herramienta de mantenimiento masivo; para administración diaria se recomienda usar el botón `Completar desde AniList` dentro del modal de la Biblioteca de anime.
 
 ## Variables de entorno
 
 El proyecto usa estas variables:
 
+- `DATA_SOURCE`
+  Fuente de datos activa. Usa `json` para archivos locales o `postgres` para Prisma/Postgres. Por defecto: `json`.
+- `DATABASE_URL`
+  URL de conexion de Prisma a Postgres. Requerida cuando `DATA_SOURCE=postgres`.
+- `POSTGRES_DB`
+  Nombre de la base usada por Docker Compose.
+- `POSTGRES_USER`
+  Usuario de Postgres usado por Docker Compose.
+- `POSTGRES_PASSWORD`
+  Password de Postgres usado por Docker Compose. Debe cambiarse en produccion.
+- `POSTGRES_PORT`
+  Puerto local donde Docker publica Postgres. Por defecto suele ser `5432`.
+- `BACKUP_DIR`
+  Carpeta donde `npm run db:backup` deja los dumps. Por defecto: `backups/postgres`.
+- `BACKUP_FILE`
+  Archivo `.dump` que `npm run db:restore` debe restaurar.
 - `ADMIN_PASSWORD`
   Contraseña del panel admin.
 - `ADMIN_SESSION_TOKEN`
@@ -154,6 +208,7 @@ Notas:
 
 - si no defines estas variables, el proyecto tiene valores por defecto pensados solo para entorno local
 - no uses esos valores por defecto en produccion
+- `.env` no debe versionarse; usa `.env.example` como plantilla
 
 ## Estructura del proyecto
 
@@ -211,10 +266,17 @@ components/
   TagsInput.js
 
 lib/
+  animeDbMapping.js
   animeLibrary.js
   auth.js
   data.js
+  liveDbMapping.js
   lives.js
+  prisma.js
+  repositories/
+    animeLibraryRepository.js
+    liveRepository.js
+    spaceDrumRepository.js
   spacedrum.js
   tagSettings.js
   tags.js
@@ -224,13 +286,24 @@ lib/
 
 data/
   data.json
-  data.local.json
   anime-metadata.json
-  anime-metadata.local.json
+  animes.json        # legacy/reference dataset, not used by the current UI
   spacedrum.json
-  spacedrum.local.json
   tag-settings.json
-  tag-settings.local.json
+
+docs/
+  postgres-migration.md
+
+prisma/
+  schema.prisma
+  migrations/
+
+scripts/
+  audit-data.mjs
+  import-*.mjs
+  export-*.mjs
+  backup-postgres.sh
+  restore-postgres.sh
 
 public/
   brand/
@@ -238,6 +311,9 @@ public/
   imagenes/
 
 middleware.js
+docker-compose.yml
+docker-compose.prod.example.yml
+prisma.config.ts
 ```
 
 ## Como funciona la app
@@ -293,7 +369,7 @@ En producción, el middleware reescribe la raíz según el dominio:
 `/rastreador/[id]`:
 
 - carga un registro concreto del rastreador por `id`
-- mantiene el mismo shell visual de la app: menu lateral, topbar y footer persistente
+- mantiene el mismo shell visual de la app: menu lateral, topbar y acciones superiores
 - muestra una pagina tipo watch page con player principal, metadata, tags, descripcion y links
 - convierte links `https://ok.ru/video/<id>` o `https://ok.ru/videoembed/<id>` en iframes `https://ok.ru/videoembed/<id>`
 - cuando hay varias partes de `OK.RU`, permite cambiar la parte sin abrir una pestaña nueva
@@ -315,8 +391,8 @@ Al entrar al detalle desde una card:
 
 `/biblioteca-anime/viendo`:
 
-- carga fichas desde `data/anime-metadata.json` o `data/anime-metadata.local.json`
-- cruza esas fichas con los tags categorizados como `Anime` en `data/tag-settings.json`
+- carga fichas desde el repositorio activo: JSON o Postgres
+- cruza esas fichas con los tags categorizados como `Anime`
 - muestra indicadores consistentes por cantidad de animes: total, temporada entera, con caps comprados y sin comprar
 - muestra el total de capitulos comprados como detalle secundario del indicador correspondiente
 - permite filtrar por `Entera`, `Caps comprados` y `Sin comprar`
@@ -334,7 +410,7 @@ Al entrar al detalle desde una card:
 
 `/spacedrum`:
 
-- carga una ficha del manga desde `data/spacedrum.json`
+- carga una ficha del manga desde el repositorio activo: JSON o Postgres
 - muestra portada, imagen hero, descripción, metadata y links externos
 - incluye un lector vertical por capítulos
 - está preparado para datos de prueba y para reemplazar imágenes/metadata por contenido real
@@ -344,7 +420,7 @@ Menu lateral y footer:
 
 - el brand del menu lateral usa `public/brand/lolweapon-logo.png` y el texto `LOLWEAPON`
 - los items principales del menu usan iconos de `lucide-react`
-- las vistas principales muestran un footer persistente con el texto `Por fans para fans 💜 para Kala`
+- Inicio y el detalle del rastreador mantienen un footer persistente de comunidad
 - el menu lateral incluye accesos externos a YouTube, X, Instagram, Patreon y SpaceDrum mediante `components/SocialLinks.js`
 
 ### Query params del rastreador
@@ -458,77 +534,98 @@ El acceso admin:
 
 ## Persistencia de datos
 
-El rastreador de directos puede usar dos archivos:
+La app tiene dos modos de persistencia controlados por `DATA_SOURCE`.
+
+### Modo JSON
+
+```env
+DATA_SOURCE=json
+```
+
+Este modo usa archivos en `data/` y es util para desarrollo, respaldo y comparaciones.
+
+Archivos base:
 
 ```text
 data/data.json
-data/data.local.json
-```
-
-Comportamiento:
-
-- si existe `data/data.local.json`, la app lee y escribe ahí
-- si no existe, la app usa `data/data.json`
-
-La resolución de lectura y escritura vive en `lib/data.js`.
-
-Al leer y guardar, el proyecto normaliza los datos con `lib/lives.js` para tolerar:
-
-- campos faltantes
-- arrays invalidos
-- links vacios
-- registros incompletos o heredados del archivo historico
-
-La Biblioteca de anime usa:
-
-```text
 data/anime-metadata.json
-data/anime-metadata.local.json
+data/tag-settings.json
+data/spacedrum.json
 ```
 
-Comportamiento:
-
-- si existe `data/anime-metadata.local.json`, la app lee y escribe ahí
-- si no existe, la app usa `data/anime-metadata.json`
-- `GET /api/anime-library` devuelve la biblioteca armada desde metadata, tags anime y registros del rastreador
-- `POST /api/anime-library` esta protegido y permite crear o actualizar fichas
-- `POST /api/anime-library/anilist` esta protegido y consulta AniList para rellenar campos del formulario
-- la metadata creada manualmente puede existir antes de que exista un tag del rastreador
-- si luego se crea un tag y se categoriza como `Anime`, la biblioteca deduplica por tag/titulo normalizado para evitar cards duplicadas
-
-La resolución de lectura, escritura, cruce con tags y deduplicación vive en `lib/animeLibrary.js`.
-
-La pagina `SpaceDrum` usa:
+Archivos locales opcionales:
 
 ```text
-data/spacedrum.json
+data/data.local.json
+data/anime-metadata.local.json
+data/tag-settings.local.json
 data/spacedrum.local.json
 ```
 
-Comportamiento:
+Si existe un `.local.json`, la app lo usa antes que el archivo base equivalente. Estos archivos locales estan ignorados por Git.
 
-- si existe `data/spacedrum.local.json`, la app lee ahí
-- si no existe, la app usa `data/spacedrum.json`
-- por ahora es una sección de lectura pública con data de prueba
-- en producción se recomienda mantener `NEXT_PUBLIC_ENABLE_SPACEDRUM=false` hasta publicar el contenido real
+### Modo Postgres
 
-La resolución de lectura y normalización vive en `lib/spacedrum.js`.
-
-Las categorias personalizadas de tags y los movimientos manuales entre categorias se guardan en:
-
-```text
-data/tag-settings.json
-data/tag-settings.local.json
+```env
+DATA_SOURCE=postgres
+DATABASE_URL=postgresql://usuario:password@127.0.0.1:5432/lolweapon_resubidos
 ```
 
-Comportamiento:
+Este modo usa Prisma y el schema normalizado en `prisma/schema.prisma`.
 
-- si existe `data/tag-settings.local.json`, la app lee y escribe ahí
-- si no existe, la app usa `data/tag-settings.json`
-- `GET /api/tags` es publico para que todos los usuarios vean la misma organizacion
-- `POST /api/tags` esta protegido y solo permite cambios con sesion admin
+Tablas principales:
 
-La resolución de lectura, escritura y normalización vive en `lib/tagSettings.js`.
+- `Live`, `LiveStatus`, `LiveTag`, `LiveLink`, `LinkPlatform`
+- `Anime`, `AnimeLibraryEntry`, `AnimeExternalReference`
+- `AnimeFormat`, `AnimeReleaseStatus`, `AnimeWatchStatus`
+- `Tag`, `TagCategory`
+- `SpaceDrum`, `SpaceDrumMeta`, `SpaceDrumLink`, `SpaceDrumChapter`, `SpaceDrumPage`
+
+Los catalogos (`LiveStatus`, `AnimeWatchStatus`, `AnimeFormat`, etc.) evitan repetir strings sueltos y permiten compartir estados entre UI, API, importadores y exportadores.
+
+### Repositorios
+
+La UI no lee archivos o tablas directamente. Las rutas API pasan por repositorios que compactan JSON/Postgres al mismo contrato de datos que usan los componentes:
+
+- `lib/repositories/liveRepository.js`
+- `lib/repositories/animeLibraryRepository.js`
+- `lib/repositories/spaceDrumRepository.js`
+- `lib/tagSettings.js`
+
+Esto permite cambiar entre JSON y Postgres sin modificar el frontend.
+
+### Import/export
+
+Los imports cargan JSON hacia Postgres:
+
+```bash
+DATA_SOURCE=postgres npm run db:import:anime
+DATA_SOURCE=postgres npm run db:import:lives
+DATA_SOURCE=postgres npm run db:import:tags
+DATA_SOURCE=postgres npm run db:import:spacedrum
+```
+
+Los exports escriben archivos de seguridad:
+
+```bash
+DATA_SOURCE=postgres npm run db:export:anime
+DATA_SOURCE=postgres npm run db:export:lives
+DATA_SOURCE=postgres npm run db:export:tags
+DATA_SOURCE=postgres npm run db:export:spacedrum
+```
+
+Salidas esperadas:
+
+```text
+data/anime-metadata.export.json
+data/data.export.json
+data/tag-settings.export.json
+data/spacedrum.export.json
+```
+
+Los `.export.json` tambien estan ignorados por Git.
+
+Para el detalle operativo de migracion, despliegue y backups, revisa `docs/postgres-migration.md`.
 
 ## Formato esperado del dataset
 
@@ -564,27 +661,6 @@ Cada registro del rastreador sigue esta forma:
 - los links de `telegram` se listan como enlaces externos y no se embeben
 - `image` puede estar vacio
 - `additional_info` es opcional
-
-Cada registro de `Viendo` sigue esta forma:
-
-```json
-{
-  "id": "shoujo-ramune",
-  "name": "Shoujo Ramune",
-  "current_episode": "0",
-  "purchased": "ENTERA",
-  "image": "/imagenes/shoujo-ramune.png",
-  "tracker_url": "/rastreador?tag=ShoujoRamune"
-}
-```
-
-### Reglas practicas para animes
-
-- `name` es obligatorio
-- `current_episode` puede ser numero o string
-- `purchased` puede ser un numero o `ENTERA`
-- `image` puede apuntar a una imagen versionada en `public/imagenes`
-- `tracker_url` es opcional; si no existe, el boton `Ver resubidos` usa `/rastreador?search=<nombre-del-anime>`
 
 Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sigue esta forma:
 
@@ -664,7 +740,7 @@ El archivo `data/spacedrum.json` sigue esta forma:
 
 ## Tags y categorias
 
-El panel de tags agrupa automaticamente los tags del rastreador con reglas en `lib/tags.js` y ajustes persistidos en `data/tag-settings.json`.
+El panel de tags agrupa automaticamente los tags del rastreador con reglas en `lib/tags.js` y ajustes persistidos en la fuente activa.
 
 Categorias actuales:
 
@@ -680,7 +756,7 @@ La clasificacion usa:
 - coincidencias exactas para tags concretos
 - keywords parciales para familias de tags
 - categorias personalizadas creadas por admins
-- overrides manuales en `data/tag-settings.json` cuando un admin mueve un tag desde el panel
+- overrides manuales cuando un admin mueve un tag desde el panel
 
 Desde el panel de tags:
 
@@ -690,6 +766,7 @@ Desde el panel de tags:
 - `Icono` espera un valor corto, normalmente un emoji como `🎭`, `🎵`, `📺` o `🔥`
 - si se deja el icono vacio, se usa `🏷️`
 - los cambios admin se guardan vía `POST /api/tags` y quedan visibles para todos los usuarios
+- en modo Postgres, categorias y overrides se guardan en `TagCategory` y `Tag`
 
 Si muchos tags caen en `Otros`, hay dos opciones:
 
@@ -717,11 +794,12 @@ Respuesta exitosa:
 
 ### `GET /api/lives`
 
-- devuelve el dataset normalizado
+- devuelve el dataset normalizado desde JSON o Postgres
+- incluye el catalogo de estados disponible para el modal admin
 
 ### `GET /api/anime-library`
 
-- devuelve la Biblioteca de anime armada desde `data/anime-metadata.json`, tags categorizados como anime y registros del rastreador
+- devuelve la Biblioteca de anime armada desde la fuente activa, tags categorizados como anime y registros del rastreador
 - incluye fichas sin resubidos si están habilitadas en metadata
 - deduplica entradas manuales y entradas provenientes de tags por tag/titulo normalizado
 
@@ -755,19 +833,21 @@ Ejemplo:
 
 Endpoint protegido.
 
-- consulta AniList por titulo o tag
+- consulta AniList por URL, titulo o tag
+- si el formulario trae URL de AniList, esa URL tiene prioridad sobre titulo y tag
 - devuelve metadata para rellenar el formulario de la Biblioteca de anime
-- no escribe archivos por si solo
+- no persiste cambios por si solo
 
 Ejemplo:
 
 ```json
-{ "search": "World Trigger" }
+{ "providerUrl": "https://anilist.co/anime/20729/World-Trigger/" }
 ```
 
 ### `GET /api/tags`
 
 - devuelve categorias personalizadas y movimientos manuales de tags
+- en modo Postgres, devuelve el estado compacto de `TagCategory` y `Tag`
 - es publico para que todos los usuarios vean la misma agrupacion
 
 Respuesta:
@@ -796,7 +876,8 @@ Endpoint protegido.
 
 - guarda categorias personalizadas
 - guarda overrides manuales de tags
-- normaliza los datos antes de escribir `data/tag-settings.json` o `data/tag-settings.local.json`
+- normaliza los datos antes de escribir JSON o Postgres
+- mantiene los tags de anime existentes aunque no tengan registros del rastreador
 
 Ejemplo:
 
@@ -901,7 +982,7 @@ Cuando se crea un registro automático:
 
 - `title`: título actual del directo en Twitch
 - `date` y `year`: fecha del inicio
-- `status`: `En directo`
+- `status`: `En directo`, tomado del catalogo de estados en la fuente activa
 - `tags`: `Twitch` y la categoría si existe
 - `image`: thumbnail de Twitch
 - `additional_info`: URL del canal y datos disponibles
@@ -981,38 +1062,98 @@ La autenticacion actual es simple y funcional para uso privado o de comunidad pe
 Importante:
 
 - no subas `.env`
+- no subas `docker-compose.prod.yml`, dumps de `backups/`, archivos `.local.json` o `.export.json`
 - si una credencial de `.env` se comparte por error, rota el secreto o API key afectado antes de usarlo en produccion
 - cambia siempre `ADMIN_PASSWORD` y `ADMIN_SESSION_TOKEN` antes de usarlo fuera de local
 - restringe `YOUTUBE_API_KEY` en Google Cloud por API y, si aplica, por dominio o IP
 - rota `TWITCH_CLIENT_SECRET` y `TWITCH_EVENTSUB_SECRET` si se exponen
-- la persistencia actual escribe el archivo JSON completo en cada operación
-- en plataformas serverless, los cambios escritos en archivos locales pueden no persistir; para produccion con escritura real conviene usar base de datos o storage persistente
+- en modo JSON se escribe el archivo completo en cada operación
+- para produccion con escritura real se recomienda `DATA_SOURCE=postgres`
+- Postgres debe quedar publicado solo en `127.0.0.1` o en una red privada, nunca abierto a internet
 
 ## Flujo de trabajo recomendado
 
-1. Haz backup de `data/data.json`, `data/anime-metadata.json` y `data/tag-settings.json`
-2. Si no quieres tocar el dataset versionado, crea una copia local:
+### Desarrollo en JSON
+
+1. Haz backup de `data/data.json`, `data/anime-metadata.json`, `data/tag-settings.json` y `data/spacedrum.json`.
+2. Crea copias locales si no quieres tocar el dataset versionado:
 
 ```bash
 cp data/data.json data/data.local.json
 cp data/anime-metadata.json data/anime-metadata.local.json
 cp data/tag-settings.json data/tag-settings.local.json
+cp data/spacedrum.json data/spacedrum.local.json
 ```
 
-3. Ejecuta `npm run dev`
-4. Entra a `/login`
-5. Crea o edita registros
-6. Verifica cambios en la UI
-7. Revisa el diff del archivo activo:
+3. Usa `DATA_SOURCE=json`.
+4. Ejecuta `npm run dev`.
+5. Entra a `/login`.
+6. Crea o edita registros.
+7. Verifica cambios en la UI.
+8. Revisa el diff del archivo activo.
 
-```text
-data/data.local.json
-data/data.json
-data/anime-metadata.local.json
-data/anime-metadata.json
-data/tag-settings.local.json
-data/tag-settings.json
+### Desarrollo en Postgres
+
+1. Levanta Postgres:
+
+```bash
+docker compose up -d postgres
 ```
+
+2. Ejecuta migraciones e imports:
+
+```bash
+npm run db:generate
+npm run db:migrate:deploy
+DATA_SOURCE=postgres npm run db:import:anime
+DATA_SOURCE=postgres npm run db:import:lives
+DATA_SOURCE=postgres npm run db:import:tags
+DATA_SOURCE=postgres npm run db:import:spacedrum
+```
+
+3. Usa `DATA_SOURCE=postgres`.
+4. Ejecuta `npm run dev`.
+5. Entra a `/login`.
+6. Crea o edita registros.
+7. Verifica cambios en la UI y, si hace falta, en `npm run db:studio`.
+
+### Produccion con systemd y Postgres Docker
+
+El despliegue recomendado mantiene Next.js bajo systemd y ejecuta solo Postgres en Docker.
+
+1. Copia la plantilla:
+
+```bash
+cp docker-compose.prod.example.yml docker-compose.prod.yml
+```
+
+2. Configura el `.env` existente del servidor con `DATA_SOURCE=postgres`, `DATABASE_URL` y las variables `POSTGRES_*`.
+3. Levanta Postgres:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env up -d postgres
+```
+
+4. Aplica migraciones e importa data:
+
+```bash
+DATA_SOURCE=postgres npm run db:migrate:deploy
+DATA_SOURCE=postgres npm run db:import:anime
+DATA_SOURCE=postgres npm run db:import:lives
+DATA_SOURCE=postgres npm run db:import:tags
+DATA_SOURCE=postgres npm run db:import:spacedrum
+```
+
+5. Valida:
+
+```bash
+DATA_SOURCE=postgres npm run audit:data
+DATA_SOURCE=postgres npm run build
+```
+
+6. Reinicia el servicio systemd de la app.
+
+La guia completa esta en `docs/postgres-migration.md`.
 
 ## Notas sobre rendimiento
 
@@ -1051,9 +1192,10 @@ Prueba un hard refresh:
 Revisa:
 
 - que la sesión admin siga vigente
-- que exista y sea escribible el archivo de datos activo
 - que no haya errores de validación en el modal
-- que no estes esperando persistencia de archivos locales en un entorno serverless
+- que `DATA_SOURCE` apunte a la fuente donde estas revisando los cambios
+- en modo JSON, que exista y sea escribible el archivo activo
+- en modo Postgres, que `DATABASE_URL` apunte a la BD correcta y que las migraciones estén aplicadas
 
 ### Las categorias de tags no cambian para otros usuarios
 
@@ -1061,8 +1203,9 @@ Revisa:
 
 - que el cambio se haya hecho logueado como admin
 - que `POST /api/tags` no devuelva `401`
-- que `data/tag-settings.json` o `data/tag-settings.local.json` sea escribible
-- que no estés probando contra otra instancia o entorno con otro archivo de datos
+- que `DATA_SOURCE` sea el mismo en la instancia donde estas probando
+- en modo JSON, que `data/tag-settings.json` o `data/tag-settings.local.json` sea escribible
+- en modo Postgres, que `Tag` y `TagCategory` se estén leyendo desde la misma BD
 - que el usuario público haya refrescado la pagina para volver a consultar `/api/tags`
 
 ### No suben imágenes
@@ -1108,7 +1251,8 @@ Revisa:
 - que la URL callback sea HTTPS y accesible desde internet
 - que `TWITCH_EVENTSUB_SECRET` sea el mismo al registrar y al recibir eventos
 - que hayas registrado la suscripción con el boton admin `Registrar EventSub`
-- que el servidor pueda escribir en `data/data.json` o `data/data.local.json`
+- que el servidor pueda escribir en la fuente activa
+- en modo Postgres, que el estado `En directo` exista en `LiveStatus`
 - si el directo ya está online, usa `Crear card desde Twitch` para crear el registro manualmente
 
 ### No aparecen videos de YouTube
@@ -1130,7 +1274,7 @@ Revisa:
 
 Revisa:
 
-- que el anime tenga `tracker_url` configurado si necesita un filtro especifico
+- que el anime tenga `trackerUrl` configurado si necesita un filtro especifico
 - que el tag o texto usado exista en los registros del rastreador
 - que la URL use los parametros soportados: `search`, `q`, `year`, `status` o `tag`
 

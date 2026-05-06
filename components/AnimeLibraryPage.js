@@ -1134,8 +1134,6 @@ export default function AnimeLibraryPage({
         )}
       </main>
 
-      <footer className="site-footer">Metadata editable en data/anime-metadata.json</footer>
-
       <AnimeLibraryModal
         anime={editingAnime}
         isOpen={Boolean(editingAnime)}

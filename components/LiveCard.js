@@ -3,6 +3,8 @@
 import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
+
 function statusClass(status) {
   const normalized = String(status || "").toLowerCase();
 
@@ -154,7 +156,7 @@ function LiveCard({
             }}
           >
             <span className={statusDotClass(live.status)} aria-hidden="true" />
-            {live.status || "Pendiente"}
+            {live.status || PENDING_LIVE_STATUS_LABEL}
           </button>
         </div>
 

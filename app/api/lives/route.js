@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { readLives } from "@/lib/data";
+import { getLiveStatuses, readLives } from "@/lib/repositories/liveRepository";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const lives = await readLives();
-  return NextResponse.json({ lives });
-}
+  const [lives, statuses] = await Promise.all([
+    readLives(),
+    getLiveStatuses(),
+  ]);
 
+  return NextResponse.json({ lives, statuses });
+}
