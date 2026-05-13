@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, LogOut, Settings } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 function getInitials(user) {
   const source = user?.alias || user?.login || "Admin";
@@ -17,8 +17,13 @@ function getInitials(user) {
 
 export default function AccountMenu({ user }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const menuRef = useRef(null);
   const [isOpen, setIsOpen] = useState(false);
+  const currentQuery = searchParams.toString();
+  const currentPath = `${pathname || "/"}${currentQuery ? `?${currentQuery}` : ""}`;
+  const loginHref = `/login?next=${encodeURIComponent(currentPath)}`;
 
   useEffect(() => {
     function handlePointerDown(event) {
@@ -40,9 +45,11 @@ export default function AccountMenu({ user }) {
 
   if (!user) {
     return (
-      <Link href="/login" id="btn-login-top" className="admin-icon-button" aria-label="Iniciar sesion de admin">
-        <span className="admin-icon" aria-hidden="true">A</span>
-        <span>Admin</span>
+      <Link href={loginHref} id="btn-login-top" className="admin-icon-button" aria-label="Iniciar sesión">
+        <span className="admin-icon" aria-hidden="true">
+          <User size={16} />
+        </span>
+        <span>Iniciar sesión</span>
       </Link>
     );
   }
