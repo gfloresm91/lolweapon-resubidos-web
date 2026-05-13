@@ -167,6 +167,15 @@ TWITCH_BROADCASTER_LOGIN=kalathraslolweapon
 UPLOAD_DIR=public/imagenes
 ```
 
+Si QA o produccion usan mas de un dominio para la misma app, registra cada callback en Twitch Developers. Ejemplo QA:
+
+```text
+https://resubidos-qa.lolweapon.com/api/auth/twitch/callback
+https://viendo-qa.lolweapon.com/api/auth/twitch/callback
+```
+
+La app usa el host actual cuando coincide con `RESUBIDOS_HOST` o `VIENDO_HOST`, para que la cookie OAuth `state` y el callback queden en el mismo dominio.
+
 No expongas el puerto `5432` publicamente. El compose de produccion debe publicar Postgres en `127.0.0.1`.
 
 ### 6. Limpiar data antigua para partir desde cero

@@ -181,7 +181,7 @@ El proyecto usa estas variables:
 - `TWITCH_EVENTSUB_CALLBACK_URL`
   URL publica HTTPS del listener, por ejemplo `https://tu-dominio.com/api/twitch/eventsub`.
 - `TWITCH_AUTH_REDIRECT_URI`
-  Callback OAuth para login con Twitch. Si no se define, la app usa el host actual y `/api/auth/twitch/callback`.
+  Callback OAuth principal para login con Twitch. Si el request viene desde `RESUBIDOS_HOST` o `VIENDO_HOST`, la app usa ese host y `/api/auth/twitch/callback`; esto permite iniciar sesion desde ambos dominios QA/produccion. Registra todos esos callbacks en Twitch Developers.
 - `TWITCH_ARCHIVE_TIME_ZONE`
   Zona horaria para guardar la fecha del directo. Por defecto: `America/Santiago`.
 - `TWITCH_REQUIRE_ACTIVE_STREAM`

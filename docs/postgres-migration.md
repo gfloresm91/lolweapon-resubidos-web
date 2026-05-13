@@ -84,6 +84,15 @@ TWITCH_CLIENT_SECRET=your-twitch-client-secret
 TWITCH_AUTH_REDIRECT_URI=https://tu-dominio.com/api/auth/twitch/callback
 ```
 
+If the same deployment is served by multiple domains, for example `RESUBIDOS_HOST` and `VIENDO_HOST`, register both OAuth callbacks in Twitch Developers:
+
+```text
+https://resubidos-qa.lolweapon.com/api/auth/twitch/callback
+https://viendo-qa.lolweapon.com/api/auth/twitch/callback
+```
+
+The app will use the request host for OAuth when it matches one of the configured hosts. This keeps the OAuth state cookie and callback on the same domain.
+
 The production compose binds Postgres to `127.0.0.1:${POSTGRES_PORT}` only, so it is reachable by the local systemd app but not exposed publicly.
 
 Start Postgres:
