@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { buildTwitchAuthorizeUrl, TWITCH_OAUTH_STATE_COOKIE } from "@/lib/twitchOAuth";
+import { buildTwitchAppUrl, buildTwitchAuthorizeUrl, TWITCH_OAUTH_STATE_COOKIE } from "@/lib/twitchOAuth";
 
 export async function GET(request) {
   try {
@@ -19,6 +19,6 @@ export async function GET(request) {
 
     return response;
   } catch (error) {
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error.message)}`, request.url));
+    return NextResponse.redirect(buildTwitchAppUrl(request, `/login?error=${encodeURIComponent(error.message)}`));
   }
 }

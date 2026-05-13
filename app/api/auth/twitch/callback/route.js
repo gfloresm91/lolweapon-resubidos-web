@@ -6,6 +6,7 @@ import {
   findOrCreateTwitchUser,
 } from "@/lib/repositories/platformUserRepository";
 import {
+  buildTwitchAppUrl,
   exchangeTwitchCode,
   fetchTwitchChannelMembership,
   fetchTwitchUserProfile,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/twitchOAuth";
 
 function redirectLogin(request, message) {
-  return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
+  return NextResponse.redirect(buildTwitchAppUrl(request, `/login?error=${encodeURIComponent(message)}`));
 }
 
 export async function GET(request) {
@@ -40,7 +41,7 @@ export async function GET(request) {
     }
 
     const session = await createPlatformSession(user.id);
-    const response = NextResponse.redirect(new URL("/", request.url));
+    const response = NextResponse.redirect(buildTwitchAppUrl(request, "/"));
 
     response.cookies.set(SESSION_COOKIE, session.token, {
       httpOnly: true,
