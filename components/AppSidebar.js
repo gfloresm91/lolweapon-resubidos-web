@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, House } from "lucide-react";
+import { Archive, BookOpenText, CheckCircle2, CircleDot, House, ShieldCheck, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -9,12 +9,14 @@ const SIDEBAR_ITEMS = [
     href: "/inicio",
     label: "Inicio",
     icon: House,
+    permission: "home.view",
   },
   {
     key: "tracker",
     href: "/rastreador",
     label: "Rastreador de directos",
     icon: Archive,
+    permission: "tracker.view",
   },
 ];
 
@@ -24,12 +26,14 @@ const ANIME_ITEMS = [
     href: "/biblioteca-anime/viendo",
     label: "Viendo",
     icon: CircleDot,
+    permission: "anime.tracking.view",
   },
   {
     key: "animeLibraryCompleted",
     href: "/biblioteca-anime/terminados",
     label: "Terminados",
     icon: CheckCircle2,
+    permission: "anime.completed.view",
   },
 ];
 
@@ -38,7 +42,25 @@ const SPACEDRUM_ITEM = {
   href: "/spacedrum",
   label: "SpaceDrum",
   icon: BookOpenText,
+  permission: "spacedrum.view",
 };
+
+const ADMIN_ITEMS = [
+  {
+    key: "platformUsers",
+    href: "/administracion/usuarios",
+    label: "Usuarios",
+    icon: Users,
+    permission: "users.read",
+  },
+  {
+    key: "platformRoles",
+    href: "/administracion/roles",
+    label: "Roles",
+    icon: ShieldCheck,
+    permission: "roles.read",
+  },
+];
 
 function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
   const Icon = item.icon;
@@ -76,10 +98,20 @@ export default function AppSidebar({
   activeView,
   className = "",
   id = "main-sidebar",
+  canManageUsers = false,
+  canManageRoles = false,
   isSpaceDrumEnabled = false,
+  canAccess = () => true,
   onSelect,
 }) {
   const sidebarClassName = ["sidebar", className].filter(Boolean).join(" ");
+  const sidebarItems = SIDEBAR_ITEMS.filter((item) => canAccess(item.permission));
+  const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission));
+  const adminItems = ADMIN_ITEMS.filter((item) => {
+    if (item.key === "platformUsers") return canManageUsers && canAccess(item.permission);
+    if (item.key === "platformRoles") return canManageRoles && canAccess(item.permission);
+    return false;
+  });
 
   return (
     <aside id={id} className={sidebarClassName} aria-label="Menu principal">
@@ -105,14 +137,14 @@ export default function AppSidebar({
       )}
 
       <nav className="sidebar-nav">
-        {SIDEBAR_ITEMS.map((item) => (
+        {sidebarItems.map((item) => (
           <SidebarNavItem key={item.key} item={item} activeView={activeView} onSelect={onSelect} />
         ))}
 
-        <div className="sidebar-section">
+        {animeItems.length ? <div className="sidebar-section">
           <span className="sidebar-section-label">Biblioteca de anime</span>
           <div className="sidebar-section-links" aria-label="Biblioteca de anime">
-            {ANIME_ITEMS.map((item) => (
+            {animeItems.map((item) => (
               <SidebarNavItem
                 key={item.key}
                 item={item}
@@ -122,9 +154,26 @@ export default function AppSidebar({
               />
             ))}
           </div>
-        </div>
+        </div> : null}
 
-        {isSpaceDrumEnabled ? (
+        {adminItems.length ? (
+          <div className="sidebar-section">
+            <span className="sidebar-section-label">Administración</span>
+            <div className="sidebar-section-links" aria-label="Administración">
+              {adminItems.map((item) => (
+                <SidebarNavItem
+                  key={item.key}
+                  item={item}
+                  activeView={activeView}
+                  isSectionLink
+                  onSelect={onSelect}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {isSpaceDrumEnabled && canAccess(SPACEDRUM_ITEM.permission) ? (
           <SidebarNavItem item={SPACEDRUM_ITEM} activeView={activeView} onSelect={onSelect} />
         ) : null}
       </nav>

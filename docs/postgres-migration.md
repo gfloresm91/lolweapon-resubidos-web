@@ -1,5 +1,7 @@
 # Postgres migration notes
 
+Para release, versionado y despliegue completo en DigitalOcean/systemd, revisa tambien `docs/release-and-production.md`.
+
 ## Current state
 
 The app can run with either JSON files or Postgres by changing `DATA_SOURCE`.
@@ -15,6 +17,9 @@ Postgres is normalized and now covers:
 - tracker lives, statuses, tags, and links
 - tag categories and overrides
 - SpaceDrum content
+- platform users and Twitch login sessions
+- manual login credentials, Twitch-linked users and profile avatars
+- platform roles, permissions, role-permission assignments and login attempts
 
 JSON remains useful as a local fallback, source import format, and export safety format.
 
@@ -74,6 +79,9 @@ POSTGRES_USER=lolweapon
 POSTGRES_PASSWORD=use-a-strong-password
 POSTGRES_PORT=5432
 DATABASE_URL=postgresql://lolweapon:use-a-strong-password@127.0.0.1:5432/lolweapon_resubidos
+TWITCH_CLIENT_ID=your-twitch-client-id
+TWITCH_CLIENT_SECRET=your-twitch-client-secret
+TWITCH_AUTH_REDIRECT_URI=https://tu-dominio.com/api/auth/twitch/callback
 ```
 
 The production compose binds Postgres to `127.0.0.1:${POSTGRES_PORT}` only, so it is reachable by the local systemd app but not exposed publicly.
@@ -142,6 +150,19 @@ SpaceDrum data is split across:
 - `SpaceDrumLink`
 - `SpaceDrumChapter`
 - `SpaceDrumPage`
+
+Platform administration data is split across:
+
+- `PlatformRole`: role catalog. Initial roles are `Dios`, `Admin`, `Moderador`, `TW_Tier 1`, `TW_Tier 2`, `TW_Tier 3`, `TW_VIP`, `YT_Miembro`, `Publico`, and `Invitado`.
+- `PlatformPermission`: permission catalog grouped by screen and action.
+- `PlatformRolePermission`: assignment table between roles and permissions.
+- `PlatformUser`: manual and Twitch-linked platform users, including `deletedAt` for logical deletion.
+- `PlatformSession`: persistent login sessions.
+- `LoginAttempt`: login audit and rate-limit support data.
+
+Admin access is controlled by permissions, with `Dios` acting as an immutable superuser. This keeps temporary roles editable without changing application code.
+
+Runtime seed helpers create or update default roles and permissions without using blind `upsert`, so Postgres sequences do not advance artificially on every page load.
 
 The tracker now uses the same repository switch as the anime library. With `DATA_SOURCE=json`, it reads and writes JSON. With `DATA_SOURCE=postgres`, it reads and writes normalized `Live`, `LiveStatus`, `LiveTag`, and `LiveLink` rows.
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
+import AccountMenu from "@/components/AccountMenu";
 import AdminModal from "@/components/AdminModal";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import AppSidebar from "@/components/AppSidebar";
@@ -12,6 +13,8 @@ import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
+import PlatformUsersPage from "@/components/PlatformUsersPage";
+import PlatformRolesPage from "@/components/PlatformRolesPage";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
@@ -78,6 +81,8 @@ const VIEW_LABELS = {
   tracker: "Rastreador de directos",
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Anime terminados",
+  platformUsers: "Usuarios",
+  platformRoles: "Roles",
   spacedrum: "SpaceDrum",
 };
 
@@ -86,6 +91,8 @@ const VIEW_PATHS = {
   tracker: "/rastreador",
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
+  platformUsers: "/administracion/usuarios",
+  platformRoles: "/administracion/roles",
   spacedrum: "/spacedrum",
 };
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
@@ -121,6 +128,9 @@ export default function HomePage({
   initialLives = EMPTY_LIST,
   initialLiveStatuses = LIVE_STATUS_OPTIONS,
   initialAnimeLibrary = EMPTY_LIST,
+  initialPlatformUsers = EMPTY_LIST,
+  initialPlatformRoles = EMPTY_LIST,
+  initialPlatformPermissions = EMPTY_LIST,
   initialSpaceDrum = null,
   initialYoutubeVideos = EMPTY_LIST,
   initialTwitchStream = null,
@@ -130,9 +140,23 @@ export default function HomePage({
   twitchLogin,
   youtubeChannelUrl,
   isAdmin,
+  currentUser = null,
+  accessPermissions = EMPTY_LIST,
 }) {
   const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
-  const router = useRouter();
+  const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
+  const hasPermission = (permission) => currentUser?.role === "dios" || effectivePermissions.has(permission);
+  const canManageUsers = hasPermission("users.read");
+  const canManageRoles = hasPermission("roles.read");
+  const canCreateTracker = hasPermission("tracker.create");
+  const canUpdateTracker = hasPermission("tracker.update");
+  const canDeleteTracker = hasPermission("tracker.delete");
+  const canCreateTrackingAnime = hasPermission("anime.tracking.create");
+  const canUpdateTrackingAnime = hasPermission("anime.tracking.update");
+  const canDeleteTrackingAnime = hasPermission("anime.tracking.delete");
+  const canCreateCompletedAnime = hasPermission("anime.completed.create");
+  const canUpdateCompletedAnime = hasPermission("anime.completed.update");
+  const canDeleteCompletedAnime = hasPermission("anime.completed.delete");
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -180,8 +204,7 @@ export default function HomePage({
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
     toast.error(message || "Tu sesion de admin ya no es valida. Vuelve a iniciar sesion.");
-    router.push("/login");
-    router.refresh();
+    window.location.href = "/login";
   }
 
   const stats = useMemo(() => {
@@ -442,6 +465,10 @@ export default function HomePage({
   }, [filteredLives.length, hasMoreLives]);
 
   async function uploadImage(file) {
+    if (!canCreateTracker && !canUpdateTracker && !canCreateTrackingAnime && !canUpdateTrackingAnime && !canCreateCompletedAnime && !canUpdateCompletedAnime) {
+      throw new Error("No tienes permiso para subir imagenes.");
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -464,6 +491,16 @@ export default function HomePage({
   }
 
   async function persistLive(nextLive) {
+    if (nextLive?.id && !canUpdateTracker) {
+      toast.error("No tienes permiso para editar directos.");
+      return;
+    }
+
+    if (!nextLive?.id && !canCreateTracker) {
+      toast.error("No tienes permiso para crear directos.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -511,6 +548,11 @@ export default function HomePage({
   }
 
   async function deleteLive(id) {
+    if (!canDeleteTracker) {
+      toast.error("No tienes permiso para eliminar directos.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -553,6 +595,11 @@ export default function HomePage({
   }
 
   async function archiveCurrentTwitchLive() {
+    if (!canCreateTracker) {
+      toast.error("No tienes permiso para crear directos.");
+      return;
+    }
+
     setIsTwitchActionLoading(true);
 
     try {
@@ -578,6 +625,11 @@ export default function HomePage({
   }
 
   async function registerTwitchEventSub() {
+    if (!canUpdateTracker) {
+      toast.error("No tienes permiso para configurar EventSub.");
+      return;
+    }
+
     setIsTwitchActionLoading(true);
 
     try {
@@ -601,12 +653,23 @@ export default function HomePage({
     }
   }
 
-  async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    router.refresh();
-  }
-
   function selectView(view) {
+    const viewPermissions = {
+      home: "home.view",
+      tracker: "tracker.view",
+      animeLibraryTracking: "anime.tracking.view",
+      animeLibraryCompleted: "anime.completed.view",
+      platformUsers: "users.read",
+      platformRoles: "roles.read",
+      spacedrum: "spacedrum.view",
+    };
+    const requiredPermission = viewPermissions[view];
+
+    if (requiredPermission && !hasPermission(requiredPermission)) {
+      toast.error("No tienes permiso para ver esa pantalla.");
+      return;
+    }
+
     const nextPath = VIEW_PATHS[view] || "/inicio";
     window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
@@ -679,7 +742,11 @@ export default function HomePage({
           id="main-sidebar"
           activeView={currentView}
           className={`${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
+          isAdmin={isAdmin}
+          canManageUsers={canManageUsers}
+          canManageRoles={canManageRoles}
           isSpaceDrumEnabled={isSpaceDrumEnabled}
+          canAccess={hasPermission}
           onSelect={selectView}
         />
 
@@ -690,19 +757,9 @@ export default function HomePage({
               <span className="topbar-page">{VIEW_LABELS[currentView]}</span>
             </div>
 
-            {isAdmin ? (
-              <div className="topbar-actions">
-                <button type="button" id="btn-logout" className="admin-icon-button is-logged" onClick={logout}>
-                  <span className="admin-icon" aria-hidden="true">A</span>
-                  <span>Salir</span>
-                </button>
-              </div>
-            ) : (
-              <a href="/login" id="btn-login-top" className="admin-icon-button" aria-label="Iniciar sesion de admin">
-                <span className="admin-icon" aria-hidden="true">A</span>
-                <span>Admin</span>
-              </a>
-            )}
+            <div className="topbar-actions">
+              <AccountMenu user={currentUser} canManageUsers={canManageUsers} />
+            </div>
           </header>
 
           <div className="app-wrapper">
@@ -752,7 +809,7 @@ export default function HomePage({
 
         <StatsBar stats={stats} />
 
-        {isAdmin ? (
+        {canCreateTracker ? (
           <section className="tracker-actions" aria-label="Acciones del rastreador">
             <div>
               <span className="tracker-actions-label">Administración</span>
@@ -841,7 +898,7 @@ export default function HomePage({
                   <LiveCard
                     key={live.id}
                     live={live}
-                    isAdmin={isAdmin}
+                    isAdmin={canUpdateTracker}
                     searchTerm={deferredSearch}
                     onEdit={() => setEditingLive(live)}
                     onFilterTag={(tag) =>
@@ -894,7 +951,10 @@ export default function HomePage({
             {currentView === "animeLibraryTracking" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
-                isAdmin={isAdmin}
+                canCreate={canCreateTrackingAnime}
+                canUpdate={canUpdateTrackingAnime}
+                canDelete={canDeleteTrackingAnime}
+                formVariant={hasPermission("anime.tracking.form.full") ? "full" : "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
                 onAnimesChange={setAnimeLibrary}
@@ -904,7 +964,10 @@ export default function HomePage({
             {currentView === "animeLibraryCompleted" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
-                isAdmin={isAdmin}
+                canCreate={canCreateCompletedAnime}
+                canUpdate={canUpdateCompletedAnime}
+                canDelete={canDeleteCompletedAnime}
+                formVariant={hasPermission("anime.completed.form.full") ? "full" : "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
                 onAnimesChange={setAnimeLibrary}
@@ -913,6 +976,14 @@ export default function HomePage({
 
             {isSpaceDrumEnabled && currentView === "spacedrum" ? (
               <SpaceDrumPage data={initialSpaceDrum} />
+            ) : null}
+
+            {currentView === "platformUsers" && canManageUsers ? (
+              <PlatformUsersPage initialUsers={initialPlatformUsers} initialRoles={initialPlatformRoles} currentUser={currentUser} />
+            ) : null}
+
+            {currentView === "platformRoles" && canManageRoles ? (
+              <PlatformRolesPage initialRoles={initialPlatformRoles} initialPermissions={initialPlatformPermissions} />
             ) : null}
           </div>
           <footer className="persistent-footer">
@@ -926,7 +997,13 @@ export default function HomePage({
         isOpen={Boolean(editingLive)}
         onClose={() => setEditingLive(null)}
         onSave={persistLive}
-        onDelete={(id) => setPendingDeleteId(id)}
+        onDelete={(id) => {
+          if (!canDeleteTracker) {
+            toast.error("No tienes permiso para eliminar directos.");
+            return;
+          }
+          setPendingDeleteId(id);
+        }}
         isSaving={isSaving}
         statuses={liveStatuses}
       />
@@ -952,7 +1029,7 @@ export default function HomePage({
         selectedTag={selectedTag}
         onClose={() => setIsTagPanelOpen(false)}
         onSelectTag={setSelectedTag}
-        isAdmin={isAdmin}
+        isAdmin={canUpdateTracker}
       />
     </>
   );

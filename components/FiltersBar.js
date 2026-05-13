@@ -17,7 +17,7 @@ const MONTH_LABELS = {
   "12": "Diciembre",
 };
 
-function FilterSelect({ id, label, value, options, onChange, disabled = false, disabledHint = "" }) {
+export function FilterSelect({ id, label, value, options, onChange, disabled = false, disabledHint = "" }) {
   const [isOpen, setIsOpen] = useState(false);
   const selectRef = useRef(null);
   const selectedOption = options.find((option) => option.value === value) || options[0];

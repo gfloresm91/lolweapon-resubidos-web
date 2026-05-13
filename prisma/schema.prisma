@@ -278,3 +278,108 @@ model SpaceDrumPage {
 
   @@index([chapterId])
 }
+
+model PlatformRole {
+  id          Int            @id @default(autoincrement())
+  code        String         @unique
+  label       String
+  sortOrder   Int            @default(0)
+  isActive    Boolean        @default(true)
+  canAdmin    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  users       PlatformUser[]
+  permissions PlatformRolePermission[]
+
+  @@index([isActive])
+  @@index([canAdmin])
+  @@index([sortOrder])
+}
+
+model PlatformPermission {
+  id          Int                      @id @default(autoincrement())
+  code        String                   @unique
+  label       String
+  group       String
+  description String?
+  sortOrder   Int                      @default(0)
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  roles       PlatformRolePermission[]
+
+  @@index([group])
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model PlatformRolePermission {
+  roleId       Int
+  permissionId Int
+  assignedAt   DateTime           @default(now())
+
+  role         PlatformRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   PlatformPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model PlatformUser {
+  id             Int               @id @default(autoincrement())
+  twitchUserId   String?           @unique
+  login          String            @unique
+  alias          String
+  email          String            @unique
+  avatarUrl      String?
+  twitchSubscriberTier String?
+  isTwitchModerator Boolean        @default(false)
+  isTwitchVip    Boolean           @default(false)
+  twitchRoleSyncedAt DateTime?
+  passwordHash   String?
+  passwordSalt   String?
+  passwordUpdatedAt DateTime?
+  roleId         Int
+  isActive       Boolean           @default(true)
+  deletedAt      DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  role           PlatformRole      @relation(fields: [roleId], references: [id])
+  sessions       PlatformSession[]
+
+  @@index([roleId])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model PlatformSession {
+  id        Int          @id @default(autoincrement())
+  token     String       @unique
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+
+  user      PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  login     String?
+  ip        String?
+  userAgent String?
+  success   Boolean  @default(false)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([login])
+  @@index([ip])
+  @@index([success])
+  @@index([createdAt])
+}

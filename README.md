@@ -14,6 +14,10 @@ La aplicacion permite:
 - mostrar redes oficiales en el menu lateral
 - abrir el rastreador desde animes con filtros preaplicados
 - administrar el archivo desde una interfaz protegida por login
+- iniciar sesion con usuario manual o Twitch OAuth
+- registrar usuarios manuales desde `/registro`
+- configurar perfil, email, contraseña y avatar personalizado
+- administrar usuarios, roles y permisos por pantalla desde `/administracion`
 - administrar categorias globales de tags desde la interfaz admin
 - crear y editar fichas de anime con metadata de AniList bajo demanda
 - guardar los cambios en JSON local o en Postgres normalizado, segun `DATA_SOURCE`
@@ -27,6 +31,7 @@ La aplicacion permite:
 - `react-hook-form` + `zod` para validaciones del admin
 - `lucide-react` para iconos de navegacion
 - `sonner` para toasts
+- `react-dropzone` para carga de avatar por drag and drop
 - `Prisma` + `PostgreSQL` para persistencia normalizada
 - modo JSON para desarrollo local, fallback y exportaciones
 
@@ -53,15 +58,7 @@ cp .env.example .env
 3. Define al menos estas variables:
 
 ```env
-ADMIN_PASSWORD=tu-password
-ADMIN_SESSION_TOKEN=un-token-largo-y-privado
 DATA_SOURCE=json
-```
-
-Sugerencia para generar `ADMIN_SESSION_TOKEN`:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 4. Para trabajar en modo JSON, coloca tus datasets base en:
@@ -169,10 +166,6 @@ El proyecto usa estas variables:
   Carpeta donde `npm run db:backup` deja los dumps. Por defecto: `backups/postgres`.
 - `BACKUP_FILE`
   Archivo `.dump` que `npm run db:restore` debe restaurar.
-- `ADMIN_PASSWORD`
-  Contraseña del panel admin.
-- `ADMIN_SESSION_TOKEN`
-  Token secreto usado para validar la cookie de sesión.
 - `RESUBIDOS_HOST`
   Host que debe cargar `/rastreador` cuando se visita la raíz. Ejemplo QA: `resubidos-qa.lolweapon.com`.
 - `VIENDO_HOST`
@@ -187,6 +180,8 @@ El proyecto usa estas variables:
   Secreto para verificar los webhooks de Twitch EventSub.
 - `TWITCH_EVENTSUB_CALLBACK_URL`
   URL publica HTTPS del listener, por ejemplo `https://tu-dominio.com/api/twitch/eventsub`.
+- `TWITCH_AUTH_REDIRECT_URI`
+  Callback OAuth para login con Twitch. Si no se define, la app usa el host actual y `/api/auth/twitch/callback`.
 - `TWITCH_ARCHIVE_TIME_ZONE`
   Zona horaria para guardar la fecha del directo. Por defecto: `America/Santiago`.
 - `TWITCH_REQUIRE_ACTIVE_STREAM`
@@ -201,6 +196,7 @@ El proyecto usa estas variables:
   Playlist de subidas del canal. Si la tienes, es la forma más directa para listar los últimos videos.
 - `UPLOAD_DIR`
   Carpeta donde se guardan las imagenes subidas desde el admin. Por defecto: `public/imagenes`.
+  Los avatares personalizados se sirven desde `/imagenes/avatars/<archivo>` y se guardan bajo `UPLOAD_DIR/avatars`.
 - `NEXT_PUBLIC_ENABLE_SPACEDRUM`
   Feature flag para mostrar la sección `/spacedrum` y su item de menú. Por defecto debe quedar en `false` hasta que la página esté lista para producción.
 
@@ -221,6 +217,16 @@ app/
     lives/route.js
     login/route.js
     logout/route.js
+    register/route.js
+    auth/
+      twitch/
+        start/route.js
+        callback/route.js
+    platform-users/route.js
+    platform-roles/route.js
+    profile/
+      route.js
+      avatar/route.js
     tags/route.js
     twitch/
       archive/route.js
@@ -235,7 +241,13 @@ app/
   inicio/page.js
   imagenes/
     [filename]/route.js
+    avatars/[filename]/route.js
   login/page.js
+  registro/page.js
+  perfil/page.js
+  administracion/
+    usuarios/page.js
+    roles/page.js
   layout.js
   page.js
   rastreador/
@@ -251,6 +263,12 @@ app/
 components/
   AdminModal.js
   ConfirmModal.js
+  MaintainerModal.js
+  MaintainerStats.js
+  MaintainerTable.js
+  MaintainerToolbar.js
+  AvatarUploader.js
+  AccountMenu.js
   DetailTopbarActions.js
   FiltersBar.js
   HomeDashboard.js
@@ -269,6 +287,9 @@ lib/
   animeDbMapping.js
   animeLibrary.js
   auth.js
+  serverAuth.js
+  loginSecurity.js
+  platformUserValidation.js
   data.js
   liveDbMapping.js
   lives.js
@@ -277,6 +298,7 @@ lib/
     animeLibraryRepository.js
     liveRepository.js
     spaceDrumRepository.js
+    platformUserRepository.js
   spacedrum.js
   tagSettings.js
   tags.js
@@ -293,6 +315,7 @@ data/
 
 docs/
   postgres-migration.md
+  release-and-production.md
 
 prisma/
   schema.prisma
@@ -511,9 +534,27 @@ Notas de uso:
 - si falla al guardar o unir el archivo, instala FFmpeg y vuelve a intentar
 - mientras el modal esta abierto, `Esc` lo cierra y los atajos globales del player quedan pausados
 
-### Panel admin
+### Autenticacion y administracion
 
-El admin permite:
+La app soporta tres niveles de acceso:
+
+- `Invitado`: usuario publico sin sesion. Sus permisos se administran desde el rol `Invitado`.
+- usuario registrado manualmente: entra con usuario y contraseña desde `/login`.
+- usuario externo: entra con Twitch OAuth desde `/login`; YouTube queda preparado para incorporarse mas adelante.
+
+Rutas principales:
+
+- `/login`: login manual, login Twitch y acceso a registro.
+- `/registro`: alta manual de usuario. Por defecto asigna el rol `Publico`.
+- `/perfil`: permite editar alias, email, avatar personalizado y contraseña.
+- `/administracion/usuarios`: mantenedor de usuarios.
+- `/administracion/roles`: mantenedor de roles y permisos.
+
+El login manual muestra mensajes genericos de credenciales incorrectas para no revelar si el usuario existe. Las validaciones de formularios se muestran bajo cada campo y se mantienen homologadas entre registro, perfil y mantenedores.
+
+El perfil permite reemplazar el avatar con drag and drop o selector de archivos. La app valida extension/MIME, firma real del archivo y tamaño maximo de 2 MB. Los avatares personalizados se conservan aunque el usuario vuelva a iniciar sesion con Twitch.
+
+El panel de contenido tambien permite:
 
 - crear un nuevo directo
 - editar uno existente
@@ -526,11 +567,51 @@ El admin permite:
 - crear o actualizar manualmente un card desde el directo actual de Twitch
 - registrar la suscripción EventSub para creación automática al iniciar directo
 
-El acceso admin:
+El mantenedor de usuarios permite:
+
+- crear usuarios manuales
+- editar usuario, alias, email, avatar y rol
+- cambiar contraseña desde una operacion separada
+- activar o desactivar usuarios desde una operacion con confirmacion
+- archivar usuarios con eliminacion logica mediante `deletedAt`
+- buscar por ID, alias, usuario, email o rol
+- filtrar por rol, estado y origen
+- ordenar columnas y paginar resultados
+
+Reglas protegidas:
+
+- `Dios` es unico e inmutable: no se puede eliminar, desactivar ni cambiar contraseña.
+- `Admin` no ve operaciones para el usuario `Dios`.
+- `Invitado` no se puede eliminar ni cambiar de estado.
+
+El mantenedor de roles permite:
+
+- crear y editar roles temporales o permanentes
+- activar/desactivar roles desde una operacion dedicada
+- asignar permisos por pantalla y accion
+- buscar por ID, codigo o nombre
+- crear roles sin permisos, mostrando advertencia visual
+- usar buscador interno dentro del modal de permisos
+
+Roles base actuales:
+
+- `Dios`
+- `Admin`
+- `Moderador`
+- `TW_Tier 1`
+- `TW_Tier 2`
+- `TW_Tier 3`
+- `TW_VIP`
+- `YT_Miembro`
+- `Publico`
+- `Invitado`
+
+El acceso protegido:
 
 - se hace desde `/login`
-- crea una cookie de sesión cuando la contraseña es correcta
+- crea una cookie de sesión cuando el login es correcto
 - se valida de nuevo en cada endpoint protegido
+- se controla por permisos (`users.read`, `roles.update`, `anime.tracking.view`, etc.) y por rol `Dios`
 
 ## Persistencia de datos
 
@@ -580,6 +661,8 @@ Tablas principales:
 - `AnimeFormat`, `AnimeReleaseStatus`, `AnimeWatchStatus`
 - `Tag`, `TagCategory`
 - `SpaceDrum`, `SpaceDrumMeta`, `SpaceDrumLink`, `SpaceDrumChapter`, `SpaceDrumPage`
+- `PlatformUser`, `PlatformRole`, `PlatformPermission`, `PlatformRolePermission`
+- `PlatformSession`, `LoginAttempt`
 
 Los catalogos (`LiveStatus`, `AnimeWatchStatus`, `AnimeFormat`, etc.) evitan repetir strings sueltos y permiten compartir estados entre UI, API, importadores y exportadores.
 
@@ -625,7 +708,10 @@ data/spacedrum.export.json
 
 Los `.export.json` tambien estan ignorados por Git.
 
-Para el detalle operativo de migracion, despliegue y backups, revisa `docs/postgres-migration.md`.
+Para el detalle operativo de migracion, despliegue y backups, revisa:
+
+- `docs/postgres-migration.md`
+- `docs/release-and-production.md`
 
 ## Formato esperado del dataset
 
@@ -1064,7 +1150,6 @@ Importante:
 - no subas `.env`
 - no subas `docker-compose.prod.yml`, dumps de `backups/`, archivos `.local.json` o `.export.json`
 - si una credencial de `.env` se comparte por error, rota el secreto o API key afectado antes de usarlo en produccion
-- cambia siempre `ADMIN_PASSWORD` y `ADMIN_SESSION_TOKEN` antes de usarlo fuera de local
 - restringe `YOUTUBE_API_KEY` en Google Cloud por API y, si aplica, por dominio o IP
 - rota `TWITCH_CLIENT_SECRET` y `TWITCH_EVENTSUB_SECRET` si se exponen
 - en modo JSON se escribe el archivo completo en cada operación
@@ -1172,7 +1257,7 @@ Se evito la virtualización del grid porque introducía problemas visuales con e
 
 Revisa:
 
-- que `ADMIN_PASSWORD` exista en `.env`
+- que el usuario exista, esté activo y tenga contraseña configurada
 - que reiniciaste `npm run dev` despues de cambiar variables de entorno
 
 ### No aparecen estilos

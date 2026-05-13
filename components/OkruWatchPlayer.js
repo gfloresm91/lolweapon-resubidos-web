@@ -304,7 +304,7 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
               </div>
               <button
                 type="button"
-                className="download-modal-close"
+                className="modal-close-button"
                 aria-label="Cerrar modal de descarga"
                 onClick={() => setIsDownloadModalOpen(false)}
               >

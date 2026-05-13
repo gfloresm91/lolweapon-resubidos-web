@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import HomePage from "@/components/HomePage";
-import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
+import { SESSION_COOKIE } from "@/lib/auth";
+import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { can } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses } from "@/lib/repositories/liveRepository";
 import { readSpaceDrum } from "@/lib/repositories/spaceDrumRepository";
 
@@ -15,11 +17,27 @@ export default async function SpaceDrumRoutePage() {
 
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const isAdmin = validateSessionToken(token);
-  const [spacedrum, liveStatuses] = await Promise.all([
+  const [currentUser, accessUser, isAdmin, spacedrum, liveStatuses] = await Promise.all([
+    getCurrentUserFromToken(token),
+    getAccessUserFromToken(token),
+    validateAdminSessionToken(token),
     readSpaceDrum(),
     getLiveStatuses(),
   ]);
 
-  return <HomePage activeView="spacedrum" initialLives={[]} initialLiveStatuses={liveStatuses} initialSpaceDrum={spacedrum} isAdmin={isAdmin} />;
+  if (!can(accessUser, "spacedrum.view")) {
+    notFound();
+  }
+
+  return (
+    <HomePage
+      activeView="spacedrum"
+      initialLives={[]}
+      initialLiveStatuses={liveStatuses}
+      initialSpaceDrum={spacedrum}
+      isAdmin={isAdmin}
+      currentUser={currentUser}
+      accessPermissions={accessUser?.permissions || []}
+    />
+  );
 }

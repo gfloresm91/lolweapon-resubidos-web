@@ -7,7 +7,9 @@ import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
-import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
+import { SESSION_COOKIE } from "@/lib/auth";
+import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { can } from "@/lib/repositories/platformUserRepository";
 import { readLives } from "@/lib/repositories/liveRepository";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +68,16 @@ export default async function LiveDetailPage({ params }) {
   const { id } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const isAdmin = validateSessionToken(token);
+  const [currentUser, accessUser, isAdmin] = await Promise.all([
+    getCurrentUserFromToken(token),
+    getAccessUserFromToken(token),
+    validateAdminSessionToken(token),
+  ]);
+
+  if (!can(accessUser, "tracker.view")) {
+    notFound();
+  }
+
   const lives = await readLives();
   const sortedLives = [...lives].sort((left, right) => {
     const dateCompare = parseLiveSortDate(left.date).localeCompare(parseLiveSortDate(right.date));
@@ -110,7 +121,11 @@ export default async function LiveDetailPage({ params }) {
 
         <AppSidebar
           activeView="tracker"
+          isAdmin={isAdmin}
+          canManageUsers={can(accessUser, "users.read")}
+          canManageRoles={can(accessUser, "roles.read")}
           isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
+          canAccess={(permission) => can(accessUser, permission)}
         />
 
         <div className="content-shell">
@@ -120,7 +135,7 @@ export default async function LiveDetailPage({ params }) {
               <span className="topbar-page">Resubido</span>
             </div>
 
-            <DetailTopbarActions isAdmin={isAdmin} />
+            <DetailTopbarActions currentUser={currentUser} canManageUsers={can(accessUser, "users.read")} />
           </header>
 
           <main className="app-wrapper live-detail-page">

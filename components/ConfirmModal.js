@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "lucide-react";
+
 export default function ConfirmModal({
   isOpen,
   title,
@@ -18,6 +20,9 @@ export default function ConfirmModal({
   return (
     <div className="modal-backdrop confirm-backdrop">
       <div className="modal-content confirm-modal" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={onCancel} disabled={isLoading}>
+          <X size={18} />
+        </button>
         <h2 className="modal-title">{title}</h2>
         <p className="confirm-copy">{description}</p>
 
@@ -43,4 +48,3 @@ export default function ConfirmModal({
     </div>
   );
 }
-

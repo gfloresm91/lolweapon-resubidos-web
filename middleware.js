@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth";
-
 export function middleware(request) {
   const hostname = request.headers.get("host")?.split(":")[0] || "";
   const resubidosHost = process.env.RESUBIDOS_HOST || "resubidos.lolweapon.com";
@@ -19,12 +17,6 @@ export function middleware(request) {
 
   if (request.nextUrl.pathname !== "/login") {
     return NextResponse.next();
-  }
-
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-
-  if (validateSessionToken(token)) {
-    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

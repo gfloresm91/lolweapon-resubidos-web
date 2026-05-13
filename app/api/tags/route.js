@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
+import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { readTagSettings, writeTagSettings } from "@/lib/tagSettings";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +11,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const unauthorizedResponse = await ensureAuthorized(request);
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  const authorization = await ensurePermissionAuthorized(request, "tracker.update");
+  if (authorization.response) {
+    return authorization.response;
   }
 
   const payload = await request.json();

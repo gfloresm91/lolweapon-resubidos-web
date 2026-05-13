@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "lucide-react";
 
 import { buildTagGroups, normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
 
@@ -432,8 +433,8 @@ export default function TagPanel({
                 <p className="tag-move-kicker">Cambiar categoria</p>
                 <h2 className="modal-title tag-move-modal-title">{moveDialog.tag}</h2>
               </div>
-              <button type="button" className="tag-panel-close" onClick={() => setMoveDialog(null)}>
-                ✕
+              <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={() => setMoveDialog(null)}>
+                <X size={18} />
               </button>
             </div>
 
@@ -489,8 +490,8 @@ export default function TagPanel({
                 <p className="tag-move-kicker">Nueva categoria</p>
                 <h2 className="modal-title tag-move-modal-title">Crear categoria de tags</h2>
               </div>
-              <button type="button" className="tag-panel-close" onClick={() => setCategoryDialogOpen(false)}>
-                ✕
+              <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={() => setCategoryDialogOpen(false)}>
+                <X size={18} />
               </button>
             </div>
 

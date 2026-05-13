@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
+import { ensureAnyPermissionAuthorized } from "@/lib/serverAuth";
 import { saveUploadFile } from "@/lib/uploads";
 
 export const runtime = "nodejs";
 
 export async function POST(request) {
-  const unauthorizedResponse = await ensureAuthorized(request);
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  const authorization = await ensureAnyPermissionAuthorized(request, [
+    "tracker.create",
+    "tracker.update",
+    "anime.tracking.create",
+    "anime.tracking.update",
+    "anime.completed.create",
+    "anime.completed.update",
+  ]);
+
+  if (authorization.response) {
+    return authorization.response;
   }
 
   const formData = await request.formData();

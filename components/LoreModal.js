@@ -1,3 +1,5 @@
+import { X } from "lucide-react";
+
 export default function LoreModal({ isOpen, onClose }) {
   if (!isOpen) {
     return null;
@@ -14,6 +16,9 @@ export default function LoreModal({ isOpen, onClose }) {
         }}
         onClick={(event) => event.stopPropagation()}
       >
+        <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={onClose}>
+          <X size={18} />
+        </button>
         <h2
           className="modal-title"
           style={{
@@ -52,4 +57,3 @@ export default function LoreModal({ isOpen, onClose }) {
     </div>
   );
 }
-

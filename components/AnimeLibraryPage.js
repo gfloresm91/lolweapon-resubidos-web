@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 
 import ConfirmModal from "@/components/ConfirmModal";
@@ -228,7 +229,7 @@ function getRestorablePurchasedValue(anime) {
   return value && value.toUpperCase() !== "ENTERA" ? value : "0";
 }
 
-function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete }) {
+function AnimeLibraryModal({ anime, isOpen, isSaving, formVariant = "full", canDelete = false, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(() => toEditableAnime(anime));
   const [imageFile, setImageFile] = useState(null);
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
@@ -358,10 +359,14 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
   const isCreating = !anime?.key;
   const isPersistedHidden = !isCreating && anime?.libraryEnabled === false;
   const isMobilePurchased = form.watchStatus === "purchased" || String(form.purchased || "").toUpperCase() === "ENTERA";
+  const isCompactForm = formVariant === "compact";
 
   return (
     <div className="modal-backdrop">
       <div className="modal-content anime-library-modal" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={onClose}>
+          <X size={18} />
+        </button>
         <div className="anime-library-modal-header">
           <div>
             <h2 className="modal-title">{isCreating ? "Añadir anime" : "Editar anime"}</h2>
@@ -400,13 +405,13 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <label>Título AniList</label>
                   <input className="modal-input" value={form.title} onChange={(event) => updateField("title", event.target.value)} />
                 </div>
-                <div className="form-group-modal anime-library-mobile-hidden">
+                {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
                   <label>Título personalizado</label>
                   <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
-                </div>
+                </div> : null}
               </div>
 
-              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field">
+              <div className={`form-group-modal ${isCompactForm ? "" : "anime-library-mobile-only anime-library-mobile-field"}`}>
                 <label>URL AniList</label>
                 <input
                   className="modal-input"
@@ -418,19 +423,19 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
 
               <button
                 type="button"
-                className="anime-library-metadata-button anime-library-mobile-only"
+                className={`anime-library-metadata-button ${isCompactForm ? "" : "anime-library-mobile-only"}`}
                 onClick={fetchAniListMetadata}
                 disabled={isSaving || isFetchingMetadata}
               >
                 {isFetchingMetadata ? "Buscando..." : "Completar desde AniList"}
               </button>
 
-              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field anime-library-mobile-field-after-action">
+              {!isCompactForm ? <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field anime-library-mobile-field-after-action">
                 <label>Título personalizado</label>
                 <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
-              </div>
+              </div> : null}
 
-              <div className="form-group-modal anime-library-mobile-only anime-library-mobile-field">
+              <div className={`form-group-modal ${isCompactForm ? "" : "anime-library-mobile-only anime-library-mobile-field"}`}>
                 <label>Sinopsis personalizada</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
@@ -439,7 +444,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 />
               </div>
 
-              <div className="form-group-modal anime-library-mobile-hidden">
+              {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Tag del rastreador</label>
                 <input
                   className="modal-input"
@@ -447,13 +452,13 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   value={form.tag}
                   onChange={(event) => updateField("tag", event.target.value)}
                 />
-              </div>
+              </div> : null}
 
-              <div className="form-group-modal anime-library-mobile-hidden">
+              {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Imagen por URL</label>
                 <input className="modal-input" value={form.image} onChange={(event) => updateField("image", event.target.value)} />
                 {form.image ? <p className="current-image-note">{form.image}</p> : null}
-              </div>
+              </div> : null}
 
               <div className="form-group-modal">
                 <label>Poster / Imagen local</label>
@@ -465,7 +470,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 />
               </div>
 
-              <div className="form-row anime-library-mobile-hidden">
+              <div className={isCompactForm ? "form-row" : "form-row anime-library-mobile-hidden"}>
                 <div className="form-group-modal">
                   <label>Estado biblioteca</label>
                   <select className="modal-input" value={form.watchStatus} onChange={(event) => updateWatchStatus(event.target.value)}>
@@ -474,7 +479,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                     ))}
                   </select>
                 </div>
-                <div className="form-group-modal">
+                {!isCompactForm ? <div className="form-group-modal">
                   <label>Mostrar en biblioteca</label>
                   <select
                     className="modal-input"
@@ -484,7 +489,7 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                     <option value="true">Sí</option>
                     <option value="false">No</option>
                   </select>
-                </div>
+                </div> : null}
               </div>
 
               <hr className="modal-hr" />
@@ -564,9 +569,9 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                 </button>
               </div>
 
-              <hr className="modal-hr anime-library-mobile-hidden" />
-              <h3 className="modal-subtitle anime-library-mobile-hidden">Metadata</h3>
-              <div className="form-row anime-library-mobile-hidden">
+              {!isCompactForm ? <hr className="modal-hr anime-library-mobile-hidden" /> : null}
+              {!isCompactForm ? <h3 className="modal-subtitle anime-library-mobile-hidden">Metadata</h3> : null}
+              {!isCompactForm ? <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Año</label>
                   <input className="modal-input" value={form.year} onChange={(event) => updateField("year", event.target.value)} />
@@ -575,9 +580,9 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <label>Episodios</label>
                   <input className="modal-input" value={form.episodes} onChange={(event) => updateField("episodes", event.target.value)} />
                 </div>
-              </div>
+              </div> : null}
 
-              <div className="form-row anime-library-mobile-hidden">
+              {!isCompactForm ? <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Formato</label>
                   <input className="modal-input" value={form.format} onChange={(event) => updateField("format", event.target.value)} />
@@ -586,29 +591,29 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <label>Estado AniList</label>
                   <input className="modal-input" value={form.status} onChange={(event) => updateField("status", event.target.value)} />
                 </div>
-              </div>
+              </div> : null}
 
-              <div className="form-group-modal anime-library-mobile-hidden">
+              {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Sinopsis personalizada</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
                   value={form.descriptionEs}
                   onChange={(event) => updateField("descriptionEs", event.target.value)}
                 />
-              </div>
+              </div> : null}
 
-              <div className="form-group-modal anime-library-mobile-hidden">
+              {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
                 <label>Sinopsis AniList</label>
                 <textarea
                   className="modal-input textarea-links anime-library-textarea"
                   value={form.description}
                   onChange={(event) => updateField("description", event.target.value)}
                 />
-              </div>
+              </div> : null}
 
-              <hr className="modal-hr anime-library-mobile-hidden" />
-              <h3 className="modal-subtitle anime-library-mobile-hidden">Proveedor</h3>
-              <div className="form-row anime-library-mobile-hidden">
+              {!isCompactForm ? <hr className="modal-hr anime-library-mobile-hidden" /> : null}
+              {!isCompactForm ? <h3 className="modal-subtitle anime-library-mobile-hidden">Proveedor</h3> : null}
+              {!isCompactForm ? <div className="form-row anime-library-mobile-hidden">
                 <div className="form-group-modal">
                   <label>Provider</label>
                   <input className="modal-input" value={form.provider} onChange={(event) => updateField("provider", event.target.value)} />
@@ -617,22 +622,22 @@ function AnimeLibraryModal({ anime, isOpen, isSaving, onClose, onSave, onDelete 
                   <label>Provider ID</label>
                   <input className="modal-input" value={form.providerId} onChange={(event) => updateField("providerId", event.target.value)} />
                 </div>
-              </div>
+              </div> : null}
 
-          <div className="form-group-modal anime-library-mobile-hidden">
+          {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
             <label>Provider URL</label>
             <input className="modal-input" value={form.providerUrl} onChange={(event) => updateField("providerUrl", event.target.value)} />
-          </div>
+          </div> : null}
 
-          <div className="form-group-modal anime-library-mobile-hidden">
+          {!isCompactForm ? <div className="form-group-modal anime-library-mobile-hidden">
             <label>URL resubidos</label>
             <input className="modal-input" value={form.trackerUrl} onChange={(event) => updateField("trackerUrl", event.target.value)} />
-          </div>
+          </div> : null}
             </div>
           </div>
 
           <div className="modal-actions">
-            {isPersistedHidden ? (
+            {isPersistedHidden && canDelete ? (
               <button type="button" className="btn-modal btn-modal-danger" onClick={() => onDelete(anime.key)} disabled={isSaving}>
                 Eliminar definitivamente
               </button>
@@ -704,6 +709,10 @@ function getNewAnimeDraft(mode) {
 export default function AnimeLibraryPage({
   animes: initialAnimes = [],
   isAdmin = false,
+  canCreate = isAdmin,
+  canUpdate = isAdmin,
+  canDelete = isAdmin,
+  formVariant = "full",
   isLoading = false,
   mode = "active",
   onAnimesChange,
@@ -716,6 +725,7 @@ export default function AnimeLibraryPage({
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
   const pageConfig = PAGE_CONFIG[mode] || PAGE_CONFIG.active;
+  const canManageAnime = canCreate || canUpdate || canDelete;
 
   useEffect(() => {
     setAnimes(initialAnimes);
@@ -729,12 +739,12 @@ export default function AnimeLibraryPage({
   const pageAnimes = useMemo(() => {
     return animes.filter((anime) => {
       if (anime.libraryEnabled === false) {
-        return isAdmin;
+        return canManageAnime;
       }
 
       return pageConfig.acceptsStatus(anime.watchStatus || "pending");
     });
-  }, [animes, isAdmin, mode, pageConfig]);
+  }, [animes, canManageAnime, mode, pageConfig]);
 
   const stats = useMemo(() => {
     const visiblePageAnimes = pageAnimes.filter((anime) => anime.libraryEnabled !== false);
@@ -874,6 +884,16 @@ export default function AnimeLibraryPage({
   }
 
   async function saveAnimeMetadata(form) {
+    if (form?.key && !canUpdate) {
+      toast.error("No tienes permiso para editar anime.");
+      return;
+    }
+
+    if (!form?.key && !canCreate) {
+      toast.error("No tienes permiso para crear anime.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -919,6 +939,11 @@ export default function AnimeLibraryPage({
   }
 
   async function deleteAnimeMetadata(key) {
+    if (!canDelete) {
+      toast.error("No tienes permiso para eliminar anime.");
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -974,7 +999,7 @@ export default function AnimeLibraryPage({
         ))}
       </section>
 
-      {isAdmin ? (
+      {canCreate ? (
         <section className="tracker-actions" aria-label="Acciones de biblioteca anime">
           <div>
             <span className="tracker-actions-label">Administración</span>
@@ -1001,7 +1026,7 @@ export default function AnimeLibraryPage({
           <>
             {[
               ...pageConfig.statusOptions,
-              ...(isAdmin ? [{ key: "hidden", label: `Ocultos (${stats.hidden})` }] : []),
+              ...(canManageAnime ? [{ key: "hidden", label: `Ocultos (${stats.hidden})` }] : []),
             ].map((option) => (
               <button
                 key={option.key}
@@ -1049,10 +1074,10 @@ export default function AnimeLibraryPage({
               return (
                 <article
                   key={anime.key}
-                  className={`anime-card anime-library-card ${isAdmin ? "is-admin" : ""}`}
-                  onClick={isAdmin ? () => setEditingAnime(anime) : undefined}
+                  className={`anime-card anime-library-card ${canUpdate ? "is-admin" : ""}`}
+                  onClick={canUpdate ? () => setEditingAnime(anime) : undefined}
                 >
-                  {isAdmin ? <span className="anime-edit-indicator">Editar</span> : null}
+                  {canUpdate ? <span className="anime-edit-indicator">Editar</span> : null}
                   <div className="poster-container anime-library-poster">
                     {anime.image ? (
                       <img src={anime.image} alt={anime.title} className="poster-img" loading="lazy" />
@@ -1138,6 +1163,8 @@ export default function AnimeLibraryPage({
         anime={editingAnime}
         isOpen={Boolean(editingAnime)}
         isSaving={isSaving}
+        formVariant={formVariant}
+        canDelete={canDelete}
         onClose={() => setEditingAnime(null)}
         onSave={saveAnimeMetadata}
         onDelete={(key) => setPendingDeleteKey(key)}

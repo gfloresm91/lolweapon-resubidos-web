@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { X } from "lucide-react";
 
 import TagsInput from "@/components/TagsInput";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
@@ -154,6 +155,9 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
   return (
     <div id="edit-modal" className="modal-backdrop">
       <div className="modal-content admin-modal" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={onClose}>
+          <X size={18} />
+        </button>
         <h2 id="modal-title" className="modal-title">
           {live ? "Editar Directo" : "Nuevo Directo"}
         </h2>

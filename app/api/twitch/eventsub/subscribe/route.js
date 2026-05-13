@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
+import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { createStreamOnlineSubscription } from "@/lib/twitch";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request) {
-  const unauthorizedResponse = await ensureAuthorized(request);
+  const authorization = await ensurePermissionAuthorized(request, "tracker.update");
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (authorization.response) {
+    return authorization.response;
   }
 
   try {
@@ -22,4 +22,3 @@ export async function POST(request) {
     );
   }
 }
-

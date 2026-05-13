@@ -1,6 +1,6 @@
 {
   "name": "lolweapon-resubidos-web",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "Web de resubidos para el streamer/youtuber Lolweapon",
@@ -39,6 +39,7 @@
     "prisma": "^7.8.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-dropzone": "^15.0.0",
     "react-hook-form": "^7.72.1",
     "react-virtuoso": "^4.18.5",
     "sonner": "^2.0.7",

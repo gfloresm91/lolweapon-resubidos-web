@@ -1,17 +1,30 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
+import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { deleteLive, getLiveStatuses, upsertLive, writeLives } from "@/lib/repositories/liveRepository";
 import { normalizeLives, sortLives } from "@/lib/lives";
 
 export async function POST(request) {
-  const unauthorizedResponse = await ensureAuthorized(request);
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
-  }
-
   const payload = await request.json();
   const action = payload?.action;
+  const permissionByAction = {
+    replace: "tracker.update",
+    upsert: payload?.live?.id ? "tracker.update" : "tracker.create",
+    delete: "tracker.delete",
+  };
+  const requiredPermission = permissionByAction[action];
+
+  if (!requiredPermission) {
+    return NextResponse.json(
+      { success: false, error: "Acción no soportada" },
+      { status: 400 },
+    );
+  }
+
+  const authorization = await ensurePermissionAuthorized(request, requiredPermission);
+  if (authorization.response) {
+    return authorization.response;
+  }
 
   if (action === "replace" && Array.isArray(payload.lives)) {
     const nextLives = sortLives(normalizeLives(payload.lives));
@@ -37,7 +50,7 @@ export async function POST(request) {
   }
 
   return NextResponse.json(
-    { success: false, error: "Accion no soportada" },
+    { success: false, error: "Acción no soportada" },
     { status: 400 },
   );
 }

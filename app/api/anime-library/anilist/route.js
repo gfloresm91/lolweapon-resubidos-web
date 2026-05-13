@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ensureAuthorized } from "@/lib/auth";
+import { ensureAnyPermissionAuthorized } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -65,10 +65,15 @@ function toMetadata(media) {
 }
 
 export async function POST(request) {
-  const unauthorizedResponse = await ensureAuthorized(request);
+  const authorization = await ensureAnyPermissionAuthorized(request, [
+    "anime.tracking.create",
+    "anime.tracking.update",
+    "anime.completed.create",
+    "anime.completed.update",
+  ]);
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (authorization.response) {
+    return authorization.response;
   }
 
   const payload = await request.json();
