@@ -13,6 +13,7 @@ import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
+import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformUsersPage from "@/components/PlatformUsersPage";
 import PlatformRolesPage from "@/components/PlatformRolesPage";
 import StatsBar from "@/components/StatsBar";
@@ -81,6 +82,8 @@ const VIEW_LABELS = {
   tracker: "Rastreador de directos",
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Anime terminados",
+  platformAnimeTracking: "Mantenedor Viendo",
+  platformAnimeCompleted: "Mantenedor Terminados",
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   spacedrum: "SpaceDrum",
@@ -91,6 +94,8 @@ const VIEW_PATHS = {
   tracker: "/rastreador",
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
+  platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
+  platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
   spacedrum: "/spacedrum",
@@ -146,6 +151,7 @@ export default function HomePage({
   const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
   const hasPermission = (permission) => currentUser?.role === "dios" || effectivePermissions.has(permission);
+  const canAccessAdminAnimeMaintainers = ["dios", "admin"].includes(currentUser?.role);
   const canManageUsers = hasPermission("users.read");
   const canManageRoles = hasPermission("roles.read");
   const canCreateTracker = hasPermission("tracker.create");
@@ -157,6 +163,10 @@ export default function HomePage({
   const canCreateCompletedAnime = hasPermission("anime.completed.create");
   const canUpdateCompletedAnime = hasPermission("anime.completed.update");
   const canDeleteCompletedAnime = hasPermission("anime.completed.delete");
+  const canViewTrackingAnimeMaintainer = hasPermission("admin.anime.tracking.view");
+  const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
+  const canManageTrackingAnime = canAccessAdminAnimeMaintainers && canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
+  const canManageCompletedAnime = canAccessAdminAnimeMaintainers && canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -659,6 +669,8 @@ export default function HomePage({
       tracker: "tracker.view",
       animeLibraryTracking: "anime.tracking.view",
       animeLibraryCompleted: "anime.completed.view",
+      platformAnimeTracking: "admin.anime.tracking.view",
+      platformAnimeCompleted: "admin.anime.completed.view",
       platformUsers: "users.read",
       platformRoles: "roles.read",
       spacedrum: "spacedrum.view",
@@ -745,6 +757,8 @@ export default function HomePage({
           isAdmin={isAdmin}
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
+          canManageAnimeTracking={canManageTrackingAnime}
+          canManageAnimeCompleted={canManageCompletedAnime}
           isSpaceDrumEnabled={isSpaceDrumEnabled}
           canAccess={hasPermission}
           onSelect={selectView}
@@ -984,6 +998,30 @@ export default function HomePage({
 
             {currentView === "platformRoles" && canManageRoles ? (
               <PlatformRolesPage initialRoles={initialPlatformRoles} initialPermissions={initialPlatformPermissions} />
+            ) : null}
+
+            {currentView === "platformAnimeTracking" && canManageTrackingAnime ? (
+              <PlatformAnimeMaintainerPage
+                initialAnimes={animeLibrary}
+                canCreate={canCreateTrackingAnime}
+                canUpdate={canUpdateTrackingAnime}
+                canDelete={canDeleteTrackingAnime}
+                formVariant="full"
+                mode="active"
+                onAnimesChange={setAnimeLibrary}
+              />
+            ) : null}
+
+            {currentView === "platformAnimeCompleted" && canManageCompletedAnime ? (
+              <PlatformAnimeMaintainerPage
+                initialAnimes={animeLibrary}
+                canCreate={canCreateCompletedAnime}
+                canUpdate={canUpdateCompletedAnime}
+                canDelete={canDeleteCompletedAnime}
+                formVariant="full"
+                mode="completed"
+                onAnimesChange={setAnimeLibrary}
+              />
             ) : null}
           </div>
           <footer className="persistent-footer">

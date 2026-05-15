@@ -171,6 +171,13 @@ Platform administration data is split across:
 
 Admin access is controlled by permissions, with `Dios` acting as an immutable superuser. This keeps temporary roles editable without changing application code.
 
+Anime library permissions are intentionally split in two layers:
+
+- `Anime: Viendo` and `Anime: Terminados` control public/library screen access and operational actions.
+- `Administración: Viendo` and `Administración: Terminados` control access to the admin maintainers under `/administracion/biblioteca-anime`.
+
+The admin anime maintainers require role `Dios` or `Admin`, the matching `admin.anime.*.view` permission, and at least one create/update/delete permission for that anime screen.
+
 Runtime seed helpers create or update default roles and permissions without using blind `upsert`, so Postgres sequences do not advance artificially on every page load.
 
 The tracker now uses the same repository switch as the anime library. With `DATA_SOURCE=json`, it reads and writes JSON. With `DATA_SOURCE=postgres`, it reads and writes normalized `Live`, `LiveStatus`, `LiveTag`, and `LiveLink` rows.

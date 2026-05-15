@@ -142,6 +142,7 @@ function getRoleErrorField(message) {
 
 function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
   const normalizedRole = normalizeRole(role);
+  const rolePermissionsKey = normalizedRole.permissions.join("|");
   const [draftPermissions, setDraftPermissions] = useState(normalizedRole.permissions);
   const [permissionSearch, setPermissionSearch] = useState("");
   const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
@@ -185,13 +186,12 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
   });
 
   useEffect(() => {
-    const nextRole = normalizeRole(role);
     reset({
-      code: nextRole.code,
-      label: nextRole.label,
+      code: normalizedRole.code,
+      label: normalizedRole.label,
     });
-    setDraftPermissions(nextRole.permissions);
-  }, [reset, role]);
+    setDraftPermissions(normalizedRole.permissions);
+  }, [normalizedRole.code, normalizedRole.id, normalizedRole.label, reset, rolePermissionsKey]);
 
   useEffect(() => {
     if (isGod) {

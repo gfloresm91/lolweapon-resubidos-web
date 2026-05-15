@@ -6,6 +6,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { X } from "lucide-react";
 
+import FormSelect from "@/components/FormSelect";
 import TagsInput from "@/components/TagsInput";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
@@ -171,13 +172,19 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
             </div>
             <div className="form-group-modal">
               <label>Año (Carpeta)</label>
-              <select id="live-year" className="modal-input" {...register("year")}>
-                {["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019"].map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="year"
+                render={({ field }) => (
+                  <FormSelect
+                    id="live-year"
+                    label="Año"
+                    value={field.value}
+                    options={["2026", "2025", "2024", "2023", "2022", "2021", "2020", "2019"].map((year) => ({ value: year, label: year }))}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
               {errors.year ? <p className="field-error">{errors.year.message}</p> : null}
             </div>
           </div>
@@ -190,13 +197,19 @@ export default function AdminModal({ live, isOpen, onClose, onSave, onDelete, is
             </div>
             <div className="form-group-modal">
               <label>Estado</label>
-              <select id="live-status" className="modal-input" {...register("status")}>
-                {(statuses.length ? statuses : LIVE_STATUS_OPTIONS).map((status) => (
-                  <option key={status.code || status.label} value={status.label}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <FormSelect
+                    id="live-status"
+                    label="Estado"
+                    value={field.value}
+                    options={(statuses.length ? statuses : LIVE_STATUS_OPTIONS).map((status) => ({ value: status.label, label: status.label }))}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
               {errors.status ? <p className="field-error">{errors.status.message}</p> : null}
             </div>
           </div>

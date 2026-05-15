@@ -18,6 +18,7 @@ La aplicacion permite:
 - registrar usuarios manuales desde `/registro`
 - configurar perfil, email, contraseña y avatar personalizado
 - administrar usuarios, roles y permisos por pantalla desde `/administracion`
+- administrar los mantenedores de `Viendo` y `Terminados` desde `/administracion/biblioteca-anime`
 - administrar categorias globales de tags desde la interfaz admin
 - crear y editar fichas de anime con metadata de AniList bajo demanda
 - guardar los cambios en JSON local o en Postgres normalizado, segun `DATA_SOURCE`
@@ -248,6 +249,9 @@ app/
   administracion/
     usuarios/page.js
     roles/page.js
+    biblioteca-anime/
+      viendo/page.js
+      terminados/page.js
   layout.js
   page.js
   rastreador/
@@ -549,6 +553,8 @@ Rutas principales:
 - `/perfil`: permite editar alias, email, avatar personalizado y contraseña.
 - `/administracion/usuarios`: mantenedor de usuarios.
 - `/administracion/roles`: mantenedor de roles y permisos.
+- `/administracion/biblioteca-anime/viendo`: mantenedor administrativo de animes en seguimiento.
+- `/administracion/biblioteca-anime/terminados`: mantenedor administrativo de animes terminados.
 
 El login manual muestra mensajes genericos de credenciales incorrectas para no revelar si el usuario existe. Las validaciones de formularios se muestran bajo cada campo y se mantienen homologadas entre registro, perfil y mantenedores.
 
@@ -593,6 +599,16 @@ El mantenedor de roles permite:
 - crear roles sin permisos, mostrando advertencia visual
 - usar buscador interno dentro del modal de permisos
 
+Los mantenedores administrativos de Biblioteca Anime permiten:
+
+- crear fichas desde busqueda de AniList o de forma manual
+- editar metadata, progreso, estado, imagen y URL de rastreador
+- seleccionar o crear tags de resubidos
+- generar automaticamente la URL del rastreador desde tag o titulo
+- ocultar/mostrar fichas desde una operacion dedicada
+- eliminar fichas con confirmacion
+- filtrar, ordenar y paginar con la tabla estandarizada de mantenedores
+
 Roles base actuales:
 
 - `Dios`
@@ -612,6 +628,9 @@ El acceso protegido:
 - crea una cookie de sesión cuando el login es correcto
 - se valida de nuevo en cada endpoint protegido
 - se controla por permisos (`users.read`, `roles.update`, `anime.tracking.view`, etc.) y por rol `Dios`
+- separa permisos públicos de biblioteca (`Anime: Viendo`, `Anime: Terminados`) de permisos de mantenedores administrativos (`Administración: Viendo`, `Administración: Terminados`)
+- los mantenedores administrativos de Viendo y Terminados requieren rol `Dios` o `Admin`, permiso del módulo administrativo y al menos una acción operativa sobre esa pantalla
+- el menú de administración mantiene el orden estándar: Usuarios, Roles, Viendo y Terminados
 
 ## Persistencia de datos
 
@@ -778,7 +797,8 @@ Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sig
 ### Reglas practicas para la Biblioteca de anime
 
 - `tag` conecta la ficha con los tags del rastreador
-- si `trackerUrl` está vacio, se usa `/rastreador?tag=<tag>`
+- si `trackerUrl` está vacio, se genera una URL al rastreador con `/rastreador?tag=<tag>`; si no hay tag, se usa `/rastreador?search=<titulo>`
+- `trackerUrl` permite reemplazar el enlace generado cuando se necesita un filtro especifico del rastreador
 - `currentEpisode` indica el capitulo actual visto
 - `episodes` indica el total de episodios y se usa junto a `currentEpisode` para la barra de progreso
 - `purchased` puede ser `0`, un numero de capitulos comprados o `ENTERA`
@@ -790,6 +810,7 @@ Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sig
 - `libraryEnabled=false` oculta la ficha de la biblioteca
 - las fichas creadas desde la web se guardan por `POST /api/anime-library`
 - el boton `Completar desde AniList` solo rellena el formulario; no guarda cambios hasta presionar `Guardar`
+- en administracion, Viendo usa el modo `watching`/`purchased` y Terminados usa el modo `completed`
 
 El archivo `data/spacedrum.json` sigue esta forma:
 
@@ -1361,7 +1382,8 @@ Revisa:
 
 - que el anime tenga `trackerUrl` configurado si necesita un filtro especifico
 - que el tag o texto usado exista en los registros del rastreador
-- que la URL use los parametros soportados: `search`, `q`, `year`, `status` o `tag`
+- que la URL use `/rastreador` o una URL `http/https` valida
+- que los parametros internos soportados sean `tag`, `search`, `q`, `year`, `month` o `status`
 
 ### Un link OK.RU no aparece en el player
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, House, ShieldCheck, Users } from "lucide-react";
+import { Archive, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -60,6 +60,20 @@ const ADMIN_ITEMS = [
     icon: ShieldCheck,
     permission: "roles.read",
   },
+  {
+    key: "platformAnimeTracking",
+    href: "/administracion/biblioteca-anime/viendo",
+    label: "Viendo",
+    icon: CircleDot,
+    permission: "admin.anime.tracking.view",
+  },
+  {
+    key: "platformAnimeCompleted",
+    href: "/administracion/biblioteca-anime/terminados",
+    label: "Terminados",
+    icon: Library,
+    permission: "admin.anime.completed.view",
+  },
 ];
 
 function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
@@ -100,6 +114,8 @@ export default function AppSidebar({
   id = "main-sidebar",
   canManageUsers = false,
   canManageRoles = false,
+  canManageAnimeTracking = false,
+  canManageAnimeCompleted = false,
   isSpaceDrumEnabled = false,
   canAccess = () => true,
   onSelect,
@@ -108,6 +124,8 @@ export default function AppSidebar({
   const sidebarItems = SIDEBAR_ITEMS.filter((item) => canAccess(item.permission));
   const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission));
   const adminItems = ADMIN_ITEMS.filter((item) => {
+    if (item.key === "platformAnimeTracking") return canManageAnimeTracking && canAccess(item.permission);
+    if (item.key === "platformAnimeCompleted") return canManageAnimeCompleted && canAccess(item.permission);
     if (item.key === "platformUsers") return canManageUsers && canAccess(item.permission);
     if (item.key === "platformRoles") return canManageRoles && canAccess(item.permission);
     return false;

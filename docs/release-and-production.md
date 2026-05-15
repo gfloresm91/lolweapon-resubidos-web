@@ -6,15 +6,15 @@ Guia operativa para versionar, commitear y desplegar la app en un droplet de Dig
 
 La version actual vive en `package.json` y `package-lock.json`.
 
-Para este cambio se recomienda subir version **minor**, porque agrega login manual/Twitch, perfil, administracion de usuarios, roles, permisos, avatares y migraciones:
+Para este ciclo se recomienda subir version **minor** si `v1.7.3` ya fue publicada, porque agrega mantenedores administrativos para Biblioteca Anime, nuevos permisos por módulo, rutas administrativas y migraciones:
 
 ```bash
 npm version minor --no-git-tag-version
 ```
 
-Ejemplo: `1.6.0` pasa a `1.7.0`.
+Ejemplo: `1.7.3` pasa a `1.8.0`.
 
-Usa `patch` solo para correcciones pequeñas:
+Usa `patch` solo si estos cambios todavía son parte del mismo release no publicado y solo estás cerrando ajustes sobre esa versión:
 
 ```bash
 npm version patch --no-git-tag-version
@@ -58,9 +58,9 @@ git add -A
 Commit recomendado para este trabajo:
 
 ```bash
-git commit -m "feat(admin): add platform auth and role management" \
-  -m "Add manual and Twitch login, registration, profile settings, avatar upload, platform users, role permissions, protected roles, reusable maintainer UI, and Postgres migrations for platform administration." \
-  -m "Document release, versioning, and DigitalOcean production deployment steps."
+git commit -m "feat(admin): add anime library maintainers" \
+  -m "Add administration screens for Viendo and Terminados, separate admin anime permissions from public library permissions, and keep maintainer UI consistent with users and roles." \
+  -m "Document role permissions, menu order, database migration, and release steps."
 ```
 
 Si prefieres separar documentacion en otro commit:
@@ -69,12 +69,12 @@ Si prefieres separar documentacion en otro commit:
 git commit -m "docs: document platform administration deployment"
 ```
 
-Tag opcional despues del commit:
+Tag recomendado despues del commit si vas a liberar esta version:
 
 ```bash
-git tag v1.7.0
+git tag v1.8.0
 git push origin <branch>
-git push origin v1.7.0
+git push origin v1.8.0
 ```
 
 ## Checklist local antes de produccion
@@ -216,7 +216,7 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres \
 npm run db:migrate:deploy
 ```
 
-Este paso crea tablas como `PlatformUser`, `PlatformRole`, `PlatformPermission`, `PlatformSession`, `LoginAttempt` y el resto del modelo normalizado.
+Este paso crea tablas como `PlatformUser`, `PlatformRole`, `PlatformPermission`, `PlatformSession`, `LoginAttempt` y el resto del modelo normalizado. También aplica permisos nuevos como `admin.anime.tracking.view` y `admin.anime.completed.view`.
 
 ### 8. Importar data base
 
