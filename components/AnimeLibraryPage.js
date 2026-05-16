@@ -508,12 +508,15 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
   function updateField(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
     setFieldErrors((current) => {
-      if (!current[field]) {
+      if (!current[field] && !(field === "titleEs" && current.title)) {
         return current;
       }
 
       const nextErrors = { ...current };
       delete nextErrors[field];
+      if (field === "titleEs") {
+        delete nextErrors.title;
+      }
       return nextErrors;
     });
   }
@@ -552,11 +555,14 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
   function submit(event) {
     event.preventDefault();
 
-    const nextErrors = getAnimeFormErrors(form, { validateTrackerUrl: !isCompactForm });
+    const normalizedForm = isCompactForm && !String(form.title || "").trim()
+      ? { ...form, title: String(form.titleEs || "").trim() }
+      : form;
+    const nextErrors = getAnimeFormErrors(normalizedForm, { validateTrackerUrl: !isCompactForm });
     if (imageError) {
       nextErrors.imageFile = imageError;
     }
-    const duplicateError = getDuplicateAnimeError(form, existingAnimes, anime?.key || "");
+    const duplicateError = getDuplicateAnimeError(normalizedForm, existingAnimes, anime?.key || "");
     if (duplicateError) {
       nextErrors.form = duplicateError;
     }
@@ -574,8 +580,8 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
     }
 
     onSave({
-      ...form,
-      purchased: form.watchStatus === "purchased" ? "ENTERA" : form.purchased,
+      ...normalizedForm,
+      purchased: normalizedForm.watchStatus === "purchased" ? "ENTERA" : normalizedForm.purchased,
       imageFile,
     });
   }
@@ -745,39 +751,33 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
               >
                 {hasAniListMetadata ? "Cambiar ficha AniList" : "Buscar en AniList"}
               </button>
-              {isCompactForm && isCreating ? (
-                <div className="form-group-modal">
-                  <label>Título original</label>
-                  <input
-                    className="modal-input"
-                    value={form.title}
-                    readOnly={hasAniListMetadata}
-                    aria-invalid={Boolean(fieldErrors.title)}
-                    aria-describedby={fieldErrors.title ? "anime-title-error" : undefined}
-                    onChange={(event) => updateField("title", event.target.value)}
-                  />
-                  {fieldErrors.title ? <span id="anime-title-error" className="field-error">{fieldErrors.title}</span> : null}
-                  {hasAniListMetadata ? <span className="field-help">Gestionado por la ficha AniList seleccionada.</span> : null}
-                </div>
-              ) : null}
-              <div className="form-row">
-                <div className="form-group-modal">
-                  <label>Tag de resubidos</label>
-                  <TagCombobox
-                    value={form.tag}
-                    tags={availableTags}
-                    tagCounts={tagCounts}
-                    onChange={(nextTag) => updateField("tag", nextTag)}
-                  />
-                  <span className="field-help">Se usa para enlazar VODs del rastreador con esta ficha.</span>
-                </div>
+              <div className={`form-row ${isCompactForm ? "is-single-column" : ""}`}>
+                {!isCompactForm ? (
+                  <div className="form-group-modal">
+                    <label>Tag de resubidos</label>
+                    <TagCombobox
+                      value={form.tag}
+                      tags={availableTags}
+                      tagCounts={tagCounts}
+                      onChange={(nextTag) => updateField("tag", nextTag)}
+                    />
+                    <span className="field-help">Se usa para enlazar VODs del rastreador con esta ficha.</span>
+                  </div>
+                ) : null}
                 <div className="form-group-modal">
                   <label>Título visible</label>
-                  <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
+                  <input
+                    className="modal-input"
+                    value={form.titleEs}
+                    aria-invalid={isCompactForm && Boolean(fieldErrors.title)}
+                    aria-describedby={isCompactForm && fieldErrors.title ? "anime-title-visible-error" : undefined}
+                    onChange={(event) => updateField("titleEs", event.target.value)}
+                  />
+                  {isCompactForm && fieldErrors.title ? <span id="anime-title-visible-error" className="field-error">{fieldErrors.title}</span> : null}
                 </div>
               </div>
 
-              <div className="form-row">
+              <div className={`form-row ${isCompactForm ? "is-single-column" : ""}`}>
                 <div className="form-group-modal">
                   <label>Estado seguimiento</label>
                   <FormSelect
@@ -788,33 +788,39 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                     onChange={updateWatchStatus}
                   />
                 </div>
-                <div className="form-group-modal">
-                  <label>Mostrar en biblioteca</label>
-                  <FormSelect
-                    id="anime-library-enabled"
-                    label="Mostrar en biblioteca"
-                    value={form.libraryEnabled ? "true" : "false"}
-                    options={VISIBILITY_SELECT_OPTIONS}
-                    onChange={(value) => updateField("libraryEnabled", value === "true")}
-                  />
-                </div>
+                {!isCompactForm ? (
+                  <div className="form-group-modal">
+                    <label>Mostrar en biblioteca</label>
+                    <FormSelect
+                      id="anime-library-enabled"
+                      label="Mostrar en biblioteca"
+                      value={form.libraryEnabled ? "true" : "false"}
+                      options={VISIBILITY_SELECT_OPTIONS}
+                      onChange={(value) => updateField("libraryEnabled", value === "true")}
+                    />
+                  </div>
+                ) : null}
               </div>
 
-              <div className="form-group-modal">
-                <label>Enlace resubidos generado</label>
-                <input className="modal-input" value={generatedTrackerUrl} readOnly />
-                <span className="field-help">Se genera automáticamente desde el tag o el título. Puedes reemplazarlo con una URL personalizada.</span>
-              </div>
+              {!isCompactForm ? (
+                <>
+                  <div className="form-group-modal">
+                    <label>Enlace resubidos generado</label>
+                    <input className="modal-input" value={generatedTrackerUrl} readOnly />
+                    <span className="field-help">Se genera automáticamente desde el tag o el título. Puedes reemplazarlo con una URL personalizada.</span>
+                  </div>
 
-              <button
-                type="button"
-                className="anime-library-advanced-toggle anime-library-tracker-url-toggle"
-                onClick={() => setIsTrackerUrlOpen((current) => !current)}
-              >
-                {isTrackerUrlOpen ? "Ocultar URL personalizada" : "Usar URL personalizada de resubidos"}
-              </button>
+                  <button
+                    type="button"
+                    className="anime-library-advanced-toggle anime-library-tracker-url-toggle"
+                    onClick={() => setIsTrackerUrlOpen((current) => !current)}
+                  >
+                    {isTrackerUrlOpen ? "Ocultar URL personalizada" : "Usar URL personalizada de resubidos"}
+                  </button>
+                </>
+              ) : null}
 
-              {isTrackerUrlOpen ? (
+              {!isCompactForm && isTrackerUrlOpen ? (
                 <div className="form-group-modal">
                   <label>URL personalizada de resubidos</label>
                   <input
@@ -1046,16 +1052,6 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                     </button>
                   ) : null}
                 </div>
-              ) : null}
-              {isCompactForm && hasAniListMetadata ? (
-                <button
-                  type="button"
-                  className="btn-modal btn-modal-danger anime-library-clear-metadata-button"
-                  onClick={() => setIsClearAniListConfirmOpen(true)}
-                  disabled={isSaving}
-                >
-                  Quitar ficha AniList
-                </button>
               ) : null}
               {fieldErrors.form ? <p className="field-error">{fieldErrors.form}</p> : null}
             </div>
