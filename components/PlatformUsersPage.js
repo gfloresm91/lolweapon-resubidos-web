@@ -188,6 +188,7 @@ function normalizeDraft(user) {
 function PlatformUserModal({ user, editableRoles, isSaving, onCancel, onSubmit }) {
   const isTwitchUser = Boolean(user.twitchUserId);
   const isCreating = !user.id;
+  const isGodUser = user.role === "dios";
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [avatarError, setAvatarError] = useState("");
@@ -449,12 +450,15 @@ function PlatformUserModal({ user, editableRoles, isSaving, onCancel, onSubmit }
             id="platform-user-role"
             label="Rol"
             value={watch("role")}
-            options={editableRoles.map((role) => ({
+            options={(isGodUser ? editableRoles.filter((role) => role.code === "dios") : editableRoles).map((role) => ({
               value: role.code,
               label: `${role.label}${role.canAdmin ? " · admin" : ""}`,
             }))}
+            disabled={isGodUser}
+            disabledHint="El usuario Dios no puede cambiar de rol."
             onChange={(role) => setValue("role", role, { shouldDirty: true, shouldValidate: true })}
           />
+          {isGodUser ? <span className="field-help">El rol Dios es inmutable.</span> : null}
           {errors.role ? <span className="field-error">{errors.role.message}</span> : null}
         </div>
         </div>
