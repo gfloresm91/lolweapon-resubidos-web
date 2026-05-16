@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
 
+import { readJsonRequest } from "@/lib/http";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
-import { deleteLive, getLiveStatuses, upsertLive, writeLives } from "@/lib/repositories/liveRepository";
+import { deleteLive, getLiveStatuses, updateLiveStatus, upsertLive, writeLives } from "@/lib/repositories/liveRepository";
 import { normalizeLives, sortLives } from "@/lib/lives";
+import { getTrackerValidationMessage, trackerLivePayloadSchema } from "@/lib/trackerValidation";
 
 export async function POST(request) {
-  const payload = await request.json();
+  const payload = await readJsonRequest(request);
+
+  if (!payload) {
+    return NextResponse.json({ success: false, error: "Solicitud inválida." }, { status: 400 });
+  }
+
   const action = payload?.action;
   const permissionByAction = {
     replace: "tracker.update",
+    create: "tracker.create",
     upsert: payload?.live?.id ? "tracker.update" : "tracker.create",
+    status: "tracker.update",
     delete: "tracker.delete",
   };
   const requiredPermission = permissionByAction[action];
@@ -33,9 +42,18 @@ export async function POST(request) {
     return NextResponse.json({ success: true, lives: nextLives, statuses });
   }
 
-  if (action === "upsert" && payload.live) {
+  if ((action === "upsert" || action === "create") && payload.live) {
+    const validation = trackerLivePayloadSchema.safeParse(payload.live);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { success: false, error: getTrackerValidationMessage(validation.error) },
+        { status: 400 },
+      );
+    }
+
     const [sortedLives, statuses] = await Promise.all([
-      upsertLive(payload.live),
+      upsertLive(validation.data),
       getLiveStatuses(),
     ]);
     return NextResponse.json({ success: true, lives: sortedLives, statuses });
@@ -44,6 +62,14 @@ export async function POST(request) {
   if (action === "delete" && payload.id) {
     const [nextLives, statuses] = await Promise.all([
       deleteLive(payload.id),
+      getLiveStatuses(),
+    ]);
+    return NextResponse.json({ success: true, lives: nextLives, statuses });
+  }
+
+  if (action === "status" && payload.id && payload.status) {
+    const [nextLives, statuses] = await Promise.all([
+      updateLiveStatus(payload.id, payload.status),
       getLiveStatuses(),
     ]);
     return NextResponse.json({ success: true, lives: nextLives, statuses });

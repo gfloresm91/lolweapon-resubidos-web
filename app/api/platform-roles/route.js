@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonRequest } from "@/lib/http";
 import { ensureRoleManagementAuthorized } from "@/lib/serverAuth";
 import {
   listPlatformPermissions,
@@ -30,7 +31,11 @@ export async function POST(request) {
     return authorization.response;
   }
 
-  const payload = await request.json();
+  const payload = await readJsonRequest(request);
+
+  if (!payload) {
+    return NextResponse.json({ success: false, error: "Solicitud inválida." }, { status: 400 });
+  }
 
   try {
     if ((payload?.action === "create" || payload?.action === "update") && payload.role) {

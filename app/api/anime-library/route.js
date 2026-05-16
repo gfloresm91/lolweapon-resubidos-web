@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth";
+import { readJsonRequest } from "@/lib/http";
 import { ensureAnyPermissionAuthorized, ensurePermissionAuthorized, validateAnyPermissionSessionToken } from "@/lib/serverAuth";
 import {
   getAnimeLibrary,
@@ -17,28 +18,40 @@ function getAnimeSection(anime) {
 }
 
 export async function GET(request) {
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const canViewAnime = await validateAnyPermissionSessionToken(token, [
-    "anime.tracking.view",
-    "anime.completed.view",
-  ]);
+  try {
+    const token = request.cookies.get(SESSION_COOKIE)?.value;
+    const canViewAnime = await validateAnyPermissionSessionToken(token, [
+      "anime.tracking.view",
+      "anime.completed.view",
+    ]);
 
-  if (!canViewAnime) {
-    return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    if (!canViewAnime) {
+      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
+    }
+
+    const includeHidden = await validateAnyPermissionSessionToken(token, [
+      "anime.tracking.update",
+      "anime.tracking.delete",
+      "anime.completed.update",
+      "anime.completed.delete",
+    ]);
+    const animes = await getAnimeLibrary({ includeHidden });
+    return NextResponse.json({ animes });
+  } catch (error) {
+    console.error("anime-library:get", error);
+    return NextResponse.json(
+      { success: false, error: "No se pudo cargar la biblioteca de anime." },
+      { status: 500 },
+    );
   }
-
-  const includeHidden = await validateAnyPermissionSessionToken(token, [
-    "anime.tracking.update",
-    "anime.tracking.delete",
-    "anime.completed.update",
-    "anime.completed.delete",
-  ]);
-  const animes = await getAnimeLibrary({ includeHidden });
-  return NextResponse.json({ animes });
 }
 
 export async function POST(request) {
-  const payload = await request.json();
+  const payload = await readJsonRequest(request);
+
+  if (!payload) {
+    return NextResponse.json({ success: false, error: "Solicitud inválida." }, { status: 400 });
+  }
 
   if ((payload?.action === "update" || payload?.action === "upsert") && payload.anime) {
     const section = getAnimeSection(payload.anime);

@@ -10,6 +10,7 @@ const MESSAGE_ID = "twitch-eventsub-message-id";
 const MESSAGE_TIMESTAMP = "twitch-eventsub-message-timestamp";
 const MESSAGE_SIGNATURE = "twitch-eventsub-message-signature";
 const MESSAGE_TYPE = "twitch-eventsub-message-type";
+const MAX_MESSAGE_AGE_MS = 10 * 60 * 1000;
 
 function getEventSubSecret() {
   const secret = process.env.TWITCH_EVENTSUB_SECRET;
@@ -27,6 +28,12 @@ function verifyTwitchSignature(headers, rawBody) {
   const signature = headers.get(MESSAGE_SIGNATURE);
 
   if (!messageId || !timestamp || !signature) {
+    return false;
+  }
+
+  const messageTime = Date.parse(timestamp);
+
+  if (!Number.isFinite(messageTime) || Math.abs(Date.now() - messageTime) > MAX_MESSAGE_AGE_MS) {
     return false;
   }
 
@@ -51,7 +58,13 @@ export async function POST(request) {
   }
 
   const messageType = request.headers.get(MESSAGE_TYPE);
-  const payload = JSON.parse(rawBody);
+  let payload;
+
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ success: false, error: "Payload invalido" }, { status: 400 });
+  }
 
   if (messageType === "webhook_callback_verification") {
     return new Response(payload.challenge, {

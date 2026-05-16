@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonRequest } from "@/lib/http";
 import { ensureAnyPermissionAuthorized } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
@@ -91,7 +92,12 @@ export async function POST(request) {
       return authorization.response;
     }
 
-    const payload = await request.json();
+    const payload = await readJsonRequest(request);
+
+    if (!payload) {
+      return NextResponse.json({ success: false, error: "Solicitud inválida." }, { status: 400 });
+    }
+
     const search = String(payload?.search || "").trim();
     const providerUrl = String(payload?.providerUrl || "").trim();
     const providerId = payload?.providerId ? Number(payload.providerId) : null;

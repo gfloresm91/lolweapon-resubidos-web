@@ -26,10 +26,17 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: "Archivo invalido" }, { status: 400 });
   }
 
-  const savedFile = await saveUploadFile(file);
+  try {
+    const savedFile = await saveUploadFile(file);
 
-  return NextResponse.json({
-    success: true,
-    path: savedFile.path,
-  });
+    return NextResponse.json({
+      success: true,
+      path: savedFile.path,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error.message || "No se pudo subir la imagen." },
+      { status: 400 },
+    );
+  }
 }

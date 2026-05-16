@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth";
+import { readJsonRequest } from "@/lib/http";
 import {
   auditLoginAttempt,
   clearLoginRateLimit,
@@ -27,7 +28,8 @@ async function failedLoginResponse(startedAt) {
 
 export async function POST(request) {
   const startedAt = Date.now();
-  const { login, password } = await request.json();
+  const payload = await readJsonRequest(request);
+  const { login, password } = payload || {};
   const ip = getClientIp(request);
   const userAgent = request.headers.get("user-agent") || "";
   const rateLimitKey = getRateLimitKey({ ip, login });

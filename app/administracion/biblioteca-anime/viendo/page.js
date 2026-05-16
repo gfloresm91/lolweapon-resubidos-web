@@ -15,7 +15,6 @@ const TRACKING_MANAGEMENT_PERMISSIONS = [
   "anime.tracking.delete",
 ];
 const TRACKING_SCREEN_PERMISSION = "admin.anime.tracking.view";
-const ADMIN_ROLE_CODES = new Set(["dios", "admin"]);
 
 export default async function PlatformAnimeTrackingAdminPage() {
   const cookieStore = await cookies();
@@ -23,8 +22,7 @@ export default async function PlatformAnimeTrackingAdminPage() {
   const currentUser = await getCurrentUserFromToken(token);
 
   if (
-    !ADMIN_ROLE_CODES.has(currentUser?.role)
-    || !canAny(currentUser, [TRACKING_SCREEN_PERMISSION])
+    !canAny(currentUser, [TRACKING_SCREEN_PERMISSION])
     || !canAny(currentUser, TRACKING_MANAGEMENT_PERMISSIONS)
   ) {
     redirect("/login");

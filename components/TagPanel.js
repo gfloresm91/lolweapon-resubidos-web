@@ -412,14 +412,6 @@ export default function TagPanel({
               <button type="button" className="tag-admin-action" onClick={openCategoryDialog}>
                 Crear categoria
               </button>
-              <button
-                type="button"
-                className="tag-override-reset"
-                onClick={() => persistTagSettings({ overrides: {} })}
-                disabled={isSavingSettings}
-              >
-                Resetear categorias manuales
-              </button>
             </div>
           ) : null}
         </div>

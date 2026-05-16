@@ -120,6 +120,8 @@ model TagCategory {
   code      String   @unique
   label     String
   icon      String?
+  exact     String[] @default([])
+  keywords  String[] @default([])
   isCustom  Boolean  @default(false)
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)

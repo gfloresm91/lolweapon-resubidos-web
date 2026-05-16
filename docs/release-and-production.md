@@ -6,13 +6,13 @@ Guia operativa para versionar, commitear y desplegar la app en un droplet de Dig
 
 La version actual vive en `package.json` y `package-lock.json`.
 
-Para este ciclo se recomienda subir version **minor** si `v1.7.3` ya fue publicada, porque agrega mantenedores administrativos para Biblioteca Anime, nuevos permisos por módulo, rutas administrativas y migraciones:
+Para este ciclo se recomienda subir version **minor** si `v1.8.0` ya fue publicada, porque agrega mantenedores administrativos para Rastreador y Tags, endurece APIs/uploads, agrega permisos por módulo y nuevas migraciones:
 
 ```bash
 npm version minor --no-git-tag-version
 ```
 
-Ejemplo: `1.7.3` pasa a `1.8.0`.
+Ejemplo: `1.8.0` pasa a `1.9.0`.
 
 Usa `patch` solo si estos cambios todavía son parte del mismo release no publicado y solo estás cerrando ajustes sobre esa versión:
 
@@ -58,9 +58,9 @@ git add -A
 Commit recomendado para este trabajo:
 
 ```bash
-git commit -m "feat(admin): add anime library maintainers" \
-  -m "Add administration screens for Viendo and Terminados, separate admin anime permissions from public library permissions, and keep maintainer UI consistent with users and roles." \
-  -m "Document role permissions, menu order, database migration, and release steps."
+git commit -m "feat(admin): add platform maintainers and permissions" \
+  -m "Add administration screens for Rastreador, Tags, Viendo and Terminados, permission-driven access, safer uploads, safer API payload handling, tag category rules, and Postgres sequence reset tooling." \
+  -m "Document role permissions, menu order, database migration, sequence maintenance, and production rollout steps."
 ```
 
 Si prefieres separar documentacion en otro commit:
@@ -72,9 +72,9 @@ git commit -m "docs: document platform administration deployment"
 Tag recomendado despues del commit si vas a liberar esta version:
 
 ```bash
-git tag v1.8.0
+git tag v1.9.0
 git push origin <branch>
-git push origin v1.8.0
+git push origin v1.9.0
 ```
 
 ## Checklist local antes de produccion
@@ -230,6 +230,12 @@ DATA_SOURCE=postgres npm run db:import:spacedrum
 ```
 
 Si quieres partir totalmente sin contenido operativo, omite esos imports. La app igual creara roles y permisos base al cargar.
+
+Después de imports masivos, reajusta las secuencias autoincrementales para que los próximos IDs sigan desde el último registro real:
+
+```bash
+npm run db:reset-sequences
+```
 
 ### 9. Validar y construir
 

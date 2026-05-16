@@ -20,7 +20,8 @@ const EMPTY_ROLE = {
   isActive: true,
   permissions: [],
 };
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ROLE_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
   { key: "role", label: "Rol", sortable: true },
@@ -364,6 +365,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editingRole, setEditingRole] = useState(null);
   const [statusRole, setStatusRole] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -389,10 +391,10 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
         return String(leftValue).localeCompare(String(rightValue), "es", { numeric: true }) * direction;
       });
   }, [permissions, roles, searchQuery, sortConfig.direction, sortConfig.key, statusFilter]);
-  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / PAGE_SIZE));
-  const paginatedRoles = filteredRoles.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const paginationFrom = filteredRoles.length ? ((currentPage - 1) * PAGE_SIZE) + 1 : 0;
-  const paginationTo = Math.min(currentPage * PAGE_SIZE, filteredRoles.length);
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / pageSize));
+  const paginatedRoles = filteredRoles.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginationFrom = filteredRoles.length ? ((currentPage - 1) * pageSize) + 1 : 0;
+  const paginationTo = Math.min(currentPage * pageSize, filteredRoles.length);
   const stats = useMemo(() => ({
     total: roles.length,
     active: roles.filter((role) => role.isActive).length,
@@ -595,6 +597,12 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
           total: filteredRoles.length,
           canPrevious: currentPage > 1,
           canNext: currentPage < totalPages,
+          pageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          onPageSizeChange: (nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          },
           onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
           onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
         }}

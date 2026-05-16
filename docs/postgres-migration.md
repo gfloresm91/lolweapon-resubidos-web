@@ -124,6 +124,7 @@ npm run db:import:spacedrum
 npm run db:export:spacedrum
 npm run db:backup
 npm run db:restore
+npm run db:reset-sequences
 ```
 
 Use `npm run db:migrate` only for local schema changes that should create a new migration. Use `npm run db:migrate:deploy` in production or when applying already committed migrations.
@@ -133,6 +134,8 @@ Use `npm run db:migrate` only for local schema changes that should create a new 
 ```bash
 BACKUP_FILE=backups/postgres/lolweapon_resubidos_20260506T120000Z.dump npm run db:restore
 ```
+
+`npm run db:reset-sequences` resets PostgreSQL autoincrement sequences to the next logical value for each table with an `id` column. It is useful after repeated imports or after fixing sequence drift. It does not renumber existing rows.
 
 ## Current schema scope
 
@@ -174,9 +177,11 @@ Admin access is controlled by permissions, with `Dios` acting as an immutable su
 Anime library permissions are intentionally split in two layers:
 
 - `Anime: Viendo` and `Anime: Terminados` control public/library screen access and operational actions.
+- `Administración: Rastreador` controls access to `/administracion/rastreador`.
+- `Administración: Tags` controls access to `/administracion/tags`.
 - `Administración: Viendo` and `Administración: Terminados` control access to the admin maintainers under `/administracion/biblioteca-anime`.
 
-The admin anime maintainers require role `Dios` or `Admin`, the matching `admin.anime.*.view` permission, and at least one create/update/delete permission for that anime screen.
+Administrative maintainers are controlled by permissions, not by a hard-coded role allowlist. `Dios` still acts as an immutable superuser and receives all permissions by default.
 
 Runtime seed helpers create or update default roles and permissions without using blind `upsert`, so Postgres sequences do not advance artificially on every page load.
 

@@ -136,6 +136,7 @@ npm run db:import:spacedrum
 npm run db:export:spacedrum
 npm run db:backup
 npm run db:restore
+npm run db:reset-sequences
 npm run enrich:anime
 ```
 
@@ -144,6 +145,8 @@ Nota: en `Next.js 15`, `next lint` está deprecado. Si el proyecto no tiene una 
 `npm run audit:data` valida la fuente activa. Con `DATA_SOURCE=json` revisa archivos JSON; con `DATA_SOURCE=postgres` revisa la BD.
 
 Los scripts `db:import:*` cargan datos desde JSON hacia Postgres. Los scripts `db:export:*` escriben archivos `.export.json` de seguridad y no sobreescriben los JSON fuente.
+
+`npm run db:reset-sequences` reajusta las secuencias autoincrementales de Postgres al próximo ID lógico (`MAX(id) + 1`). Úsalo después de imports masivos o si una secuencia quedó adelantada por pruebas antiguas. No renumera registros existentes.
 
 `npm run enrich:anime` consulta AniList para completar metadata faltante. En modo JSON actualiza el archivo activo; en modo Postgres actualiza la biblioteca en BD. Es una herramienta de mantenimiento masivo; para administración diaria se recomienda usar el botón `Completar desde AniList` dentro del modal de la Biblioteca de anime.
 
@@ -249,6 +252,8 @@ app/
   administracion/
     usuarios/page.js
     roles/page.js
+    rastreador/page.js
+    tags/page.js
     biblioteca-anime/
       viendo/page.js
       terminados/page.js
@@ -271,6 +276,11 @@ components/
   MaintainerStats.js
   MaintainerTable.js
   MaintainerToolbar.js
+  PlatformAnimeMaintainerPage.js
+  PlatformRolesPage.js
+  PlatformTagsMaintainerPage.js
+  PlatformTrackerMaintainerPage.js
+  PlatformUsersPage.js
   AvatarUploader.js
   AccountMenu.js
   DetailTopbarActions.js
@@ -285,19 +295,23 @@ components/
   SocialLinks.js
   StatsBar.js
   TagPanel.js
+  TagCombobox.js
   TagsInput.js
+  TrackerMaintainerModal.js
 
 lib/
   animeDbMapping.js
   animeLibrary.js
   auth.js
   serverAuth.js
+  http.js
   loginSecurity.js
   platformUserValidation.js
   data.js
   liveDbMapping.js
   lives.js
   prisma.js
+  prismaSafeUpsert.js
   repositories/
     animeLibraryRepository.js
     liveRepository.js
@@ -306,6 +320,7 @@ lib/
   spacedrum.js
   tagSettings.js
   tags.js
+  trackerValidation.js
   twitch.js
   twitchArchive.js
   youtube.js
@@ -329,6 +344,7 @@ scripts/
   audit-data.mjs
   import-*.mjs
   export-*.mjs
+  reset-postgres-sequences.mjs
   backup-postgres.sh
   restore-postgres.sh
 
@@ -553,6 +569,8 @@ Rutas principales:
 - `/perfil`: permite editar alias, email, avatar personalizado y contraseña.
 - `/administracion/usuarios`: mantenedor de usuarios.
 - `/administracion/roles`: mantenedor de roles y permisos.
+- `/administracion/rastreador`: mantenedor administrativo del archivo de directos.
+- `/administracion/tags`: mantenedor administrativo de categorías y asignaciones de tags.
 - `/administracion/biblioteca-anime/viendo`: mantenedor administrativo de animes en seguimiento.
 - `/administracion/biblioteca-anime/terminados`: mantenedor administrativo de animes terminados.
 
@@ -560,7 +578,7 @@ El login manual muestra mensajes genericos de credenciales incorrectas para no r
 
 El perfil permite reemplazar el avatar con drag and drop o selector de archivos. La app valida extension/MIME, firma real del archivo y tamaño maximo de 2 MB. Los avatares personalizados se conservan aunque el usuario vuelva a iniciar sesion con Twitch.
 
-El panel de contenido tambien permite:
+El mantenedor administrativo del rastreador permite:
 
 - crear un nuevo directo
 - editar uno existente
@@ -572,6 +590,14 @@ El panel de contenido tambien permite:
 - mover tags entre categorias desde un modal amplio
 - crear o actualizar manualmente un card desde el directo actual de Twitch
 - registrar la suscripción EventSub para creación automática al iniciar directo
+
+El mantenedor administrativo de tags permite:
+
+- administrar categorías globales de tags
+- editar reglas por coincidencia exacta y keywords
+- mover tags a una categoría manual
+- eliminar tags sin uso
+- filtrar por categoría, asignación y uso
 
 El mantenedor de usuarios permite:
 
@@ -629,8 +655,8 @@ El acceso protegido:
 - se valida de nuevo en cada endpoint protegido
 - se controla por permisos (`users.read`, `roles.update`, `anime.tracking.view`, etc.) y por rol `Dios`
 - separa permisos públicos de biblioteca (`Anime: Viendo`, `Anime: Terminados`) de permisos de mantenedores administrativos (`Administración: Viendo`, `Administración: Terminados`)
-- los mantenedores administrativos de Viendo y Terminados requieren rol `Dios` o `Admin`, permiso del módulo administrativo y al menos una acción operativa sobre esa pantalla
-- el menú de administración mantiene el orden estándar: Usuarios, Roles, Viendo y Terminados
+- los mantenedores administrativos respetan los permisos configurados en cada rol; `Dios` mantiene acceso total por defecto
+- el menú de administración mantiene el orden estándar: Usuarios, Roles, Rastreador, Tags, Viendo y Terminados
 
 ## Persistencia de datos
 
@@ -1032,6 +1058,8 @@ Ejemplo `upsert`:
 Endpoint protegido.
 
 - recibe `multipart/form-data`
+- acepta solo imágenes PNG, JPG o WebP válidas
+- valida el tipo real del archivo y limita el tamaño a 5 MB
 - guarda archivos en `UPLOAD_DIR`, por defecto `public/imagenes`
 - devuelve una ruta publica servida por la app, por ejemplo `/imagenes/archivo.png`
 

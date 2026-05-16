@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { SESSION_COOKIE } from "@/lib/auth";
+import { readJsonRequest } from "@/lib/http";
 import { getCurrentUserFromToken } from "@/lib/serverAuth";
 import {
   updateCurrentUserPassword,
@@ -28,7 +29,11 @@ export async function POST(request) {
     return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
   }
 
-  const payload = await request.json();
+  const payload = await readJsonRequest(request);
+
+  if (!payload) {
+    return NextResponse.json({ success: false, error: "Solicitud inválida." }, { status: 400 });
+  }
 
   try {
     if (payload?.action === "profile") {

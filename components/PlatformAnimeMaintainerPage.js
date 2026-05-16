@@ -5,14 +5,15 @@ import { Edit3, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
-import { AnimeLibraryModal, editableFields, getInitials, getStatusLabel } from "@/components/AnimeLibraryPage";
+import { AnimeLibraryModal, AnimePosterPlaceholder, editableFields, getStatusLabel } from "@/components/AnimeLibraryPage";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const COMPLETED_STATUSES = new Set(["completed", "paused", "pending", "dropped"]);
 const EMPTY_ANIME = {
   key: "",
@@ -174,6 +175,7 @@ export default function PlatformAnimeMaintainerPage({
   const [resubidosFilter, setResubidosFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [isCreateStartOpen, setIsCreateStartOpen] = useState(false);
   const [editingAnime, setEditingAnime] = useState(null);
   const [statusAnime, setStatusAnime] = useState(null);
@@ -235,10 +237,10 @@ export default function PlatformAnimeMaintainerPage({
         return String(leftValue).localeCompare(String(rightValue), "es", { numeric: true }) * direction;
       });
   }, [allVisibleAndHiddenAnimes, conditionFilter, hiddenAnimes, modeAnimes, resubidosFilter, searchQuery, sortConfig.direction, sortConfig.key, visibilityFilter]);
-  const totalPages = Math.max(1, Math.ceil(filteredAnimes.length / PAGE_SIZE));
-  const paginatedAnimes = filteredAnimes.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const paginationFrom = filteredAnimes.length ? ((currentPage - 1) * PAGE_SIZE) + 1 : 0;
-  const paginationTo = Math.min(currentPage * PAGE_SIZE, filteredAnimes.length);
+  const totalPages = Math.max(1, Math.ceil(filteredAnimes.length / pageSize));
+  const paginatedAnimes = filteredAnimes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginationFrom = filteredAnimes.length ? ((currentPage - 1) * pageSize) + 1 : 0;
+  const paginationTo = Math.min(currentPage * pageSize, filteredAnimes.length);
   const stats = useMemo(() => ({
     total: allVisibleAndHiddenAnimes.length,
     visible: modeAnimes.filter((anime) => anime.libraryEnabled !== false).length,
@@ -538,6 +540,12 @@ export default function PlatformAnimeMaintainerPage({
           total: filteredAnimes.length,
           canPrevious: currentPage > 1,
           canNext: currentPage < totalPages,
+          pageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          onPageSizeChange: (nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          },
           onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
           onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
         }}
@@ -549,7 +557,7 @@ export default function PlatformAnimeMaintainerPage({
               {anime.image ? (
                 <img src={anime.image} alt="" />
               ) : (
-                <span className="admin-user-avatar">{getInitials(getAnimeTitle(anime))}</span>
+                <AnimePosterPlaceholder title={getAnimeTitle(anime)} className="admin-anime-placeholder" />
               )}
               <div>
                 <strong>{getAnimeTitle(anime)}</strong>

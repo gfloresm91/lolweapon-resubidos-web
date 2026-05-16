@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Edit3, X } from "lucide-react";
 import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import FormSelect from "@/components/FormSelect";
+import TagCombobox from "@/components/TagCombobox";
 
 const ANIME_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -92,9 +93,10 @@ const COMPLETED_STATUS_OPTIONS = [
 const PAGE_CONFIG = {
   active: {
     badge: "Biblioteca anime",
-    titlePrefix: "Anime en",
-    titleHighlight: "Seguimiento",
-    subtitle: "Animes con temporada entera, capítulos comprados o pendientes de compra.",
+    titlePrefix: "Anime",
+    titleHighlight: "Viendo",
+    subtitle: "Animes que estás viendo, con compras parciales, temporada entera o pendientes de compra.",
+    createLabel: "Añadir a Viendo",
     empty: "No hay animes en seguimiento con ese filtro.",
     statusOptions: TRACKING_STATUS_OPTIONS,
     acceptsStatus: (status) => status === "purchased" || status === "watching",
@@ -104,6 +106,7 @@ const PAGE_CONFIG = {
     titlePrefix: "Anime",
     titleHighlight: "Terminado",
     subtitle: "Animes terminados, pausados, pendientes o dropeados fuera del seguimiento activo.",
+    createLabel: "Añadir a Terminados",
     empty: "No hay animes terminados con ese filtro.",
     statusOptions: COMPLETED_STATUS_OPTIONS,
     acceptsStatus: (status) => ["completed", "paused", "pending", "dropped"].includes(status),
@@ -122,6 +125,14 @@ export function getInitials(title) {
     .map((part) => part[0])
     .join("")
     .toUpperCase();
+}
+
+export function AnimePosterPlaceholder({ title, className = "" }) {
+  return (
+    <div className={["poster-placeholder anime-poster-placeholder", className].filter(Boolean).join(" ")}>
+      <span>{getInitials(title)}</span>
+    </div>
+  );
 }
 
 function AnimeLibrarySortSelect({ options = CAPS_SORT_OPTIONS, value, onChange }) {
@@ -289,87 +300,6 @@ function getDuplicateAnimeError(form, existingAnimes = [], currentKey = "") {
   ));
 
   return hasDuplicateTitle ? "Ya existe un anime con ese título." : "";
-}
-
-function TagCombobox({ value, tags = [], tagCounts = {}, onChange }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState(value || "");
-  const containerRef = useRef(null);
-  const normalizedSearch = normalizeComparable(search);
-  const filteredTags = tags
-    .filter((tag) => normalizeComparable(tag).includes(normalizedSearch))
-    .slice(0, 8);
-  const exactMatch = tags.some((tag) => normalizeComparable(tag) === normalizedSearch);
-  const canCreate = search.trim() && !exactMatch;
-
-  useEffect(() => {
-    setSearch(value || "");
-  }, [value]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-
-    function handlePointerDown(event) {
-      if (!containerRef.current?.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen]);
-
-  function selectTag(tag) {
-    onChange(tag);
-    setSearch(tag);
-    setIsOpen(false);
-  }
-
-  return (
-    <div ref={containerRef} className="tag-combobox">
-      <input
-        className="modal-input"
-        placeholder="Buscar o crear tag"
-        value={search}
-        onFocus={() => setIsOpen(true)}
-        onChange={(event) => {
-          setSearch(event.target.value);
-          onChange(event.target.value);
-          setIsOpen(true);
-        }}
-      />
-      {isOpen ? (
-        <div className="tag-combobox-menu">
-          {filteredTags.map((tag) => (
-            <button key={tag} type="button" className="tag-combobox-option" onClick={() => selectTag(tag)}>
-              <span>{tag}</span>
-              <small>{tagCounts[tag] || 0} resubidos</small>
-            </button>
-          ))}
-          {canCreate ? (
-            <button type="button" className="tag-combobox-option is-create" onClick={() => selectTag(search.trim())}>
-              <span>Crear "{search.trim()}"</span>
-              <small>Nuevo tag</small>
-            </button>
-          ) : null}
-          {!filteredTags.length && !canCreate ? <p className="tag-combobox-empty">No hay tags disponibles.</p> : null}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 function getOptionalNumber(value) {
@@ -787,7 +717,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
               {previewImage ? (
                 <img src={previewImage} alt={form.title} />
               ) : (
-                <div className="poster-placeholder">{getInitials(form.title)}</div>
+                <AnimePosterPlaceholder title={form.title} />
               )}
               <div className="anime-library-preview-details">
                 <strong>{form.titleEs || form.title || "Sin título"}</strong>
@@ -807,17 +737,30 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
 
             <div className="anime-library-modal-fields">
               <h3 className="modal-subtitle">Datos de biblioteca</h3>
-              {!isCompactForm ? (
-                <button
-                  type="button"
-                  className="anime-library-metadata-button anime-library-metadata-button-primary"
-                  onClick={() => setIsAniListSearchOpen(true)}
-                  disabled={isSaving}
-                >
-                  {hasAniListMetadata ? "Cambiar ficha AniList" : "Buscar en AniList"}
-                </button>
+              <button
+                type="button"
+                className="anime-library-metadata-button anime-library-metadata-button-primary"
+                onClick={() => setIsAniListSearchOpen(true)}
+                disabled={isSaving}
+              >
+                {hasAniListMetadata ? "Cambiar ficha AniList" : "Buscar en AniList"}
+              </button>
+              {isCompactForm && isCreating ? (
+                <div className="form-group-modal">
+                  <label>Título original</label>
+                  <input
+                    className="modal-input"
+                    value={form.title}
+                    readOnly={hasAniListMetadata}
+                    aria-invalid={Boolean(fieldErrors.title)}
+                    aria-describedby={fieldErrors.title ? "anime-title-error" : undefined}
+                    onChange={(event) => updateField("title", event.target.value)}
+                  />
+                  {fieldErrors.title ? <span id="anime-title-error" className="field-error">{fieldErrors.title}</span> : null}
+                  {hasAniListMetadata ? <span className="field-help">Gestionado por la ficha AniList seleccionada.</span> : null}
+                </div>
               ) : null}
-              {!isCompactForm ? <div className="form-row">
+              <div className="form-row">
                 <div className="form-group-modal">
                   <label>Tag de resubidos</label>
                   <TagCombobox
@@ -832,9 +775,9 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                   <label>Título visible</label>
                   <input className="modal-input" value={form.titleEs} onChange={(event) => updateField("titleEs", event.target.value)} />
                 </div>
-              </div> : null}
+              </div>
 
-              <div className={isCompactForm ? "form-row" : "form-row"}>
+              <div className="form-row">
                 <div className="form-group-modal">
                   <label>Estado seguimiento</label>
                   <FormSelect
@@ -845,7 +788,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                     onChange={updateWatchStatus}
                   />
                 </div>
-                {!isCompactForm ? <div className="form-group-modal">
+                <div className="form-group-modal">
                   <label>Mostrar en biblioteca</label>
                   <FormSelect
                     id="anime-library-enabled"
@@ -854,41 +797,37 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                     options={VISIBILITY_SELECT_OPTIONS}
                     onChange={(value) => updateField("libraryEnabled", value === "true")}
                   />
-                </div> : null}
+                </div>
               </div>
 
-              {!isCompactForm ? (
-                <>
-                  <div className="form-group-modal">
-                    <label>Enlace resubidos generado</label>
-                    <input className="modal-input" value={generatedTrackerUrl} readOnly />
-                    <span className="field-help">Se genera automáticamente desde el tag o el título. Puedes reemplazarlo con una URL personalizada.</span>
-                  </div>
+              <div className="form-group-modal">
+                <label>Enlace resubidos generado</label>
+                <input className="modal-input" value={generatedTrackerUrl} readOnly />
+                <span className="field-help">Se genera automáticamente desde el tag o el título. Puedes reemplazarlo con una URL personalizada.</span>
+              </div>
 
-                  <button
-                    type="button"
-                    className="anime-library-advanced-toggle anime-library-tracker-url-toggle"
-                    onClick={() => setIsTrackerUrlOpen((current) => !current)}
-                  >
-                    {isTrackerUrlOpen ? "Ocultar URL personalizada" : "Usar URL personalizada de resubidos"}
-                  </button>
+              <button
+                type="button"
+                className="anime-library-advanced-toggle anime-library-tracker-url-toggle"
+                onClick={() => setIsTrackerUrlOpen((current) => !current)}
+              >
+                {isTrackerUrlOpen ? "Ocultar URL personalizada" : "Usar URL personalizada de resubidos"}
+              </button>
 
-                  {isTrackerUrlOpen ? (
-                    <div className="form-group-modal">
-                      <label>URL personalizada de resubidos</label>
-                      <input
-                        className="modal-input"
-                        placeholder="/rastreador?tag=bleach&status=done"
-                        value={form.trackerUrl}
-                        aria-invalid={Boolean(fieldErrors.trackerUrl)}
-                        aria-describedby={fieldErrors.trackerUrl ? "anime-tracker-url-error" : undefined}
-                        onChange={(event) => updateField("trackerUrl", event.target.value)}
-                      />
-                      <span className="field-help">Opcional. Usa /rastreador?tag=..., /rastreador?search=..., /rastreador?q=..., year, month o status si necesitas un filtro específico.</span>
-                      {fieldErrors.trackerUrl ? <span id="anime-tracker-url-error" className="field-error">{fieldErrors.trackerUrl}</span> : null}
-                    </div>
-                  ) : null}
-                </>
+              {isTrackerUrlOpen ? (
+                <div className="form-group-modal">
+                  <label>URL personalizada de resubidos</label>
+                  <input
+                    className="modal-input"
+                    placeholder="/rastreador?tag=bleach&status=done"
+                    value={form.trackerUrl}
+                    aria-invalid={Boolean(fieldErrors.trackerUrl)}
+                    aria-describedby={fieldErrors.trackerUrl ? "anime-tracker-url-error" : undefined}
+                    onChange={(event) => updateField("trackerUrl", event.target.value)}
+                  />
+                  <span className="field-help">Opcional. Usa /rastreador?tag=..., /rastreador?search=..., /rastreador?q=..., year, month o status si necesitas un filtro específico.</span>
+                  {fieldErrors.trackerUrl ? <span id="anime-tracker-url-error" className="field-error">{fieldErrors.trackerUrl}</span> : null}
+                </div>
               ) : null}
 
               <hr className="modal-hr" />
@@ -913,6 +852,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                       +
                     </button>
                   </div>
+                  {isCompactForm && form.episodes ? <span className="field-help">Total configurado: {form.episodes} episodios.</span> : null}
                   {fieldErrors.currentEpisode ? <span id="anime-current-episode-error" className="field-error">{fieldErrors.currentEpisode}</span> : null}
                 </div>
 
@@ -941,20 +881,22 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
 
               <hr className="modal-hr" />
               <h3 className="modal-subtitle">Ficha visible</h3>
-              <div className="form-row">
-                <div className="form-group-modal">
-                  <label>Título original</label>
-                  <input
-                    className="modal-input"
-                    value={form.title}
-                    readOnly={hasAniListMetadata}
-                    aria-invalid={Boolean(fieldErrors.title)}
-                    aria-describedby={fieldErrors.title ? "anime-title-error" : undefined}
-                    onChange={(event) => updateField("title", event.target.value)}
-                  />
-                  {fieldErrors.title ? <span id="anime-title-error" className="field-error">{fieldErrors.title}</span> : null}
-                  {hasAniListMetadata ? <span className="field-help">Gestionado por la ficha AniList seleccionada.</span> : null}
-                </div>
+              <div className={`form-row ${isCompactForm ? "is-single-column" : ""}`}>
+                {!isCompactForm ? (
+                  <div className="form-group-modal">
+                      <label>Título original</label>
+                      <input
+                        className="modal-input"
+                        value={form.title}
+                        readOnly={hasAniListMetadata}
+                        aria-invalid={Boolean(fieldErrors.title)}
+                        aria-describedby={fieldErrors.title ? "anime-title-error" : undefined}
+                        onChange={(event) => updateField("title", event.target.value)}
+                      />
+                      {fieldErrors.title ? <span id="anime-title-error" className="field-error">{fieldErrors.title}</span> : null}
+                      {hasAniListMetadata ? <span className="field-help">Gestionado por la ficha AniList seleccionada.</span> : null}
+                  </div>
+                ) : null}
                 <div className="form-group-modal">
                   <label>Poster / Imagen local</label>
                   <div
@@ -1000,7 +942,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                 </button>
               ) : null}
 
-              {(isCompactForm || isAdvancedMetadataOpen) ? (
+              {!isCompactForm && isAdvancedMetadataOpen ? (
                 <div className="anime-library-advanced-panel">
                   <hr className="modal-hr" />
                   <h3 className="modal-subtitle">Datos de AniList</h3>
@@ -1105,6 +1047,16 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                   ) : null}
                 </div>
               ) : null}
+              {isCompactForm && hasAniListMetadata ? (
+                <button
+                  type="button"
+                  className="btn-modal btn-modal-danger anime-library-clear-metadata-button"
+                  onClick={() => setIsClearAniListConfirmOpen(true)}
+                  disabled={isSaving}
+                >
+                  Quitar ficha AniList
+                </button>
+              ) : null}
               {fieldErrors.form ? <p className="field-error">{fieldErrors.form}</p> : null}
             </div>
           </div>
@@ -1201,6 +1153,14 @@ function getNewAnimeDraft(mode) {
   };
 }
 
+function buildTagFromTitle(title) {
+  return String(title || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "")
+    .slice(0, 48);
+}
+
 export default function AnimeLibraryPage({
   animes: initialAnimes = [],
   isAdmin = false,
@@ -1216,6 +1176,7 @@ export default function AnimeLibraryPage({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortOption, setSortOption] = useState(mode === "completed" ? "title-asc" : "purchased-desc");
+  const [isCreateStartOpen, setIsCreateStartOpen] = useState(false);
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
@@ -1433,6 +1394,19 @@ export default function AnimeLibraryPage({
     }
   }
 
+  function openCreateFromMetadata(metadata) {
+    setIsCreateStartOpen(false);
+    setEditingAnime({
+      ...getNewAnimeDraft(mode),
+      ...metadata,
+      tag: buildTagFromTitle(metadata.title),
+      titleEs: "",
+      currentEpisode: "0",
+      purchased: "0",
+      libraryEnabled: true,
+    });
+  }
+
   async function deleteAnimeMetadata(key) {
     if (!canDelete) {
       toast.error("No tienes permiso para eliminar anime.");
@@ -1497,14 +1471,14 @@ export default function AnimeLibraryPage({
       {canCreate ? (
         <section className="tracker-actions" aria-label="Acciones de biblioteca anime">
           <div>
-            <span className="tracker-actions-label">Administración</span>
+            <span className="tracker-actions-label">Gestión</span>
             <p className="tracker-actions-copy">
               Gestiona animes {mode === "completed" ? "terminados" : "en seguimiento"} antes o después de crear sus tags.
             </p>
           </div>
-          <button type="button" className="tracker-action-primary" onClick={() => setEditingAnime(getNewAnimeDraft(mode))}>
+          <button type="button" className="tracker-action-primary" onClick={() => setIsCreateStartOpen(true)}>
             <span className="tracker-action-icon">+</span>
-            Añadir anime
+            {pageConfig.createLabel || "Añadir anime"}
           </button>
         </section>
       ) : null}
@@ -1570,14 +1544,23 @@ export default function AnimeLibraryPage({
                 <article
                   key={anime.key}
                   className={`anime-card anime-library-card ${canUpdate ? "is-admin" : ""}`}
-                  onClick={canUpdate ? () => setEditingAnime(anime) : undefined}
                 >
-                  {canUpdate ? <span className="anime-edit-indicator">Editar</span> : null}
+                  {canUpdate ? (
+                    <button
+                      type="button"
+                      className="anime-edit-indicator"
+                      aria-label={`Editar ${anime.titleEs || anime.title || "anime"}`}
+                      onClick={() => setEditingAnime(anime)}
+                    >
+                      <Edit3 size={14} />
+                      Editar
+                    </button>
+                  ) : null}
                   <div className="poster-container anime-library-poster">
                     {anime.image ? (
                       <img src={anime.image} alt={anime.title} className="poster-img" loading="lazy" />
                     ) : (
-                      <div className="poster-placeholder">{getInitials(anime.title)}</div>
+                      <AnimePosterPlaceholder title={anime.titleEs || anime.title} />
                     )}
                     <div className="poster-overlay" />
                     {mode === "completed" || anime.libraryEnabled === false ? (
@@ -1653,6 +1636,28 @@ export default function AnimeLibraryPage({
           </div>
         )}
       </main>
+
+      <AniListSearchModal
+        existingAnimes={animes}
+        isOpen={isCreateStartOpen}
+        title="Buscar en AniList"
+        subtitle="Pega una URL de AniList o escribe el título para precargar la metadata antes de crear la ficha."
+        emptyText="Busca en AniList para seleccionar una ficha o crea el anime manualmente."
+        onClose={() => setIsCreateStartOpen(false)}
+        onSelectMetadata={openCreateFromMetadata}
+        actions={(
+          <button
+            type="button"
+            className="btn-modal btn-modal-secondary"
+            onClick={() => {
+              setIsCreateStartOpen(false);
+              setEditingAnime(getNewAnimeDraft(mode));
+            }}
+          >
+            Crear manualmente
+          </button>
+        )}
+      />
 
       <AnimeLibraryModal
         anime={editingAnime}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readJsonRequest } from "@/lib/http";
 import {
   createPlatformSession,
   registerManualUser,
@@ -7,7 +8,14 @@ import {
 import { SESSION_COOKIE } from "@/lib/auth";
 
 export async function POST(request) {
-  const payload = await request.json();
+  const payload = await readJsonRequest(request);
+
+  if (!payload) {
+    return NextResponse.json(
+      { success: false, error: "Solicitud inválida." },
+      { status: 400 },
+    );
+  }
 
   try {
     const user = await registerManualUser(payload);

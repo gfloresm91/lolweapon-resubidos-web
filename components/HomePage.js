@@ -2,10 +2,10 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
+import { Plus, Radio, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import AccountMenu from "@/components/AccountMenu";
-import AdminModal from "@/components/AdminModal";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import AppSidebar from "@/components/AppSidebar";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -14,10 +14,13 @@ import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
+import PlatformTagsMaintainerPage from "@/components/PlatformTagsMaintainerPage";
+import PlatformTrackerMaintainerPage from "@/components/PlatformTrackerMaintainerPage";
 import PlatformUsersPage from "@/components/PlatformUsersPage";
 import PlatformRolesPage from "@/components/PlatformRolesPage";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
+import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
 import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
@@ -82,6 +85,8 @@ const VIEW_LABELS = {
   tracker: "Rastreador de directos",
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Anime terminados",
+  platformTracker: "Mantenedor Rastreador",
+  platformTags: "Mantenedor Tags",
   platformAnimeTracking: "Mantenedor Viendo",
   platformAnimeCompleted: "Mantenedor Terminados",
   platformUsers: "Usuarios",
@@ -94,6 +99,8 @@ const VIEW_PATHS = {
   tracker: "/rastreador",
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
+  platformTracker: "/administracion/rastreador",
+  platformTags: "/administracion/tags",
   platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformUsers: "/administracion/usuarios",
@@ -151,22 +158,37 @@ export default function HomePage({
   const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
   const hasPermission = (permission) => currentUser?.role === "dios" || effectivePermissions.has(permission);
-  const canAccessAdminAnimeMaintainers = ["dios", "admin"].includes(currentUser?.role);
   const canManageUsers = hasPermission("users.read");
   const canManageRoles = hasPermission("roles.read");
   const canCreateTracker = hasPermission("tracker.create");
   const canUpdateTracker = hasPermission("tracker.update");
   const canDeleteTracker = hasPermission("tracker.delete");
+  const canViewTrackerMaintainer = hasPermission("admin.tracker.view");
+  const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker);
+  const canViewTagsMaintainer = hasPermission("admin.tags.view");
+  const canCreateTags = hasPermission("tags.create");
+  const canUpdateTags = hasPermission("tags.update");
+  const canDeleteTags = hasPermission("tags.delete");
   const canCreateTrackingAnime = hasPermission("anime.tracking.create");
   const canUpdateTrackingAnime = hasPermission("anime.tracking.update");
   const canDeleteTrackingAnime = hasPermission("anime.tracking.delete");
+  const trackingAnimeFormVariant = hasPermission("anime.tracking.form.full")
+    ? "full"
+    : hasPermission("anime.tracking.form.compact")
+      ? "compact"
+      : null;
   const canCreateCompletedAnime = hasPermission("anime.completed.create");
   const canUpdateCompletedAnime = hasPermission("anime.completed.update");
   const canDeleteCompletedAnime = hasPermission("anime.completed.delete");
+  const completedAnimeFormVariant = hasPermission("anime.completed.form.full")
+    ? "full"
+    : hasPermission("anime.completed.form.compact")
+      ? "compact"
+      : null;
   const canViewTrackingAnimeMaintainer = hasPermission("admin.anime.tracking.view");
   const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
-  const canManageTrackingAnime = canAccessAdminAnimeMaintainers && canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
-  const canManageCompletedAnime = canAccessAdminAnimeMaintainers && canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
+  const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
+  const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -365,10 +387,18 @@ export default function HomePage({
 
       try {
         const response = await fetch("/api/anime-library", { cache: "no-store" });
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
 
-        if (isMounted && response.ok) {
+        if (!response.ok) {
+          throw new Error(data?.error || "No se pudo cargar la biblioteca de anime.");
+        }
+
+        if (isMounted) {
           setAnimeLibrary(data.animes || []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error(error.message || "No se pudo cargar la biblioteca de anime.");
         }
       } finally {
         if (isMounted) {
@@ -531,7 +561,7 @@ export default function HomePage({
       const response = await fetch("/api/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "upsert", live: payload }),
+        body: JSON.stringify({ action: nextLive.id ? "upsert" : "create", live: payload }),
       });
       const data = await response.json();
 
@@ -671,6 +701,8 @@ export default function HomePage({
       animeLibraryCompleted: "anime.completed.view",
       platformAnimeTracking: "admin.anime.tracking.view",
       platformAnimeCompleted: "admin.anime.completed.view",
+      platformTracker: "admin.tracker.view",
+      platformTags: "admin.tags.view",
       platformUsers: "users.read",
       platformRoles: "roles.read",
       spacedrum: "spacedrum.view",
@@ -757,6 +789,8 @@ export default function HomePage({
           isAdmin={isAdmin}
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
+          canManageTracker={canManageTracker}
+          canManageTags={canViewTagsMaintainer}
           canManageAnimeTracking={canManageTrackingAnime}
           canManageAnimeCompleted={canManageCompletedAnime}
           isSpaceDrumEnabled={isSpaceDrumEnabled}
@@ -823,32 +857,40 @@ export default function HomePage({
 
         <StatsBar stats={stats} />
 
-        {canCreateTracker ? (
+        {canCreateTracker || canUpdateTracker ? (
           <section className="tracker-actions" aria-label="Acciones del rastreador">
             <div>
               <span className="tracker-actions-label">Administración</span>
               <p className="tracker-actions-copy">Gestiona los registros del archivo.</p>
             </div>
-            <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
-              <span className="tracker-action-icon">+</span>
-              Nuevo directo
-            </button>
-            <button
-              type="button"
-              className="tracker-action-secondary"
-              onClick={archiveCurrentTwitchLive}
-              disabled={isTwitchActionLoading}
-            >
-              Crear card desde Twitch
-            </button>
-            <button
-              type="button"
-              className="tracker-action-secondary"
-              onClick={registerTwitchEventSub}
-              disabled={isTwitchActionLoading}
-            >
-              Registrar EventSub
-            </button>
+            {canCreateTracker ? (
+              <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
+                <Plus size={18} />
+                Nuevo directo
+              </button>
+            ) : null}
+            {canCreateTracker ? (
+              <button
+                type="button"
+                className="tracker-action-secondary"
+                onClick={archiveCurrentTwitchLive}
+                disabled={isTwitchActionLoading}
+              >
+                <Radio size={17} />
+                Crear card desde Twitch
+              </button>
+            ) : null}
+            {canUpdateTracker ? (
+              <button
+                type="button"
+                className="tracker-action-secondary"
+                onClick={registerTwitchEventSub}
+                disabled={isTwitchActionLoading}
+              >
+                <Zap size={17} />
+                Registrar EventSub
+              </button>
+            ) : null}
           </section>
         ) : null}
 
@@ -905,7 +947,7 @@ export default function HomePage({
                     <span>Estado</span>
                     <span>Tags</span>
                     <span>Disponibilidad</span>
-                    <span>Acción</span>
+                    <span>Acciones</span>
                   </div>
                 ) : null}
                 {visibleLives.map((live) => (
@@ -965,10 +1007,10 @@ export default function HomePage({
             {currentView === "animeLibraryTracking" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
-                canCreate={canCreateTrackingAnime}
-                canUpdate={canUpdateTrackingAnime}
-                canDelete={canDeleteTrackingAnime}
-                formVariant={hasPermission("anime.tracking.form.full") ? "full" : "compact"}
+                canCreate={canCreateTrackingAnime && Boolean(trackingAnimeFormVariant)}
+                canUpdate={canUpdateTrackingAnime && Boolean(trackingAnimeFormVariant)}
+                canDelete={canDeleteTrackingAnime && Boolean(trackingAnimeFormVariant)}
+                formVariant={trackingAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
                 onAnimesChange={setAnimeLibrary}
@@ -978,10 +1020,10 @@ export default function HomePage({
             {currentView === "animeLibraryCompleted" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
-                canCreate={canCreateCompletedAnime}
-                canUpdate={canUpdateCompletedAnime}
-                canDelete={canDeleteCompletedAnime}
-                formVariant={hasPermission("anime.completed.form.full") ? "full" : "compact"}
+                canCreate={canCreateCompletedAnime && Boolean(completedAnimeFormVariant)}
+                canUpdate={canUpdateCompletedAnime && Boolean(completedAnimeFormVariant)}
+                canDelete={canDeleteCompletedAnime && Boolean(completedAnimeFormVariant)}
+                formVariant={completedAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
                 onAnimesChange={setAnimeLibrary}
@@ -998,6 +1040,28 @@ export default function HomePage({
 
             {currentView === "platformRoles" && canManageRoles ? (
               <PlatformRolesPage initialRoles={initialPlatformRoles} initialPermissions={initialPlatformPermissions} />
+            ) : null}
+
+            {currentView === "platformTracker" && canManageTracker ? (
+              <PlatformTrackerMaintainerPage
+                initialLives={lives}
+                initialStatuses={liveStatuses}
+                canCreate={canCreateTracker}
+                canUpdate={canUpdateTracker}
+                canDelete={canDeleteTracker}
+                canUpdateTags={canUpdateTags}
+                twitchLogin={twitchLogin}
+                onLivesChange={setLives}
+                onStatusesChange={setLiveStatuses}
+              />
+            ) : null}
+
+            {currentView === "platformTags" && canViewTagsMaintainer ? (
+              <PlatformTagsMaintainerPage
+                canCreate={canCreateTags}
+                canUpdate={canUpdateTags}
+                canDelete={canDeleteTags}
+              />
             ) : null}
 
             {currentView === "platformAnimeTracking" && canManageTrackingAnime ? (
@@ -1030,22 +1094,6 @@ export default function HomePage({
         </div>
       </div>
 
-      <AdminModal
-        live={editingLive && editingLive.id ? editingLive : null}
-        isOpen={Boolean(editingLive)}
-        onClose={() => setEditingLive(null)}
-        onSave={persistLive}
-        onDelete={(id) => {
-          if (!canDeleteTracker) {
-            toast.error("No tienes permiso para eliminar directos.");
-            return;
-          }
-          setPendingDeleteId(id);
-        }}
-        isSaving={isSaving}
-        statuses={liveStatuses}
-      />
-
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}
         title="Borrar directo"
@@ -1060,6 +1108,21 @@ export default function HomePage({
 
       <LoreModal isOpen={isLoreOpen} onClose={() => setIsLoreOpen(false)} />
 
+      <TrackerMaintainerModal
+        live={editingLive && editingLive.id ? editingLive : null}
+        isOpen={Boolean(editingLive)}
+        onClose={() => setEditingLive(null)}
+        onSave={persistLive}
+        isSaving={isSaving}
+        statuses={liveStatuses}
+        availableTags={allTags}
+        tagCounts={tagCounts}
+        onDelete={canDeleteTracker ? (id) => {
+          setEditingLive(null);
+          setPendingDeleteId(id);
+        } : null}
+      />
+
       <TagPanel
         isOpen={isTagPanelOpen}
         tags={allTags}
@@ -1067,7 +1130,7 @@ export default function HomePage({
         selectedTag={selectedTag}
         onClose={() => setIsTagPanelOpen(false)}
         onSelectTag={setSelectedTag}
-        isAdmin={canUpdateTracker}
+        isAdmin={canUpdateTags}
       />
     </>
   );

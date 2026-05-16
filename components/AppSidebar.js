@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Users } from "lucide-react";
+import { Archive, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -61,6 +61,20 @@ const ADMIN_ITEMS = [
     permission: "roles.read",
   },
   {
+    key: "platformTracker",
+    href: "/administracion/rastreador",
+    label: "Rastreador",
+    icon: Archive,
+    permission: "admin.tracker.view",
+  },
+  {
+    key: "platformTags",
+    href: "/administracion/tags",
+    label: "Tags",
+    icon: Tags,
+    permission: "admin.tags.view",
+  },
+  {
     key: "platformAnimeTracking",
     href: "/administracion/biblioteca-anime/viendo",
     label: "Viendo",
@@ -114,6 +128,8 @@ export default function AppSidebar({
   id = "main-sidebar",
   canManageUsers = false,
   canManageRoles = false,
+  canManageTracker = false,
+  canManageTags = false,
   canManageAnimeTracking = false,
   canManageAnimeCompleted = false,
   isSpaceDrumEnabled = false,
@@ -126,6 +142,8 @@ export default function AppSidebar({
   const adminItems = ADMIN_ITEMS.filter((item) => {
     if (item.key === "platformAnimeTracking") return canManageAnimeTracking && canAccess(item.permission);
     if (item.key === "platformAnimeCompleted") return canManageAnimeCompleted && canAccess(item.permission);
+    if (item.key === "platformTracker") return canManageTracker && canAccess(item.permission);
+    if (item.key === "platformTags") return canManageTags && canAccess(item.permission);
     if (item.key === "platformUsers") return canManageUsers && canAccess(item.permission);
     if (item.key === "platformRoles") return canManageRoles && canAccess(item.permission);
     return false;

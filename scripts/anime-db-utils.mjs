@@ -15,6 +15,7 @@ import {
   toNullableString,
   toTrimmedString,
 } from "../lib/animeDbMapping.js";
+import { safeUpsert } from "../lib/prismaSafeUpsert.js";
 
 export function createPrismaClient() {
   if (!process.env.DATABASE_URL) {
@@ -38,7 +39,7 @@ async function upsertExternalReference(prisma, animeId, item) {
     return;
   }
 
-  await prisma.animeExternalReference.upsert({
+  await safeUpsert(prisma.animeExternalReference, {
     where: {
       animeId_providerId: {
         animeId,
@@ -75,12 +76,12 @@ export async function saveAnimeRecord(prisma, key, item) {
   const trackerTag = await ensureAnimeTag(prisma, item.tag);
   const isFullSeason = getIsFullSeason(item);
   const watchStatusCode = isFullSeason ? "purchased" : toTrimmedString(item.watchStatus) || "pending";
-  const watchStatus = await prisma.animeWatchStatus.upsert({
+  const watchStatus = await safeUpsert(prisma.animeWatchStatus, {
     where: { code: watchStatusCode },
     update: { label: watchStatusCode, isActive: true },
     create: { code: watchStatusCode, label: watchStatusCode },
   });
-  const anime = await prisma.anime.upsert({
+  const anime = await safeUpsert(prisma.anime, {
     where: { key },
     update: {
       title: toAnimeTitle(key, item),
@@ -107,7 +108,7 @@ export async function saveAnimeRecord(prisma, key, item) {
     },
   });
 
-  await prisma.animeLibraryEntry.upsert({
+  await safeUpsert(prisma.animeLibraryEntry, {
     where: { animeId: anime.id },
     update: {
       watchStatusId: watchStatus.id,

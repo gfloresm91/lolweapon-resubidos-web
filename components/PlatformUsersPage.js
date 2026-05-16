@@ -59,7 +59,8 @@ const TABLE_COLUMNS = [
   { key: "isActive", label: "Estado", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const adminUserBaseSchema = z.object({
   id: z.number().optional(),
@@ -577,6 +578,7 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
   const [originFilter, setOriginFilter] = useState("all");
   const [sortConfig, setSortConfig] = useState({ key: "id", direction: "desc" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editingUser, setEditingUser] = useState(null);
   const [passwordUser, setPasswordUser] = useState(null);
   const [statusUser, setStatusUser] = useState(null);
@@ -636,10 +638,10 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
         return String(leftValue).localeCompare(String(rightValue), "es", { numeric: true }) * direction;
       });
   }, [originFilter, roleFilter, searchQuery, sortConfig.direction, sortConfig.key, statusFilter, users]);
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const paginatedUsers = filteredUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const paginationFrom = filteredUsers.length ? ((currentPage - 1) * PAGE_SIZE) + 1 : 0;
-  const paginationTo = Math.min(currentPage * PAGE_SIZE, filteredUsers.length);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const paginationFrom = filteredUsers.length ? ((currentPage - 1) * pageSize) + 1 : 0;
+  const paginationTo = Math.min(currentPage * pageSize, filteredUsers.length);
   const currentUserIsGod = currentUser?.role === "dios";
   const godUser = users.find((user) => user.role === "dios");
   const editableRoles = useMemo(() => roles.filter((role) => {
@@ -944,6 +946,12 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
           total: filteredUsers.length,
           canPrevious: currentPage > 1,
           canNext: currentPage < totalPages,
+          pageSize,
+          pageSizeOptions: PAGE_SIZE_OPTIONS,
+          onPageSizeChange: (nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          },
           onPrevious: () => setCurrentPage((page) => Math.max(1, page - 1)),
           onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
         }}

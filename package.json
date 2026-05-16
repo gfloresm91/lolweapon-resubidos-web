@@ -1,6 +1,6 @@
 {
   "name": "lolweapon-resubidos-web",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "description": "Web de resubidos para el streamer/youtuber Lolweapon",
@@ -22,6 +22,7 @@
     "db:studio": "prisma studio",
     "db:backup": "bash scripts/backup-postgres.sh",
     "db:restore": "bash scripts/restore-postgres.sh",
+    "db:reset-sequences": "node scripts/reset-postgres-sequences.mjs",
     "enrich:anime": "node scripts/enrich-anime-metadata.mjs",
     "start": "next start",
     "lint": "next lint"
@@ -32,7 +33,10 @@
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.13.24",
     "dotenv": "^17.4.2",
+    "flatpickr": "^4.6.13",
     "lucide-react": "^1.14.0",
     "next": "^15.2.0",
     "pg": "^8.20.0",

@@ -45,6 +45,16 @@ export default function MaintainerTable({
       {pagination ? (
         <div className="maintainer-pagination" aria-label="Paginación">
           <span>{pagination.from}-{pagination.to} de {pagination.total}</span>
+          {pagination.pageSize && pagination.onPageSizeChange ? (
+            <label className="maintainer-page-size">
+              <span>Filas</span>
+              <select value={pagination.pageSize} onChange={(event) => pagination.onPageSizeChange(Number(event.target.value))}>
+                {(pagination.pageSizeOptions || [10, 25, 50, 100]).map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div>
             <button type="button" onClick={pagination.onPrevious} disabled={!pagination.canPrevious}>Anterior</button>
             <button type="button" onClick={pagination.onNext} disabled={!pagination.canNext}>Siguiente</button>

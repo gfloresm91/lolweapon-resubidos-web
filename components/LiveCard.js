@@ -2,6 +2,7 @@
 
 import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Edit3 } from "lucide-react";
 
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 
@@ -116,19 +117,6 @@ function LiveCard({
       className={`live-card visible ${isAdmin ? "is-admin" : ""} ${showThumbnail ? "has-thumb" : ""}`}
       data-live-id={live.id}
     >
-      {isAdmin ? (
-        <button
-          type="button"
-          className="edit-indicator"
-          onClick={(event) => {
-            event.stopPropagation();
-            onEdit();
-          }}
-        >
-          Editar
-        </button>
-      ) : null}
-
       {showThumbnail ? (
         <div className="live-thumb" aria-hidden="true">
           <img src={live.image} alt="" loading="lazy" />
@@ -235,6 +223,20 @@ function LiveCard({
         </div>
 
         <div className="links-container">
+          {isAdmin ? (
+            <button
+              type="button"
+              className="platform-btn platform-edit"
+              title="Editar directo"
+              aria-label={`Editar ${live.title || "directo"}`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Edit3 size={15} />
+            </button>
+          ) : null}
           <button
             type="button"
             className="platform-btn platform-detail"

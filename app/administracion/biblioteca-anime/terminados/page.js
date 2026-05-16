@@ -15,7 +15,6 @@ const COMPLETED_MANAGEMENT_PERMISSIONS = [
   "anime.completed.delete",
 ];
 const COMPLETED_SCREEN_PERMISSION = "admin.anime.completed.view";
-const ADMIN_ROLE_CODES = new Set(["dios", "admin"]);
 
 export default async function PlatformAnimeCompletedAdminPage() {
   const cookieStore = await cookies();
@@ -23,8 +22,7 @@ export default async function PlatformAnimeCompletedAdminPage() {
   const currentUser = await getCurrentUserFromToken(token);
 
   if (
-    !ADMIN_ROLE_CODES.has(currentUser?.role)
-    || !canAny(currentUser, [COMPLETED_SCREEN_PERMISSION])
+    !canAny(currentUser, [COMPLETED_SCREEN_PERMISSION])
     || !canAny(currentUser, COMPLETED_MANAGEMENT_PERMISSIONS)
   ) {
     redirect("/login");
