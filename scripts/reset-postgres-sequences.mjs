@@ -25,6 +25,8 @@ const TABLES_WITH_AUTO_IDS = [
   "PlatformRole",
   "PlatformPermission",
   "PlatformUser",
+  "PlatformUserLive",
+  "PlatformUserAnime",
   "PlatformSession",
   "LoginAttempt",
 ];

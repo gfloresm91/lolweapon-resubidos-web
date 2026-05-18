@@ -9,7 +9,7 @@ const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
 const MINI_PLAYER_DEFAULT_WIDTH = 380;
 const MINI_PLAYER_MIN_WIDTH = 380;
 const MINI_PLAYER_MAX_WIDTH = 720;
-const MINI_ROUTES = ["/rastreador", "/biblioteca-anime", "/administracion", "/spacedrum"];
+const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum"];
 
 function loadTwitchEmbedScript() {
   if (window.Twitch?.Player) {

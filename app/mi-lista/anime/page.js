@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
-import { can } from "@/lib/repositories/platformUserRepository";
 import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 import { getAnimeLibrary } from "@/lib/repositories/animeLibraryRepository";
+import { can } from "@/lib/repositories/platformUserRepository";
 
 export const dynamic = "force-dynamic";
 
-export default async function AnimeLibraryWatchingPage() {
+export default async function MyAnimeListPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const [currentUser, accessUser, isAdmin] = await Promise.all([
@@ -19,24 +19,22 @@ export default async function AnimeLibraryWatchingPage() {
     validateAdminSessionToken(token),
   ]);
 
-  if (!can(accessUser, "anime.tracking.view")) {
+  if (!currentUser) {
     redirect("/login");
   }
 
-  const includeHidden = [
-    "anime.tracking.update",
-    "anime.tracking.delete",
-    "anime.completed.update",
-    "anime.completed.delete",
-  ].some((permission) => can(accessUser, permission));
+  if (!can(accessUser, "anime.tracking.view") && !can(accessUser, "anime.completed.view")) {
+    redirect("/login");
+  }
+
   const [animeLibrary, initialAnimeActivity] = await Promise.all([
-    getAnimeLibrary({ includeHidden }),
-    currentUser?.id ? getAnimeActivityMapForUser(currentUser.id) : {},
+    getAnimeLibrary({ includeHidden: false }),
+    getAnimeActivityMapForUser(currentUser.id),
   ]);
 
   return (
     <HomePage
-      activeView="animeLibraryTracking"
+      activeView="myAnimeList"
       initialLives={[]}
       initialAnimeLibrary={animeLibrary}
       initialAnimeActivity={initialAnimeActivity}

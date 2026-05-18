@@ -23,6 +23,12 @@ coverage/
 .env.test.local
 .env.production.local
 
+# Claude Code memory (local AI context, no versionar)
+memory/
+
+# Deploy script — backup temporal del build anterior
+.next_backup/
+
 # Local runtime data
 data/data.local.json
 data/animes.local.json

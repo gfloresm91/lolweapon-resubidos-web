@@ -39,7 +39,7 @@ export default function AccountMenu({ user }) {
   async function logout() {
     setIsOpen(false);
     await fetch("/api/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/inicio");
     router.refresh();
   }
 

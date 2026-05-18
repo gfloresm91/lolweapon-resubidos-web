@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
+import { Archive, Bookmark, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -20,6 +20,16 @@ const SIDEBAR_ITEMS = [
   },
 ];
 
+const AUTH_ITEMS = [
+  {
+    key: "myList",
+    href: "/mi-lista",
+    label: "Mi lista",
+    icon: Bookmark,
+    permission: "tracker.view",
+  },
+];
+
 const ANIME_ITEMS = [
   {
     key: "animeLibraryTracking",
@@ -34,6 +44,14 @@ const ANIME_ITEMS = [
     label: "Terminados",
     icon: CheckCircle2,
     permission: "anime.completed.view",
+  },
+  {
+    key: "myAnimeList",
+    href: "/mi-lista/anime",
+    label: "Mi lista anime",
+    icon: Bookmark,
+    permission: "anime.tracking.view",
+    authOnly: true,
   },
 ];
 
@@ -132,13 +150,16 @@ export default function AppSidebar({
   canManageTags = false,
   canManageAnimeTracking = false,
   canManageAnimeCompleted = false,
+  isAuthenticated = false,
   isSpaceDrumEnabled = false,
   canAccess = () => true,
   onSelect,
+  // isAdmin is intentionally omitted — permissions are controlled individually above
 }) {
   const sidebarClassName = ["sidebar", className].filter(Boolean).join(" ");
   const sidebarItems = SIDEBAR_ITEMS.filter((item) => canAccess(item.permission));
-  const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission));
+  const authItems = isAuthenticated ? AUTH_ITEMS.filter((item) => canAccess(item.permission)) : [];
+  const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission) && (!item.authOnly || isAuthenticated));
   const adminItems = ADMIN_ITEMS.filter((item) => {
     if (item.key === "platformAnimeTracking") return canManageAnimeTracking && canAccess(item.permission);
     if (item.key === "platformAnimeCompleted") return canManageAnimeCompleted && canAccess(item.permission);
@@ -174,6 +195,10 @@ export default function AppSidebar({
 
       <nav className="sidebar-nav">
         {sidebarItems.map((item) => (
+          <SidebarNavItem key={item.key} item={item} activeView={activeView} onSelect={onSelect} />
+        ))}
+
+        {authItems.map((item) => (
           <SidebarNavItem key={item.key} item={item} activeView={activeView} onSelect={onSelect} />
         ))}
 

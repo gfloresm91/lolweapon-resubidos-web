@@ -5,6 +5,7 @@ import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
+import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 import { getAnimeLibrary } from "@/lib/repositories/animeLibraryRepository";
 
 export const dynamic = "force-dynamic";
@@ -28,13 +29,17 @@ export default async function AnimeLibraryCompletedPage() {
     "anime.completed.update",
     "anime.completed.delete",
   ].some((permission) => can(accessUser, permission));
-  const animeLibrary = await getAnimeLibrary({ includeHidden });
+  const [animeLibrary, initialAnimeActivity] = await Promise.all([
+    getAnimeLibrary({ includeHidden }),
+    currentUser?.id ? getAnimeActivityMapForUser(currentUser.id) : {},
+  ]);
 
   return (
     <HomePage
       activeView="animeLibraryCompleted"
       initialLives={[]}
       initialAnimeLibrary={animeLibrary}
+      initialAnimeActivity={initialAnimeActivity}
       isAdmin={isAdmin}
       currentUser={currentUser}
       accessPermissions={accessUser?.permissions || []}

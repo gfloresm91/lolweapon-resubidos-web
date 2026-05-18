@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { Toaster, toast } from "sonner";
 import { z } from "zod";
 
+import AuthBackButton from "@/components/AuthBackButton";
 import {
   ALIAS_MAX_LENGTH,
   ALIAS_RULES,
@@ -38,6 +39,15 @@ const registerSchema = z.object({
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [nextPath, setNextPath] = useState("/inicio");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next?.startsWith("/") && !next.startsWith("//")) {
+      setNextPath(next);
+    }
+  }, []);
   const [visiblePasswords, setVisiblePasswords] = useState({
     password: false,
     confirmPassword: false,
@@ -94,7 +104,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/inicio");
       router.refresh();
     } catch {
       toast.error("No se pudo crear la cuenta. Intenta nuevamente.");
@@ -228,10 +238,7 @@ export default function RegisterPage() {
           ¿Ya tienes cuenta? <Link href="/login">Iniciar sesión</Link>
         </p>
 
-        <Link href="/" className="auth-back-link">
-          <span aria-hidden="true">←</span>
-          Volver a la web
-        </Link>
+        <AuthBackButton fallbackHref={nextPath} />
       </section>
     </main>
   );

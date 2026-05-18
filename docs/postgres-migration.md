@@ -154,6 +154,7 @@ Tracker data is split across:
 - `Live`, `LiveStatus`
 - `LiveTag`
 - `LiveLink`, `LinkPlatform`
+- `PlatformUserLive`: per-user tracker activity for saved and watched lives.
 
 SpaceDrum data is split across:
 
@@ -169,6 +170,7 @@ Platform administration data is split across:
 - `PlatformPermission`: permission catalog grouped by screen and action.
 - `PlatformRolePermission`: assignment table between roles and permissions.
 - `PlatformUser`: manual and Twitch-linked platform users, including `deletedAt` for logical deletion.
+- `PlatformUserLive`: saved/watched tracker activity tied to a user and a live.
 - `PlatformSession`: persistent login sessions.
 - `LoginAttempt`: login audit and rate-limit support data.
 
@@ -306,6 +308,7 @@ Lives are split across normalized tables:
 - `LiveStatus`: reusable status catalog.
 - `Tag`, `TagCategory`, `LiveTag`: shared tags with original per-live order preserved.
 - `LinkPlatform`, `LiveLink`: reusable link platform catalog and ordered links.
+- `PlatformUserLive`: user-specific saved/watched state used by the public tracker after login.
 
 Expected validation after import/export:
 

@@ -1,0 +1,26 @@
+name: Deploy QA
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    name: Deploy → resubidos-qa
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy vía SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/kalaplex/resubidos-qa
+            git pull origin dev
+            npm ci --prefer-offline
+            npm run build
+            npx prisma migrate deploy
+            sudo systemctl restart resubidos-qa.service
+            systemctl is-active resubidos-qa.service

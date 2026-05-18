@@ -1,0 +1,26 @@
+name: Deploy Producción
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy → resubidos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy vía SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/kalaplex/resubidos
+            git pull origin main
+            npm ci --prefer-offline
+            npm run build
+            npx prisma migrate deploy
+            sudo systemctl restart resubidos.service
+            systemctl is-active resubidos.service

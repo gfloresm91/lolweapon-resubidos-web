@@ -216,7 +216,7 @@ docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres \
 npm run db:migrate:deploy
 ```
 
-Este paso crea tablas como `PlatformUser`, `PlatformRole`, `PlatformPermission`, `PlatformSession`, `LoginAttempt` y el resto del modelo normalizado. También aplica permisos nuevos como `admin.anime.tracking.view` y `admin.anime.completed.view`.
+Este paso crea tablas como `PlatformUser`, `PlatformRole`, `PlatformPermission`, `PlatformSession`, `LoginAttempt`, `PlatformUserLive` y el resto del modelo normalizado. También aplica permisos nuevos como `admin.anime.tracking.view` y `admin.anime.completed.view`.
 
 ### 8. Importar data base
 

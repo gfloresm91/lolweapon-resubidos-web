@@ -25,6 +25,7 @@ model Anime {
   releaseStatus      AnimeReleaseStatus?       @relation(fields: [releaseStatusId], references: [id])
   libraryEntry       AnimeLibraryEntry?
   externalReferences AnimeExternalReference[]
+  userActivity       PlatformUserAnime[]
 
   @@index([formatId])
   @@index([releaseStatusId])
@@ -159,6 +160,7 @@ model Live {
   status         LiveStatus? @relation(fields: [statusId], references: [id])
   tags           LiveTag[]
   links          LiveLink[]
+  userActivity   PlatformUserLive[]
 
   @@index([statusId])
   @@index([year])
@@ -352,10 +354,57 @@ model PlatformUser {
 
   role           PlatformRole      @relation(fields: [roleId], references: [id])
   sessions       PlatformSession[]
+  liveActivity   PlatformUserLive[]
+  animeActivity  PlatformUserAnime[]
 
   @@index([roleId])
   @@index([isActive])
   @@index([deletedAt])
+}
+
+model PlatformUserLive {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  liveId    Int
+  isSaved   Boolean      @default(false)
+  isWatched Boolean      @default(false)
+  savedAt   DateTime?
+  watchedAt DateTime?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user      PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  live      Live         @relation(fields: [liveId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, liveId])
+  @@index([userId])
+  @@index([liveId])
+  @@index([isSaved])
+  @@index([isWatched])
+}
+
+model PlatformUserAnime {
+  id              Int          @id @default(autoincrement())
+  userId          Int
+  animeId         Int
+  isFavorite      Boolean      @default(false)
+  listStatus      String?
+  isHidden        Boolean      @default(false)
+  favoritedAt     DateTime?
+  statusUpdatedAt DateTime?
+  hiddenAt        DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime           Anime        @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([userId])
+  @@index([animeId])
+  @@index([isFavorite])
+  @@index([listStatus])
+  @@index([isHidden])
 }
 
 model PlatformSession {

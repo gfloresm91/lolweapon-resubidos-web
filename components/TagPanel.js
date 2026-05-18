@@ -56,6 +56,8 @@ export default function TagPanel({
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     let isCancelled = false;
 
     async function loadTagSettings() {
@@ -84,7 +86,7 @@ export default function TagPanel({
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
