@@ -17,10 +17,34 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
             cd /home/kalaplex/resubidos
+
+            # Backup del build actual para rollback
+            if [[ -d .next ]]; then
+              rm -rf .next_backup
+              cp -r .next .next_backup
+            fi
+
+            rollback() {
+              echo "Deploy falló. Restaurando build anterior..."
+              if [[ -d .next_backup ]]; then
+                rm -rf .next
+                mv .next_backup .next
+              fi
+              sudo systemctl restart resubidos.service || true
+              echo "Rollback completado. Revisa: journalctl -u resubidos.service -n 50"
+            }
+            trap rollback ERR
+
             git pull origin main
             npm ci --prefer-offline
+            npm run db:generate
             npm run build
-            npx prisma migrate deploy
+            npm run db:backup || echo "Advertencia: backup de DB falló, continuando de todas formas..."
+            npm run db:migrate:deploy
             sudo systemctl restart resubidos.service
             systemctl is-active resubidos.service
+
+            trap - ERR
+            rm -rf .next_backup
