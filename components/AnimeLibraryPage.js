@@ -1,16 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Edit3, X } from "lucide-react";
+import { CheckCircle2, Eye, ListPlus, Star, Edit3, X } from "lucide-react";
 import { toast } from "sonner";
-import { useDropzone } from "react-dropzone";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import FormSelect from "@/components/FormSelect";
 import TagCombobox from "@/components/TagCombobox";
 
-const ANIME_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const AnimeImageDropzone = dynamic(() => import("@/components/AnimeImageDropzone"), { ssr: false });
 
 const STATUS_OPTIONS = [
   { key: "all", label: "Todos" },
@@ -50,6 +50,12 @@ const EDIT_STATUS_SELECT_OPTIONS = EDIT_STATUS_OPTIONS.map((option) => ({ value:
 const VISIBILITY_SELECT_OPTIONS = [
   { value: "true", label: "Sí" },
   { value: "false", label: "No" },
+];
+
+const ANIME_PERSONAL_STATUS_OPTIONS = [
+  { key: "want", label: "Quiero ver", icon: ListPlus },
+  { key: "watching", label: "Viendo", icon: Eye },
+  { key: "completed", label: "Terminado", icon: CheckCircle2 },
 ];
 
 const emptyAnime = {
@@ -110,6 +116,16 @@ const PAGE_CONFIG = {
     empty: "No hay animes terminados con ese filtro.",
     statusOptions: COMPLETED_STATUS_OPTIONS,
     acceptsStatus: (status) => ["completed", "paused", "pending", "dropped"].includes(status),
+  },
+  personal: {
+    badge: "Lista personal",
+    titlePrefix: "Mi lista",
+    titleHighlight: "Anime",
+    subtitle: "Tus favoritos, pendientes, animes en curso y terminados en un solo lugar.",
+    createLabel: "",
+    empty: "Aún no tienes animes guardados en tu lista personal.",
+    statusOptions: [],
+    acceptsStatus: () => true,
   },
 };
 
@@ -254,6 +270,20 @@ function getAnimeImageStatus(imageFile, imageUrl) {
   if (imageFile) return "Nueva imagen local seleccionada";
   if (imageUrl) return imageUrl.startsWith("/") ? "Imagen local guardada" : "Imagen externa";
   return "Sin imagen";
+}
+
+function hasSeenDiscoveryToast(key) {
+  try {
+    const storageKey = `kala_discovery_${key}`;
+    if (window.localStorage.getItem(storageKey)) {
+      return true;
+    }
+
+    window.localStorage.setItem(storageKey, "1");
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function normalizeComparable(value) {
@@ -675,29 +705,6 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
   const imageStatus = getAnimeImageStatus(imageFile, form.image);
   const generatedTrackerUrl = getGeneratedTrackerUrl(form);
   const hasAniListMetadata = Boolean(form.provider || form.providerId);
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    accept: {
-      "image/jpeg": [".jpg", ".jpeg"],
-      "image/png": [".png"],
-      "image/webp": [".webp"],
-    },
-    maxFiles: 1,
-    maxSize: ANIME_IMAGE_MAX_BYTES,
-    noClick: true,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles[0]) {
-        updateImageFile(acceptedFiles[0]);
-      }
-    },
-    onDropRejected: (rejections) => {
-      const code = rejections[0]?.errors?.[0]?.code;
-      if (code === "file-too-large") {
-        updateImageFile(null, "La imagen no puede superar 2 MB.");
-        return;
-      }
-      updateImageFile(null, "La imagen debe ser PNG, JPG o WebP.");
-    },
-  });
 
   if (!isOpen) {
     return null;
@@ -905,18 +912,11 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                 ) : null}
                 <div className="form-group-modal">
                   <label>Poster / Imagen local</label>
-                  <div
-                    {...getRootProps({
-                      className: `anime-image-dropzone ${isDragActive ? "is-active" : ""} ${fieldErrors.imageFile ? "is-error" : ""}`,
-                    })}
-                  >
-                    <input {...getInputProps()} />
-                    <strong>{isDragActive ? "Suelta la imagen aquí" : "Arrastra una imagen aquí"}</strong>
-                    <span>PNG, JPG o WebP. Máximo 2 MB.</span>
-                    <button type="button" className="btn-modal btn-modal-secondary" onClick={open}>
-                      Seleccionar imagen
-                    </button>
-                  </div>
+                  <AnimeImageDropzone
+                    hasError={Boolean(fieldErrors.imageFile)}
+                    onFile={(file) => updateImageFile(file)}
+                    onError={(error) => updateImageFile(null, error)}
+                  />
                   <div className="anime-image-uploader-footer">
                     <span>{imageStatus}</span>
                     {imageFile ? (
@@ -1159,6 +1159,9 @@ function buildTagFromTitle(title) {
 
 export default function AnimeLibraryPage({
   animes: initialAnimes = [],
+  initialActivity = {},
+  isAuthenticated = false,
+  personalOnly = false,
   isAdmin = false,
   canCreate = isAdmin,
   canUpdate = isAdmin,
@@ -1169,9 +1172,11 @@ export default function AnimeLibraryPage({
   onAnimesChange,
 }) {
   const [animes, setAnimes] = useState(initialAnimes);
+  const [animeActivity, setAnimeActivity] = useState(initialActivity || {});
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sortOption, setSortOption] = useState(mode === "completed" ? "title-asc" : "purchased-desc");
+  const [personalFilter, setPersonalFilter] = useState("all");
+  const [sortOption, setSortOption] = useState(personalOnly || mode === "completed" ? "title-asc" : "purchased-desc");
   const [isCreateStartOpen, setIsCreateStartOpen] = useState(false);
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -1184,19 +1189,56 @@ export default function AnimeLibraryPage({
   }, [initialAnimes]);
 
   useEffect(() => {
+    setAnimeActivity(initialActivity || {});
+  }, [initialActivity]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function refreshAnimeActivity() {
+      try {
+        const response = await fetch("/api/anime-activity", { cache: "no-store" });
+        const data = await response.json().catch(() => null);
+
+        if (isMounted && response.ok && data?.success) {
+          setAnimeActivity(Object.fromEntries((data.activity || []).map((item) => [item.animeKey, item])));
+        }
+      } catch {
+        // Personal anime activity is progressive enhancement.
+      }
+    }
+
+    refreshAnimeActivity();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
     setStatusFilter("all");
-    setSortOption(mode === "completed" ? "title-asc" : "purchased-desc");
-  }, [mode]);
+    setPersonalFilter("all");
+    setSortOption(personalOnly || mode === "completed" ? "title-asc" : "purchased-desc");
+  }, [mode, personalOnly]);
 
   const pageAnimes = useMemo(() => {
     return animes.filter((anime) => {
+      if (personalOnly) {
+        const activity = animeActivity[anime.key] || {};
+        return Boolean(activity.isFavorite || activity.listStatus);
+      }
+
       if (anime.libraryEnabled === false) {
         return canManageAnime;
       }
 
       return pageConfig.acceptsStatus(anime.watchStatus || "pending");
     });
-  }, [animes, canManageAnime, mode, pageConfig]);
+  }, [animeActivity, animes, canManageAnime, pageConfig, personalOnly]);
 
   const stats = useMemo(() => {
     const visiblePageAnimes = pageAnimes.filter((anime) => anime.libraryEnabled !== false);
@@ -1246,6 +1288,25 @@ export default function AnimeLibraryPage({
         { value: stats.dropped, label: "Dropeados", color: "red" },
       ];
 
+  const personalStats = useMemo(() => {
+    return pageAnimes.reduce((acc, anime) => {
+      const activity = animeActivity[anime.key] || {};
+      if (activity.isFavorite) acc.favorites += 1;
+      if (activity.listStatus === "want") acc.want += 1;
+      if (activity.listStatus === "watching") acc.watching += 1;
+      if (activity.listStatus === "completed") acc.completed += 1;
+      return acc;
+    }, { favorites: 0, want: 0, watching: 0, completed: 0 });
+  }, [animeActivity, pageAnimes]);
+
+  const personalStatItems = [
+    { value: pageAnimes.length, label: "Total", color: "purple" },
+    { value: personalStats.favorites, label: "Favoritos", color: "orange" },
+    { value: personalStats.want, label: "Quiero ver", color: "blue" },
+    { value: personalStats.watching, label: "Viendo", color: "green" },
+    { value: personalStats.completed, label: "Terminados", color: "purple" },
+  ];
+
   const filteredAnimes = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -1263,6 +1324,11 @@ export default function AnimeLibraryPage({
       }
 
       const status = anime.watchStatus || "pending";
+      const activity = animeActivity[anime.key] || {};
+      const personalMatch = !personalOnly
+        || personalFilter === "all"
+        || (personalFilter === "favorites" && activity.isFavorite)
+        || activity.listStatus === personalFilter;
       const statusMatch = statusFilter === "all"
         || (statusFilter === "purchased" && isFullSeason(anime))
         || (statusFilter === "watching" && !isFullSeason(anime) && getPurchasedCount(anime) > 0)
@@ -1274,10 +1340,10 @@ export default function AnimeLibraryPage({
         anime.tag,
       ].filter(Boolean).join(" ").toLowerCase().includes(query);
 
-      return statusMatch && searchMatch;
+      return statusMatch && personalMatch && searchMatch;
     });
 
-    if (mode === "completed") {
+    if (personalOnly || mode === "completed") {
       const direction = sortOption.endsWith("desc") ? -1 : 1;
 
       if (sortOption.startsWith("episodes") || sortOption.startsWith("year")) {
@@ -1316,7 +1382,7 @@ export default function AnimeLibraryPage({
 
       return (left.title || "").localeCompare(right.title || "");
     });
-  }, [mode, pageAnimes, search, sortOption, statusFilter]);
+  }, [animeActivity, mode, pageAnimes, personalFilter, personalOnly, search, sortOption, statusFilter]);
 
   async function uploadAnimeImage(file) {
     const formData = new FormData();
@@ -1441,6 +1507,79 @@ export default function AnimeLibraryPage({
     }
   }
 
+  function requireLoginForAnime() {
+    toast("Inicia sesión para guardar tu lista de anime.", {
+      action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
+    });
+  }
+
+  async function updateAnimeActivity(animeKey, patch = {}) {
+    if (!isAuthenticated) {
+      requireLoginForAnime();
+      return;
+    }
+
+    const currentActivity = animeActivity[animeKey] || {
+      animeKey,
+      isFavorite: false,
+      listStatus: "",
+      isHidden: false,
+    };
+    const optimisticActivity = {
+      ...currentActivity,
+      ...patch,
+      animeKey,
+    };
+
+    setAnimeActivity((current) => ({
+      ...current,
+      [animeKey]: optimisticActivity,
+    }));
+
+    try {
+      const response = await fetch("/api/anime-activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeKey, ...patch }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (response.status === 401) {
+        requireLoginForAnime();
+        return;
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "No se pudo guardar tu lista de anime.");
+      }
+
+      setAnimeActivity((current) => ({
+        ...current,
+        [animeKey]: data.activity,
+      }));
+
+      if (Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
+        toast.success(patch.isFavorite
+          ? hasSeenDiscoveryToast("anime_favorite")
+            ? "Anime marcado como favorito."
+            : "Anime añadido a Mi lista anime."
+          : "Anime quitado de favoritos.");
+      } else if (Object.prototype.hasOwnProperty.call(patch, "listStatus")) {
+        toast.success(patch.listStatus
+          ? hasSeenDiscoveryToast("anime_status")
+            ? "Estado personal actualizado."
+            : "Estado guardado en Mi lista anime."
+          : "Estado personal quitado.");
+      }
+    } catch (error) {
+      setAnimeActivity((current) => ({
+        ...current,
+        [animeKey]: currentActivity,
+      }));
+      toast.error(error.message || "No se pudo guardar tu lista de anime.");
+    }
+  }
+
   return (
     <>
       <header className="watching-header anime-library-header">
@@ -1454,8 +1593,8 @@ export default function AnimeLibraryPage({
         <p className="subtitle">{pageConfig.subtitle}</p>
       </header>
 
-      <section className="watching-stats">
-        {statItems.map((item) => (
+      <section className={`watching-stats ${personalOnly ? "is-personal" : ""}`}>
+        {(personalOnly ? personalStatItems : statItems).map((item) => (
           <div className="watching-stat" key={item.label}>
             <span className={`watching-stat-value ${item.color}`}>{item.value}</span>
             <span className="watching-stat-label">{item.label}</span>
@@ -1487,7 +1626,26 @@ export default function AnimeLibraryPage({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
-        {pageConfig.statusOptions.length > 1 ? (
+        {personalOnly ? (
+          <>
+            {[
+              { key: "all", label: "Todos" },
+              { key: "favorites", label: "Favoritos" },
+              { key: "want", label: "Quiero ver" },
+              { key: "watching", label: "Viendo" },
+              { key: "completed", label: "Terminados" },
+            ].map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`watching-filter-btn ${personalFilter === option.key ? "active" : ""}`}
+                onClick={() => setPersonalFilter(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </>
+        ) : pageConfig.statusOptions.length > 1 ? (
           <>
             {[
               ...pageConfig.statusOptions,
@@ -1505,7 +1663,7 @@ export default function AnimeLibraryPage({
           </>
         ) : null}
         <AnimeLibrarySortSelect
-          options={mode === "completed" ? ALPHA_SORT_OPTIONS : CAPS_SORT_OPTIONS}
+          options={personalOnly || mode === "completed" ? ALPHA_SORT_OPTIONS : CAPS_SORT_OPTIONS}
           value={sortOption}
           onChange={setSortOption}
         />
@@ -1530,6 +1688,8 @@ export default function AnimeLibraryPage({
                 anime.episodes ? `${anime.episodes} eps` : null,
                 anime.format,
               ].filter(Boolean);
+              const personalActivity = animeActivity[anime.key] || {};
+              const personalStatus = personalActivity.listStatus || "";
               const hoverMeta = [
                 anime.year,
                 anime.episodes ? `${anime.episodes} eps` : null,
@@ -1584,6 +1744,41 @@ export default function AnimeLibraryPage({
                     ) : null}
                   </div>
                   <div className="anime-card-body anime-library-body">
+                    <div className="anime-personal-actions" aria-label="Lista personal de anime">
+                      <button
+                        type="button"
+                        className={`anime-personal-btn anime-personal-favorite ${personalActivity.isFavorite ? "is-active" : ""}`}
+                        aria-label={personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          updateAnimeActivity(anime.key, { isFavorite: !personalActivity.isFavorite });
+                        }}
+                      >
+                        <Star size={14} />
+                        <span>Favorito</span>
+                      </button>
+                      <div className="anime-personal-statuses" role="group" aria-label="Estado personal">
+                        {ANIME_PERSONAL_STATUS_OPTIONS.map((option) => {
+                          const Icon = option.icon;
+                          const isActive = personalStatus === option.key;
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              className={`anime-personal-btn ${isActive ? "is-active" : ""}`}
+                              aria-pressed={isActive}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateAnimeActivity(anime.key, { listStatus: isActive ? "" : option.key });
+                              }}
+                            >
+                              <Icon size={14} />
+                              <span>{option.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     {mode === "completed" ? (
                       <div className="anime-library-archive-meta">
                         {archiveMeta.length ? (
@@ -1629,6 +1824,16 @@ export default function AnimeLibraryPage({
           <div className="empty-state">
             <div className="empty-state-icon">AN</div>
             <div className="empty-state-text">{pageConfig.empty}</div>
+            {personalOnly ? (
+              <p className="empty-state-help">
+                Marca animes como favoritos o elige un estado personal desde Viendo y Terminados para verlos aquí.
+              </p>
+            ) : null}
+            {personalOnly ? (
+              <a className="empty-state-action" href="/biblioteca-anime/viendo">
+                Explorar biblioteca
+              </a>
+            ) : null}
           </div>
         )}
       </main>

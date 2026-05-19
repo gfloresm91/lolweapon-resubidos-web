@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { Toaster } from "sonner";
 
 import AppSidebar from "@/components/AppSidebar";
+import DetailActivityButtons from "@/components/DetailActivityButtons";
+import DetailBackLink from "@/components/DetailBackLink";
 import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
@@ -10,7 +13,8 @@ import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
-import { readLives } from "@/lib/repositories/liveRepository";
+import { getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
+import { getLiveActivityForLive } from "@/lib/repositories/liveActivityRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -59,13 +63,9 @@ function StatusBadge({ status }) {
   return <span className={className}>{status || PENDING_LIVE_STATUS_LABEL}</span>;
 }
 
-function parseLiveSortDate(value) {
-  const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
-  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-}
-
 export default async function LiveDetailPage({ params }) {
   const { id } = await params;
+  const decodedId = decodeURIComponent(id);
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const [currentUser, accessUser, isAdmin] = await Promise.all([
@@ -75,31 +75,22 @@ export default async function LiveDetailPage({ params }) {
   ]);
 
   if (!can(accessUser, "tracker.view")) {
-    notFound();
+    redirect(`/login?next=/rastreador/${encodeURIComponent(decodedId)}`);
   }
 
-  const lives = await readLives();
-  const sortedLives = [...lives].sort((left, right) => {
-    const dateCompare = parseLiveSortDate(left.date).localeCompare(parseLiveSortDate(right.date));
-
-    if (dateCompare !== 0) {
-      return dateCompare;
-    }
-
-    return String(left.id || "").localeCompare(String(right.id || ""));
-  });
-  const liveIndex = sortedLives.findIndex((item) => item.id === decodeURIComponent(id));
-  const live = sortedLives[liveIndex];
+  const [{ live, previousLive, nextLive }, initialActivity] = await Promise.all([
+    getLiveWithNeighbors(decodedId),
+    currentUser?.id ? getLiveActivityForLive(currentUser.id, decodedId) : Promise.resolve(null),
+  ]);
 
   if (!live) {
     notFound();
   }
 
+  const isAuthenticated = Boolean(currentUser?.id);
   const tags = Array.isArray(live.tags) ? live.tags : [];
   const telegramLinks = Array.isArray(live.links?.telegram) ? live.links.telegram : [];
   const okruLinks = Array.isArray(live.links?.okru) ? live.links.okru : [];
-  const previousLive = liveIndex > 0 ? sortedLives[liveIndex - 1] : null;
-  const nextLive = liveIndex < sortedLives.length - 1 ? sortedLives[liveIndex + 1] : null;
   const reportSubject = `Link caido: ${live.title || live.id}`;
   const reportBody = [
     "Hola, quiero reportar un link caido.",
@@ -110,8 +101,19 @@ export default async function LiveDetailPage({ params }) {
   ].join("\n");
   const reportHref = `mailto:kalathraslolweaponvods@gmail.com?subject=${encodeURIComponent(reportSubject)}&body=${encodeURIComponent(reportBody)}`;
 
+  const canManageTracker = can(accessUser, "admin.tracker.view") && (
+    can(accessUser, "tracker.create") || can(accessUser, "tracker.update") || can(accessUser, "tracker.delete")
+  );
+  const canManageAnimeTracking = can(accessUser, "admin.anime.tracking.view") && (
+    can(accessUser, "anime.tracking.create") || can(accessUser, "anime.tracking.update") || can(accessUser, "anime.tracking.delete")
+  );
+  const canManageAnimeCompleted = can(accessUser, "admin.anime.completed.view") && (
+    can(accessUser, "anime.completed.create") || can(accessUser, "anime.completed.update") || can(accessUser, "anime.completed.delete")
+  );
+
   return (
     <>
+      <Toaster position="top-right" richColors closeButton />
       <div className="bg-orb orb-1" aria-hidden="true" />
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
@@ -124,6 +126,11 @@ export default async function LiveDetailPage({ params }) {
           isAdmin={isAdmin}
           canManageUsers={can(accessUser, "users.read")}
           canManageRoles={can(accessUser, "roles.read")}
+          canManageTracker={canManageTracker}
+          canManageTags={can(accessUser, "admin.tags.view")}
+          canManageAnimeTracking={canManageAnimeTracking}
+          canManageAnimeCompleted={canManageAnimeCompleted}
+          isAuthenticated={isAuthenticated}
           isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
           canAccess={(permission) => can(accessUser, permission)}
         />
@@ -140,9 +147,7 @@ export default async function LiveDetailPage({ params }) {
 
           <main className="app-wrapper live-detail-page">
             <div className="live-detail-shell">
-              <Link href="/rastreador" className="detail-back-link">
-                Volver al rastreador
-              </Link>
+              <DetailBackLink />
               <nav className="watch-neighbor-nav" aria-label="Navegacion entre resubidos">
                 {previousLive ? (
                   <Link
@@ -182,7 +187,15 @@ export default async function LiveDetailPage({ params }) {
                   />
 
                   <div className="watch-title-block">
-                    <h1 className="detail-title">{live.title || "Sin titulo"}</h1>
+                    <div className="watch-title-row">
+                      <h1 className="detail-title">{live.title || "Sin titulo"}</h1>
+                      <DetailActivityButtons
+                        liveId={live.id}
+                        liveTitle={live.title || ""}
+                        initialActivity={initialActivity}
+                        isAuthenticated={isAuthenticated}
+                      />
+                    </div>
                     <div className="watch-meta-row">
                       <span>{live.date || "Sin fecha"}</span>
                       {live.year ? <span>{live.year}</span> : null}

@@ -262,6 +262,7 @@ app/
   rastreador/
     page.js
     [id]/page.js
+  mi-lista/page.js
   biblioteca-anime/
     page.js
     viendo/page.js
@@ -314,6 +315,7 @@ lib/
   prismaSafeUpsert.js
   repositories/
     animeLibraryRepository.js
+    liveActivityRepository.js
     liveRepository.js
     spaceDrumRepository.js
     platformUserRepository.js
@@ -367,6 +369,7 @@ Rutas internas:
 
 - `/inicio`: hub principal con Twitch, últimos directos y YouTube.
 - `/rastreador`: archivo de directos/resubidos.
+- `/mi-lista`: lista personal de directos guardados, vistos y por ver para usuarios logeados.
 - `/biblioteca-anime/viendo`: biblioteca de animes en seguimiento, comprados o pendientes de compra.
 - `/biblioteca-anime/terminados`: biblioteca de animes terminados.
 - `/spacedrum`: ficha y lector del manga SpaceDrum.
@@ -408,6 +411,15 @@ En producción, el middleware reescribe la raíz según el dominio:
 - agrupa tags en categorias automaticas como Anime, Juegos, Tiers, Charlas, Peliculas y Otros
 - carga categorias personalizadas y movimientos manuales desde `/api/tags`
 - usa scroll infinito ligero para cargar resultados por bloques sin romper el layout
+- si el usuario inicio sesion, permite guardar directos, marcarlos como vistos y filtrar por `Guardados`, `Vistos` o `Por ver`
+- si el usuario no inicio sesion, muestra un CTA contextual para explicar esos beneficios y llevar a login/registro
+
+`/mi-lista`:
+
+- requiere inicio de sesion
+- reutiliza el rastreador como base visual, pero enfocado en la actividad personal
+- muestra directos `Guardados`, `Por ver` y `Vistos`
+- permite seguir buscando, filtrando y abriendo el detalle desde la lista personal
 
 `/rastreador/[id]`:
 
@@ -702,6 +714,7 @@ Este modo usa Prisma y el schema normalizado en `prisma/schema.prisma`.
 Tablas principales:
 
 - `Live`, `LiveStatus`, `LiveTag`, `LiveLink`, `LinkPlatform`
+- `PlatformUserLive`, actividad personal por usuario sobre directos del rastreador (`guardado` y `visto`)
 - `Anime`, `AnimeLibraryEntry`, `AnimeExternalReference`
 - `AnimeFormat`, `AnimeReleaseStatus`, `AnimeWatchStatus`
 - `Tag`, `TagCategory`

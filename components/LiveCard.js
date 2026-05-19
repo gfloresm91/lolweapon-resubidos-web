@@ -2,8 +2,9 @@
 
 import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Edit3 } from "lucide-react";
+import { Bookmark, CheckCircle2, CirclePlay, Edit3 } from "lucide-react";
 
+import Tooltip from "@/components/Tooltip";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 
 function statusClass(status) {
@@ -86,11 +87,16 @@ function formatDisplayDate(value) {
 function LiveCard({
   live,
   isAdmin,
+  activity = null,
+  isAuthenticated = false,
   onEdit,
   onFilterTag,
   onFilterYear,
   onFilterStatus,
   onOpenDetail,
+  onToggleSaved,
+  onToggleWatched,
+  onLoginRequired,
   searchTerm,
 }) {
   const router = useRouter();
@@ -106,6 +112,8 @@ function LiveCard({
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
   const showThumbnail = false;
+  const isSaved = Boolean(activity?.isSaved);
+  const isWatched = Boolean(activity?.isWatched);
 
   function openDetail() {
     onOpenDetail?.(live.id);
@@ -149,6 +157,13 @@ function LiveCard({
         </div>
 
         <h2 className="live-title">{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
+
+        {(isSaved || isWatched) ? (
+          <div className="live-personal-badges" aria-label="Estado personal">
+            {isSaved ? <span className="live-personal-badge">Guardado</span> : null}
+            {isWatched ? <span className="live-personal-badge is-watched">Visto</span> : null}
+          </div>
+        ) : null}
 
         {live.additional_info ? (
           <>
@@ -223,31 +238,69 @@ function LiveCard({
         </div>
 
         <div className="links-container">
-          {isAdmin ? (
+          <Tooltip label={isSaved ? "Quitar de guardados" : "Guardar para después"}>
             <button
               type="button"
-              className="platform-btn platform-edit"
-              title="Editar directo"
-              aria-label={`Editar ${live.title || "directo"}`}
+              className={`platform-btn platform-personal ${isSaved ? "is-active" : ""}`}
+              aria-label={isSaved ? `Quitar ${live.title || "directo"} de guardados` : `Guardar ${live.title || "directo"} para después`}
               onClick={(event) => {
                 event.stopPropagation();
-                onEdit();
+                if (!isAuthenticated) {
+                  onLoginRequired?.("Inicia sesión para guardar directos y verlos después.");
+                  return;
+                }
+
+                onToggleSaved?.(live.id, !isSaved);
               }}
             >
-              <Edit3 size={15} />
+              <Bookmark size={15} />
+              <span className="platform-personal-label">{isSaved ? "Guardado" : "Guardar"}</span>
             </button>
+          </Tooltip>
+          <Tooltip label={isWatched ? "Marcar como no visto" : "Marcar como visto"}>
+            <button
+              type="button"
+              className={`platform-btn platform-personal ${isWatched ? "is-active" : ""}`}
+              aria-label={isWatched ? `Marcar ${live.title || "directo"} como no visto` : `Marcar ${live.title || "directo"} como visto`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!isAuthenticated) {
+                  onLoginRequired?.("Inicia sesión para marcar directos como vistos.");
+                  return;
+                }
+
+                onToggleWatched?.(live.id, !isWatched);
+              }}
+            >
+              <CheckCircle2 size={15} />
+              <span className="platform-personal-label">Visto</span>
+            </button>
+          </Tooltip>
+          {isAdmin ? (
+            <Tooltip label="Editar directo">
+              <button
+                type="button"
+                className="platform-btn platform-edit"
+                aria-label={`Editar ${live.title || "directo"}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onEdit();
+                }}
+              >
+                <Edit3 size={15} />
+              </button>
+            </Tooltip>
           ) : null}
           <button
             type="button"
             className="platform-btn platform-detail"
-            title="Abrir pagina del resubido"
             onClick={(event) => {
               event.stopPropagation();
               openDetail();
             }}
           >
             <span>{detailCtaLabel}</span>
-            <span aria-hidden="true">→</span>
+            <CirclePlay size={15} aria-hidden="true" />
           </button>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { Toaster, toast } from "sonner";
 import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
 
+import AuthBackButton from "@/components/AuthBackButton";
 import { LOGIN_MAX_LENGTH, PASSWORD_MAX_LENGTH } from "@/lib/platformUserValidation";
 
 const loginSchema = z.object({
@@ -20,7 +21,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [nextPath, setNextPath] = useState("/");
+  const [nextPath, setNextPath] = useState("/inicio");
   const {
     formState: { errors },
     handleSubmit,
@@ -163,10 +164,7 @@ export default function LoginPage() {
           ¿No tienes cuenta? <Link href="/registro">Registrarme</Link>
         </p>
 
-        <Link href="/" className="auth-back-link">
-          <span aria-hidden="true">←</span>
-          Volver a la web
-        </Link>
+        <AuthBackButton fallbackHref={nextPath} />
 
       </section>
     </main>

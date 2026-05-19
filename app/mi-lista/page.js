@@ -10,7 +10,7 @@ import { getLiveActivityMapForUser } from "@/lib/repositories/liveActivityReposi
 
 export const dynamic = "force-dynamic";
 
-export default async function TrackerPage() {
+export default async function MyListPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   const [currentUser, accessUser, isAdmin, lives, liveStatuses] = await Promise.all([
@@ -21,15 +21,15 @@ export default async function TrackerPage() {
     getLiveStatuses(),
   ]);
 
-  if (!can(accessUser, "tracker.view")) {
-    redirect("/login");
+  if (!currentUser || !can(accessUser, "tracker.view")) {
+    redirect("/login?next=/mi-lista");
   }
 
-  const initialLiveActivity = currentUser?.id ? await getLiveActivityMapForUser(currentUser.id) : {};
+  const initialLiveActivity = await getLiveActivityMapForUser(currentUser.id);
 
   return (
     <HomePage
-      activeView="tracker"
+      activeView="myList"
       initialLives={lives}
       initialLiveStatuses={liveStatuses}
       isAdmin={isAdmin}

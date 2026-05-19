@@ -80,9 +80,12 @@ function buildId() {
 const INITIAL_VISIBLE_COUNT = 80;
 const LOAD_MORE_COUNT = 80;
 const EMPTY_LIST = [];
+const EMPTY_OBJECT = {};
 const VIEW_LABELS = {
   home: "Inicio",
   tracker: "Rastreador de directos",
+  myList: "Mi lista",
+  myAnimeList: "Mi lista anime",
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Anime terminados",
   platformTracker: "Mantenedor Rastreador",
@@ -97,6 +100,8 @@ const VIEW_LABELS = {
 const VIEW_PATHS = {
   home: "/inicio",
   tracker: "/rastreador",
+  myList: "/mi-lista",
+  myAnimeList: "/mi-lista/anime",
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
   platformTracker: "/administracion/rastreador",
@@ -108,7 +113,14 @@ const VIEW_PATHS = {
   spacedrum: "/spacedrum",
 };
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
+const COMMUNITY_SPREADSHEET_URL = process.env.NEXT_PUBLIC_COMMUNITY_SPREADSHEET_URL
+  || "https://onedrive.live.com/:x:/g/personal/87dad8f5b07a6f01/IQABb3qw9djaIICHlm4AAAAAAYc3We7evL0vIGHpS_nUDf8?rtime=ut4s6g6U3kg&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy84N2RhZDhmNWIwN2E2ZjAxL0lRQUJiM3F3OWRqYUlJQ0hsbTRBQUFBQUFZYzNXZTdldkwwdklHSHBTX25VRGY4";
 const DEFAULT_TRACKER_FILTERS = { search: "", year: "all", month: "all", status: "all" };
+const DEFAULT_TRACKER_STATE = {
+  filters: DEFAULT_TRACKER_FILTERS,
+  selectedTag: "",
+  visibleCount: INITIAL_VISIBLE_COUNT,
+};
 
 function getViewFromPath(pathname) {
   return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
@@ -135,6 +147,42 @@ function areTrackerFiltersEqual(left, right) {
   );
 }
 
+function areLiveActivityMapsEqual(left = EMPTY_OBJECT, right = EMPTY_OBJECT) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    const leftItem = left[key] || {};
+    const rightItem = right[key] || {};
+    return (
+      rightKeys.includes(key) &&
+      leftItem.isSaved === rightItem.isSaved &&
+      leftItem.isWatched === rightItem.isWatched &&
+      leftItem.savedAt === rightItem.savedAt &&
+      leftItem.watchedAt === rightItem.watchedAt &&
+      leftItem.updatedAt === rightItem.updatedAt
+    );
+  });
+}
+
+function wasDiscoveryToastShown(key) {
+  try {
+    const storageKey = `kala_discovery_${key}`;
+    if (window.localStorage.getItem(storageKey)) {
+      return true;
+    }
+
+    window.localStorage.setItem(storageKey, "1");
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export default function HomePage({
   activeView = "home",
   initialLives = EMPTY_LIST,
@@ -149,6 +197,8 @@ export default function HomePage({
   initialTwitchProfile = null,
   initialTwitchChannelInfo = null,
   initialTwitchGame = null,
+  initialLiveActivity = EMPTY_OBJECT,
+  initialAnimeActivity = EMPTY_OBJECT,
   twitchLogin,
   youtubeChannelUrl,
   isAdmin,
@@ -189,6 +239,7 @@ export default function HomePage({
   const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
   const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
   const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
+  const isAuthenticated = Boolean(currentUser?.id);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -196,26 +247,34 @@ export default function HomePage({
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
-  const [filters, setFilters] = useState(() =>
-    activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams).filters : DEFAULT_TRACKER_FILTERS,
-  );
-  const [selectedTag, setSelectedTag] = useState(() =>
-    activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams).selectedTag : "",
-  );
+  const [trackerViewStates, setTrackerViewStates] = useState(() => {
+    const queryState = activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams) : null;
+    return {
+      tracker: queryState
+        ? { ...DEFAULT_TRACKER_STATE, filters: queryState.filters, selectedTag: queryState.selectedTag }
+        : DEFAULT_TRACKER_STATE,
+      myList: DEFAULT_TRACKER_STATE,
+    };
+  });
+  const activeTrackerState = trackerViewStates[currentView] || DEFAULT_TRACKER_STATE;
+  const filters = activeTrackerState.filters;
+  const selectedTag = activeTrackerState.selectedTag;
+  const visibleCount = activeTrackerState.visibleCount;
+  const [personalFilter, setPersonalFilter] = useState(activeView === "myList" ? "saved" : "all");
+  const [liveActivity, setLiveActivity] = useState(initialLiveActivity || {});
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
   const [isLoreOpen, setIsLoreOpen] = useState(false);
   const [editingLive, setEditingLive] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [pendingTrackerRestore, setPendingTrackerRestore] = useState(null);
   const [cardDensity, setCardDensity] = useState("comfortable");
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
   const didRestoreTrackerRef = useRef(false);
-  const skipVisibleResetRef = useRef(false);
+  const skipVisibleResetRef = useRef({ tracker: false, myList: false });
 
   useEffect(() => {
     setLives(initialLives);
@@ -226,6 +285,14 @@ export default function HomePage({
   }, [initialLiveStatuses]);
 
   useEffect(() => {
+    setLiveActivity((current) => (
+      areLiveActivityMapsEqual(current, initialLiveActivity || EMPTY_OBJECT)
+        ? current
+        : initialLiveActivity || EMPTY_OBJECT
+    ));
+  }, [initialLiveActivity]);
+
+  useEffect(() => {
     setAnimeLibrary(initialAnimeLibrary);
   }, [initialAnimeLibrary]);
 
@@ -233,10 +300,63 @@ export default function HomePage({
     setCurrentView(activeView);
   }, [activeView]);
 
+  useEffect(() => {
+    if (currentView === "myList" && personalFilter === "all") {
+      setPersonalFilter("saved");
+      return;
+    }
+
+    if (currentView === "tracker" && personalFilter !== "all") {
+      setPersonalFilter("all");
+    }
+  }, [currentView, personalFilter]);
+
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
     toast.error(message || "Tu sesion de admin ya no es valida. Vuelve a iniciar sesion.");
     window.location.href = "/login";
+  }
+
+  function updateTrackerViewState(view, updater) {
+    setTrackerViewStates((current) => {
+      const previous = current[view] || DEFAULT_TRACKER_STATE;
+      const next = typeof updater === "function" ? updater(previous) : updater;
+
+      return {
+        ...current,
+        [view]: {
+          ...DEFAULT_TRACKER_STATE,
+          ...previous,
+          ...next,
+          filters: {
+            ...DEFAULT_TRACKER_FILTERS,
+            ...(next?.filters || previous.filters || {}),
+          },
+        },
+      };
+    });
+  }
+
+  function updateCurrentTrackerState(updater) {
+    updateTrackerViewState(currentView, updater);
+  }
+
+  function setCurrentFilters(updater) {
+    updateCurrentTrackerState((previous) => ({
+      filters: typeof updater === "function" ? updater(previous.filters) : updater,
+    }));
+  }
+
+  function setCurrentSelectedTag(updater) {
+    updateCurrentTrackerState((previous) => ({
+      selectedTag: typeof updater === "function" ? updater(previous.selectedTag) : updater,
+    }));
+  }
+
+  function setCurrentVisibleCount(updater) {
+    updateCurrentTrackerState((previous) => ({
+      visibleCount: typeof updater === "function" ? updater(previous.visibleCount) : updater,
+    }));
   }
 
   const stats = useMemo(() => {
@@ -264,10 +384,15 @@ export default function HomePage({
         const monthMatch = filters.month === "all" || live._month === filters.month;
         const statusMatch = filters.status === "all" || live.status === filters.status;
         const tagMatch = !selectedTag || (live.tags || []).includes(selectedTag);
-        return searchMatch && yearMatch && monthMatch && statusMatch && tagMatch;
+        const activity = liveActivity[live.id];
+        const personalMatch = personalFilter === "all"
+          || (personalFilter === "saved" && activity?.isSaved)
+          || (personalFilter === "watched" && activity?.isWatched)
+          || (personalFilter === "pending" && activity?.isSaved && !activity?.isWatched);
+        return searchMatch && yearMatch && monthMatch && statusMatch && tagMatch && personalMatch;
       })
       .sort((left, right) => right._sortDate.localeCompare(left._sortDate));
-  }, [deferredSearch, filters.month, filters.status, filters.year, preparedLives, selectedTag]);
+  }, [deferredSearch, filters.month, filters.status, filters.year, liveActivity, personalFilter, preparedLives, selectedTag]);
 
   const visibleLives = useMemo(() => {
     return filteredLives.slice(0, visibleCount);
@@ -286,6 +411,23 @@ export default function HomePage({
       return counts;
     }, {});
   }, [lives]);
+  const personalCounts = useMemo(() => {
+    return Object.values(liveActivity).reduce((counts, activity) => {
+      if (activity?.isSaved) {
+        counts.saved += 1;
+      }
+
+      if (activity?.isWatched) {
+        counts.watched += 1;
+      }
+
+      if (activity?.isSaved && !activity?.isWatched) {
+        counts.pending += 1;
+      }
+
+      return counts;
+    }, { saved: 0, watched: 0, pending: 0 });
+  }, [liveActivity]);
 
   useEffect(() => {
     function handlePathChange(event) {
@@ -309,8 +451,10 @@ export default function HomePage({
 
     const queryState = getTrackerStateFromSearchParams(searchParams);
 
-    setFilters((current) => (areTrackerFiltersEqual(current, queryState.filters) ? current : queryState.filters));
-    setSelectedTag((current) => (current === queryState.selectedTag ? current : queryState.selectedTag));
+    updateTrackerViewState("tracker", (previous) => ({
+      filters: areTrackerFiltersEqual(previous.filters, queryState.filters) ? previous.filters : queryState.filters,
+      selectedTag: previous.selectedTag === queryState.selectedTag ? previous.selectedTag : queryState.selectedTag,
+    }));
   }, [currentView, searchParams]);
 
   useEffect(() => {
@@ -331,17 +475,21 @@ export default function HomePage({
       window.sessionStorage.removeItem(TRACKER_RETURN_STATE_KEY);
 
       if (savedState?.filters) {
-        skipVisibleResetRef.current = true;
-        setFilters({
-          search: savedState.filters.search || "",
-          year: savedState.filters.year || "all",
-          month: savedState.filters.month || "all",
-          status: savedState.filters.status || "all",
+        skipVisibleResetRef.current.tracker = true;
+        updateTrackerViewState("tracker", {
+          filters: {
+            search: savedState.filters.search || "",
+            year: savedState.filters.year || "all",
+            month: savedState.filters.month || "all",
+            status: savedState.filters.status || "all",
+          },
         });
       }
 
-      setSelectedTag(savedState?.selectedTag || "");
-      setVisibleCount(Math.max(Number(savedState?.visibleCount) || INITIAL_VISIBLE_COUNT, INITIAL_VISIBLE_COUNT));
+      updateTrackerViewState("tracker", {
+        selectedTag: savedState?.selectedTag || "",
+        visibleCount: Math.max(Number(savedState?.visibleCount) || INITIAL_VISIBLE_COUNT, INITIAL_VISIBLE_COUNT),
+      });
       setPendingTrackerRestore({
         liveId: savedState?.liveId || "",
         scrollY: Number(savedState?.scrollY) || 0,
@@ -352,7 +500,7 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    if (currentView !== "tracker" || lives.length) {
+    if (!["tracker", "myList"].includes(currentView) || lives.length) {
       return undefined;
     }
 
@@ -376,7 +524,15 @@ export default function HomePage({
   }, [currentView, lives.length]);
 
   useEffect(() => {
-    if (!["animeLibraryTracking", "animeLibraryCompleted"].includes(currentView) || animeLibrary.length) {
+    if (!["tracker", "myList"].includes(currentView) || !isAuthenticated) {
+      return;
+    }
+
+    refreshLiveActivity();
+  }, [currentView, isAuthenticated]);
+
+  useEffect(() => {
+    if (!["animeLibraryTracking", "animeLibraryCompleted", "myAnimeList"].includes(currentView) || animeLibrary.length) {
       return undefined;
     }
 
@@ -415,20 +571,20 @@ export default function HomePage({
   }, [animeLibrary.length, currentView]);
 
   useEffect(() => {
-    if (skipVisibleResetRef.current) {
-      skipVisibleResetRef.current = false;
+    if (skipVisibleResetRef.current[currentView]) {
+      skipVisibleResetRef.current[currentView] = false;
       return;
     }
 
-    setVisibleCount(INITIAL_VISIBLE_COUNT);
-  }, [deferredSearch, filters.month, filters.status, filters.year, selectedTag]);
+    setCurrentVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [deferredSearch, filters.month, filters.status, filters.year, personalFilter, selectedTag]);
 
   useEffect(() => {
     if (filters.month === "all" || availableMonths.includes(filters.month)) {
       return;
     }
 
-    setFilters((current) => ({ ...current, month: "all" }));
+    setCurrentFilters((current) => ({ ...current, month: "all" }));
   }, [availableMonths, filters.month]);
 
   useEffect(() => {
@@ -490,7 +646,7 @@ export default function HomePage({
           return;
         }
 
-        setVisibleCount((current) => Math.min(current + LOAD_MORE_COUNT, filteredLives.length));
+        setCurrentVisibleCount((current) => Math.min(current + LOAD_MORE_COUNT, filteredLives.length));
       },
       {
         root: null,
@@ -634,6 +790,111 @@ export default function HomePage({
     }
   }
 
+  async function refreshLiveActivity() {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/live-activity", { cache: "no-store" });
+      const data = await response.json().catch(() => null);
+
+      if (response.ok && data?.success) {
+        setLiveActivity(Object.fromEntries((data.activity || []).map((item) => [item.liveId, item])));
+      }
+    } catch {
+      // Personal activity is progressive enhancement; tracker data should still load.
+    }
+  }
+
+  async function updateLiveActivity(liveId, patch) {
+    if (!isAuthenticated) {
+      toast.error("Inicia sesión para usar tu lista personal.");
+      window.location.href = "/login";
+      return;
+    }
+
+    const currentActivity = liveActivity[liveId] || { liveId, isSaved: false, isWatched: false };
+    const optimisticActivity = {
+      ...currentActivity,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setLiveActivity((current) => ({
+      ...current,
+      [liveId]: optimisticActivity,
+    }));
+
+    try {
+      const response = await fetch("/api/live-activity", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liveId, ...patch }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (response.status === 401) {
+        redirectToLoginWithMessage("Inicia sesión para usar tu lista personal.");
+        return;
+      }
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "No se pudo guardar tu lista personal.");
+      }
+
+      setLiveActivity((current) => ({
+        ...current,
+        [liveId]: data.activity,
+      }));
+
+      if (Object.prototype.hasOwnProperty.call(patch, "isSaved")) {
+        toast.success(patch.isSaved
+          ? wasDiscoveryToastShown("live_saved")
+            ? "Directo guardado."
+            : "Directo guardado en Mi lista directos."
+          : "Directo quitado de guardados.");
+      } else if (Object.prototype.hasOwnProperty.call(patch, "isWatched")) {
+        toast.success(patch.isWatched
+          ? wasDiscoveryToastShown("live_watched")
+            ? "Directo marcado como visto."
+            : "Directo marcado como visto. Puedes verlo en Mi lista directos."
+          : "Directo marcado como no visto.");
+      }
+    } catch (error) {
+      setLiveActivity((current) => ({
+        ...current,
+        [liveId]: currentActivity,
+      }));
+      toast.error(error.message || "No se pudo guardar tu lista personal.");
+    }
+  }
+
+  function requireLoginForTracker(message) {
+    toast(message, {
+      action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
+    });
+  }
+
+  function setPersonalTrackerFilter(nextFilter) {
+    if (nextFilter !== "all" && !isAuthenticated) {
+      requireLoginForTracker("Inicia sesión para filtrar tu lista personal.");
+      return;
+    }
+
+    startTransition(() => {
+      setPersonalFilter(nextFilter);
+    });
+  }
+
+  function handleOpenLiveDetail(liveId) {
+    saveTrackerReturnState(liveId);
+
+    if (isAuthenticated && !liveActivity[liveId]?.isWatched) {
+      updateLiveActivity(liveId, { isWatched: true });
+    }
+  }
+
   async function archiveCurrentTwitchLive() {
     if (!canCreateTracker) {
       toast.error("No tienes permiso para crear directos.");
@@ -697,6 +958,8 @@ export default function HomePage({
     const viewPermissions = {
       home: "home.view",
       tracker: "tracker.view",
+      myList: "tracker.view",
+      myAnimeList: "anime.tracking.view",
       animeLibraryTracking: "anime.tracking.view",
       animeLibraryCompleted: "anime.completed.view",
       platformAnimeTracking: "admin.anime.tracking.view",
@@ -744,6 +1007,7 @@ export default function HomePage({
           selectedTag,
           visibleCount,
           liveId,
+          sourceView: currentView,
           scrollY: window.scrollY,
         }),
       );
@@ -764,7 +1028,7 @@ export default function HomePage({
           type="button"
           className={`hamburger-button ${isSidebarOpen ? "is-open" : ""}`}
           aria-label={isSidebarOpen === false ? "Abrir menu" : "Cerrar menu"}
-          aria-expanded={isSidebarOpen !== false}
+          aria-expanded={Boolean(isSidebarOpen)}
           aria-controls="main-sidebar"
           onClick={toggleSidebar}
         >
@@ -793,6 +1057,7 @@ export default function HomePage({
           canManageTags={canViewTagsMaintainer}
           canManageAnimeTracking={canManageTrackingAnime}
           canManageAnimeCompleted={canManageCompletedAnime}
+          isAuthenticated={isAuthenticated}
           isSpaceDrumEnabled={isSpaceDrumEnabled}
           canAccess={hasPermission}
           onSelect={selectView}
@@ -825,19 +1090,32 @@ export default function HomePage({
               />
             ) : null}
 
-            {currentView === "tracker" ? (
+            {["tracker", "myList"].includes(currentView) ? (
               <>
         <header id="inicio" className="main-header">
-          <div className="header-badge" id="btn-show-lore" onClick={() => setIsLoreOpen(true)}>
-            🚀 ARCHIVO HISTORICO
-          </div>
+          {currentView === "tracker" ? (
+            <div className="header-badge" id="btn-show-lore" onClick={() => setIsLoreOpen(true)}>
+              🚀 ARCHIVO HISTORICO
+            </div>
+          ) : (
+            <div className="header-badge">⭐ LISTA PERSONAL</div>
+          )}
           <h1 className="title">
-            Rastreador de <span className="text-gradient">Directos</span>
+            {currentView === "tracker" ? (
+              <>Rastreador de <span className="text-gradient">Directos</span></>
+            ) : (
+              <>Mi <span className="text-gradient">lista</span></>
+            )}
           </h1>
-          <p className="subtitle">Explora y busca el archivo legendario de VODs y Resubidos.</p>
+          <p className="subtitle">
+            {currentView === "tracker"
+              ? "Explora y busca el archivo legendario de VODs y Resubidos."
+              : "Tus directos guardados, vistos y por ver en un solo lugar."}
+          </p>
         </header>
 
-        <div className="site-notice-container">
+        {currentView === "tracker" ? (
+          <div className="site-notice-container">
           <div className="site-notice-card">
             <span className="notice-badge">INFO</span>
             <p className="notice-text">
@@ -845,7 +1123,7 @@ export default function HomePage({
               Creditos a Piero y Redbreake.
             </p>
             <a
-              href="https://onedrive.live.com/:x:/g/personal/87dad8f5b07a6f01/IQABb3qw9djaIICHlm4AAAAAAYc3We7evL0vIGHpS_nUDf8?rtime=ut4s6g6U3kg&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy84N2RhZDhmNWIwN2E2ZjAxL0lRQUJiM3F3OWRqYUlJQ0hsbTRBQUFBQUFZYzNXZTdldkwwdklHSHBTX25VRGY4"
+              href={COMMUNITY_SPREADSHEET_URL}
               target="_blank"
               rel="noreferrer"
               className="notice-link"
@@ -854,44 +1132,50 @@ export default function HomePage({
             </a>
           </div>
         </div>
+        ) : null}
 
-        <StatsBar stats={stats} />
+        {currentView === "tracker" ? <StatsBar stats={stats} /> : null}
 
-        {canCreateTracker || canUpdateTracker ? (
-          <section className="tracker-actions" aria-label="Acciones del rastreador">
-            <div>
-              <span className="tracker-actions-label">Administración</span>
-              <p className="tracker-actions-copy">Gestiona los registros del archivo.</p>
+        {currentView === "tracker" && (canCreateTracker || canUpdateTracker) ? (
+          <details className="tracker-actions tracker-admin-actions" aria-label="Acciones del rastreador">
+            <summary className="tracker-admin-summary">
+              <div>
+                <span className="tracker-actions-label">Gestión</span>
+                <p className="tracker-actions-copy">Herramientas de administración del archivo.</p>
+              </div>
+              <span className="tracker-admin-summary-pill">Acciones</span>
+            </summary>
+            <div className="tracker-admin-actions-body">
+              {canCreateTracker ? (
+                <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
+                  <Plus size={18} />
+                  Nuevo directo
+                </button>
+              ) : null}
+              {canCreateTracker ? (
+                <button
+                  type="button"
+                  className="tracker-action-secondary"
+                  onClick={archiveCurrentTwitchLive}
+                  disabled={isTwitchActionLoading}
+                >
+                  <Radio size={17} />
+                  Crear card desde Twitch
+                </button>
+              ) : null}
+              {canUpdateTracker ? (
+                <button
+                  type="button"
+                  className="tracker-action-secondary"
+                  onClick={registerTwitchEventSub}
+                  disabled={isTwitchActionLoading}
+                >
+                  <Zap size={17} />
+                  Registrar EventSub
+                </button>
+              ) : null}
             </div>
-            {canCreateTracker ? (
-              <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
-                <Plus size={18} />
-                Nuevo directo
-              </button>
-            ) : null}
-            {canCreateTracker ? (
-              <button
-                type="button"
-                className="tracker-action-secondary"
-                onClick={archiveCurrentTwitchLive}
-                disabled={isTwitchActionLoading}
-              >
-                <Radio size={17} />
-                Crear card desde Twitch
-              </button>
-            ) : null}
-            {canUpdateTracker ? (
-              <button
-                type="button"
-                className="tracker-action-secondary"
-                onClick={registerTwitchEventSub}
-                disabled={isTwitchActionLoading}
-              >
-                <Zap size={17} />
-                Registrar EventSub
-              </button>
-            ) : null}
-          </section>
+          </details>
         ) : null}
 
         <FiltersBar
@@ -901,20 +1185,65 @@ export default function HomePage({
           statuses={allStatuses}
           selectedTag={selectedTag}
           onSearchChange={(search) => {
-            setFilters((current) => ({ ...current, search }));
+            setCurrentFilters((current) => ({ ...current, search }));
           }}
           onFiltersChange={(partial) =>
             startTransition(() => {
-              setFilters((current) => ({ ...current, ...partial }));
+              setCurrentFilters((current) => ({ ...current, ...partial }));
             })
           }
           onTagPanelOpen={() => setIsTagPanelOpen(true)}
           onClearTag={() =>
             startTransition(() => {
-              setSelectedTag("");
+              setCurrentSelectedTag("");
             })
           }
         />
+
+        {currentView !== "myList" ? null : (
+        <section className={`tracker-personal-panel ${isAuthenticated ? "" : "is-guest"} ${currentView === "myList" ? "is-page" : ""}`} aria-label="Lista personal">
+          <div>
+            <span className="tracker-actions-label">Mi lista</span>
+            <p className="tracker-actions-copy">
+              {currentView === "myList"
+                ? "Gestiona lo que guardaste y separa lo visto de lo que tienes por ver."
+                : isAuthenticated
+                  ? "Guarda directos, marca vistos y vuelve rápido a lo que tienes por ver."
+                  : "Inicia sesión para guardar directos, marcar vistos y continuar después."}
+            </p>
+          </div>
+          <div className="tracker-personal-filters" role="group" aria-label="Filtros personales">
+            {(currentView === "myList"
+              ? [
+                  { key: "saved", label: "Guardados", count: personalCounts.saved },
+                  { key: "pending", label: "Por ver", count: personalCounts.pending },
+                  { key: "watched", label: "Vistos", count: personalCounts.watched },
+                ]
+              : [
+                  { key: "all", label: "Todos", count: lives.length },
+                  { key: "saved", label: "Mi lista", count: personalCounts.saved },
+                  { key: "watched", label: "Vistos", count: personalCounts.watched },
+                ]
+            ).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                className={`${personalFilter === option.key ? "is-active" : ""} ${option.key !== "all" && option.count === 0 ? "is-empty" : ""}`}
+                onClick={() => setPersonalTrackerFilter(option.key)}
+              >
+                <span>{option.label}</span>
+                <strong>{option.count}</strong>
+              </button>
+            ))}
+          </div>
+          {!isAuthenticated ? (
+            <div className="tracker-personal-auth">
+              <a href="/login">Iniciar sesión</a>
+              <a href="/registro">Registrarme</a>
+            </div>
+          ) : null}
+        </section>
+        )}
 
         <main>
           {filteredLives.length ? (
@@ -955,24 +1284,29 @@ export default function HomePage({
                     key={live.id}
                     live={live}
                     isAdmin={canUpdateTracker}
+                    activity={liveActivity[live.id]}
+                    isAuthenticated={isAuthenticated}
                     searchTerm={deferredSearch}
                     onEdit={() => setEditingLive(live)}
+                    onLoginRequired={requireLoginForTracker}
+                    onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
+                    onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
                     onFilterTag={(tag) =>
                       startTransition(() => {
-                        setSelectedTag(tag);
+                        setCurrentSelectedTag(tag);
                       })
                     }
                     onFilterYear={(year) =>
                       startTransition(() => {
-                        setFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+                        setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
                       })
                     }
                     onFilterStatus={(status) =>
                       startTransition(() => {
-                        setFilters((current) => ({ ...current, status: status || "all" }));
+                        setCurrentFilters((current) => ({ ...current, status: status || "all" }));
                       })
                     }
-                    onOpenDetail={saveTrackerReturnState}
+                    onOpenDetail={handleOpenLiveDetail}
                   />
                 ))}
               </div>
@@ -983,24 +1317,41 @@ export default function HomePage({
               ) : null}
             </>
           ) : (
-            <div className="empty-state">
+              <div className="empty-state">
               <div className="empty-state-icon">📼</div>
-              <div className="empty-state-text">No hay resultados con esos filtros.</div>
+              <div className="empty-state-text">
+                {currentView === "myList"
+                  ? "Aún no tienes directos en esta vista."
+                  : "No hay resultados con esos filtros."}
+              </div>
+              {currentView === "myList" ? (
+                <p className="empty-state-help">
+                  Guarda directos desde el rastreador o márcalos como vistos para construir tu lista personal.
+                </p>
+              ) : null}
               <button
                 type="button"
                 className="empty-state-action"
                 onClick={() => {
-                  setFilters({ search: "", year: "all", month: "all", status: "all" });
-                  setSelectedTag("");
+                  if (currentView === "myList" && personalCounts.saved + personalCounts.watched === 0) {
+                    selectView("tracker");
+                    return;
+                  }
+
+                  setCurrentFilters({ search: "", year: "all", month: "all", status: "all" });
+                  setCurrentSelectedTag("");
+                  setPersonalFilter(currentView === "myList" ? "saved" : "all");
                 }}
               >
-                Limpiar filtros
+                {currentView === "myList" && personalCounts.saved + personalCounts.watched === 0 ? "Explorar rastreador" : "Limpiar filtros"}
               </button>
             </div>
           )}
         </main>
 
-        <footer className="site-footer">Archivo VODs · Desarrollado para mantener la historia</footer>
+        <footer className="site-footer">
+          {currentView === "myList" ? "Tu archivo personal · Directos guardados para después" : "Archivo VODs · Desarrollado para mantener la historia"}
+        </footer>
               </>
             ) : null}
 
@@ -1013,6 +1364,8 @@ export default function HomePage({
                 formVariant={trackingAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
+                initialActivity={initialAnimeActivity}
+                isAuthenticated={isAuthenticated}
                 onAnimesChange={setAnimeLibrary}
               />
             ) : null}
@@ -1026,6 +1379,20 @@ export default function HomePage({
                 formVariant={completedAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
+                initialActivity={initialAnimeActivity}
+                isAuthenticated={isAuthenticated}
+                onAnimesChange={setAnimeLibrary}
+              />
+            ) : null}
+
+            {currentView === "myAnimeList" ? (
+              <AnimeLibraryPage
+                animes={animeLibrary}
+                initialActivity={initialAnimeActivity}
+                isAuthenticated={isAuthenticated}
+                isLoading={isAnimeLibraryLoading}
+                mode="personal"
+                personalOnly
                 onAnimesChange={setAnimeLibrary}
               />
             ) : null}
@@ -1129,7 +1496,7 @@ export default function HomePage({
         tagCounts={tagCounts}
         selectedTag={selectedTag}
         onClose={() => setIsTagPanelOpen(false)}
-        onSelectTag={setSelectedTag}
+        onSelectTag={setCurrentSelectedTag}
         isAdmin={canUpdateTags}
       />
     </>
