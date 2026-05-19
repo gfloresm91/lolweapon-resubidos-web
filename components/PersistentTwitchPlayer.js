@@ -251,6 +251,17 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [isVisible, routeMode, isOnline]);
 
   useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && isVisible && playerRef.current) {
+        tryAutoplay(playerRef.current, mutedPreferenceRef);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isVisible]);
+
+  useEffect(() => {
     if (!isVisible || !playerRef.current) {
       return undefined;
     }

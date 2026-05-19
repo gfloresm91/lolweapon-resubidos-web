@@ -77,7 +77,7 @@ export default function HomeDashboard({
   const [currentProfile, setCurrentProfile] = useState(twitchProfile);
   const [currentChannelInfo, setCurrentChannelInfo] = useState(twitchChannelInfo);
   const [currentGame, setCurrentGame] = useState(twitchGame);
-  const [isTwitchLoading, setIsTwitchLoading] = useState(false);
+  const [isTwitchLoading, setIsTwitchLoading] = useState(!twitchChannelInfo && !twitchStream);
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
@@ -109,6 +109,10 @@ export default function HomeDashboard({
           setIsTwitchLoading(false);
         }
       }
+    }
+
+    if (!twitchChannelInfo && !twitchStream) {
+      refreshStatus();
     }
 
     const intervalId = window.setInterval(refreshStatus, 60000);
