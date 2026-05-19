@@ -23,8 +23,9 @@ coverage/
 .env.test.local
 .env.production.local
 
-# Claude Code memory (local AI context, no versionar)
+# Claude Code — contexto local, no versionar
 memory/
+.claude/commands/
 
 # Deploy script — backup temporal del build anterior
 .next_backup/

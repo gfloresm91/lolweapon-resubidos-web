@@ -1,0 +1,102 @@
+# lolweapon-resubidos-web
+
+Archivo VOD y biblioteca de anime para el streamer Lolweapon. Sirve dos dominios desde la misma app Next.js: el tracker de resubidos y la biblioteca de anime. El middleware distingue el dominio usando `RESUBIDOS_HOST` / `VIENDO_HOST` del `.env`.
+
+## Stack
+
+- **Next.js 15** App Router, React Server Components
+- **Prisma** ORM con PostgreSQL (Docker)
+- **Tailwind CSS** + shadcn/ui
+- **Autenticación**: Twitch OAuth + login manual con sesiones persistentes
+- **Deploy**: DigitalOcean Droplet, systemd, GitHub Actions CI/CD
+
+## Fuente de datos
+
+La app puede correr con JSON o Postgres según `DATA_SOURCE` en `.env`:
+
+```env
+DATA_SOURCE=json      # fallback local, sin BD
+DATA_SOURCE=postgres  # producción y QA
+```
+
+Los repositorios en `lib/repositories/` abstraen esta diferencia. El frontend no sabe cuál se usa.
+
+## Ramas y entornos
+
+| Rama | Entorno |
+|------|---------|
+| `dev` | QA |
+| `main` | Producción |
+
+Push a `dev` → deploy automático a QA vía GitHub Actions.
+Push a `main` → deploy automático a producción vía GitHub Actions.
+
+## Entornos locales vs producción
+
+**El `.env` local y el de producción tienen credenciales distintas.** Nunca asumir que son iguales. El `.env` de producción no está en el repo.
+
+**Importante con Prisma**: si hay `DATABASE_URL` seteada como variable de entorno en el shell, Prisma la usa ignorando el `.env`. Hacer `unset DATABASE_URL` antes de correr migraciones en QA para evitar conectar a la BD de producción por error.
+
+## Comandos npm
+
+```bash
+npm run dev                    # servidor de desarrollo
+npm run build                  # build de producción
+npm run db:generate            # generar cliente Prisma (necesario tras npm ci)
+npm run db:migrate             # nueva migración (solo local)
+npm run db:migrate:deploy      # aplicar migraciones (producción/QA)
+npm run db:backup              # backup pg_dump
+npm run db:restore             # restaurar backup (requiere BACKUP_FILE=...)
+npm run db:import:lives        # importar tracker desde JSON
+npm run db:import:anime        # importar biblioteca desde JSON
+npm run db:import:tags         # importar tags desde JSON
+npm run db:import:spacedrum    # importar SpaceDrum desde JSON
+npm run db:reset-sequences     # resetear autoincrement tras imports
+npm run audit:data             # auditar consistencia de datos
+```
+
+## Estructura clave
+
+```
+app/                        # Next.js App Router — rutas y páginas
+  api/                      # Route handlers
+  rastreador/               # Tracker de resubidos
+  biblioteca-anime/         # Biblioteca de anime
+  mi-lista/                 # Lista personal del usuario
+  administracion/           # Panel de administración
+components/                 # Componentes React reutilizables
+lib/
+  repositories/             # Abstracción JSON/Postgres por entidad
+prisma/
+  schema.prisma             # Schema de la BD
+  migrations/               # Migraciones versionadas
+docs/
+  postgres-migration.md     # Guía completa de migración y comandos de BD
+  release-and-production.md # Guía de release y deploy
+.github/workflows/          # CI/CD — deploy-qa.yml y deploy-prod.yml
+```
+
+## Convenciones de código
+
+- Sin comentarios salvo que el *por qué* sea no obvio
+- Sin abstracciones prematuras — tres líneas similares están bien
+- Sin manejo de errores para escenarios imposibles
+- Validación solo en boundaries del sistema (input de usuario, APIs externas)
+- Toast con acción en lugar de redirección forzada para usuarios no autenticados
+- `loading.js` en cada ruta para skeleton states (comparten `AppShellLoading`)
+
+## Migraciones
+
+Crear migraciones con nombre descriptivo en formato `YYYYMMDDHHMMSS_descripcion`:
+```bash
+npm run db:migrate  # crea la migración localmente
+```
+
+En producción/QA solo aplicar, nunca crear:
+```bash
+npm run db:migrate:deploy
+```
+
+## Release
+
+Ver `/release` para el checklist completo de release a producción.
