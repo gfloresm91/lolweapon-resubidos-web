@@ -22,4 +22,14 @@ _(vacío)_
 
 ## Ideas / Mejoras futuras
 
-_(agregar aquí ideas sin prioridad definida)_
+### Doble polling de Twitch status
+
+- `HomeDashboard` y `PersistentTwitchPlayer` hacen fetch a `/api/twitch/status` de forma independiente cada 60 segundos.
+- Impacto: doble carga innecesaria al servidor de Twitch.
+- Approach sugerido: compartir el estado via React Context o subir el fetch al Server Component y pasarlo como prop inicial, dejando solo un poller activo.
+
+### Refactor de HomePage.js
+
+- `components/HomePage.js` tiene ~1500 líneas y maneja 10+ vistas distintas (home, tracker, mi lista, anime, admin, spacedrum), todo el estado global, filtros, permisos y fetches.
+- Impacto: difícil de mantener, todo el código se carga para todos los usuarios.
+- Approach sugerido: separar cada vista en su propio componente contenedor con su estado local, y dejar `HomePage.js` solo como shell de navegación.

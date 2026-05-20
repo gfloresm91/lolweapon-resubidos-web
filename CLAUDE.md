@@ -115,6 +115,10 @@ En producción/QA solo aplicar, nunca crear:
 npm run db:migrate:deploy
 ```
 
+## Variables de entorno
+
+Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.example` con el valor vacío o un valor por defecto seguro.
+
 ## Gotchas conocidos
 
 - **`npm run db:generate` es obligatorio después de `npm ci`** — sin esto, el build falla con `Cannot find module '.prisma/client/default'`. Ya está en los workflows de GitHub Actions, pero si se corre el build manualmente hay que hacerlo explícitamente.
