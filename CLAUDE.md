@@ -85,6 +85,24 @@ docs/
 - Toast con acción en lugar de redirección forzada para usuarios no autenticados
 - `loading.js` en cada ruta para skeleton states (comparten `AppShellLoading`)
 
+**Nombrado:** PascalCase para componentes, camelCase para utils y helpers.
+
+**Server / Client:** Server Component fetches data y pasa props a un Client Component hijo. No mezclar fetch en `useEffect` donde se puede evitar.
+
+**Errores en route handlers:** `try/catch` con respuesta JSON estructurada y status HTTP correspondiente:
+```js
+try {
+  // ...
+} catch {
+  return Response.json({ error: "mensaje" }, { status: 500 });
+}
+```
+
+**Estados de carga y error en el frontend:**
+- Carga inicial de ruta → `loading.js` con `AppShellLoading`
+- Mutaciones (guardar, eliminar) → estado local `isPending`/`isSaving` que deshabilita el botón
+- Errores de operación → `toast.error(data?.error || "mensaje fallback")`
+
 ## Migraciones
 
 Crear migraciones con nombre descriptivo en formato `YYYYMMDDHHMMSS_descripcion`:
@@ -96,6 +114,20 @@ En producción/QA solo aplicar, nunca crear:
 ```bash
 npm run db:migrate:deploy
 ```
+
+## Gotchas conocidos
+
+- **`npm run db:generate` es obligatorio después de `npm ci`** — sin esto, el build falla con `Cannot find module '.prisma/client/default'`. Ya está en los workflows de GitHub Actions, pero si se corre el build manualmente hay que hacerlo explícitamente.
+- **`unset DATABASE_URL` antes de migrar en el servidor QA** — si la variable está seteada en el shell (puede pasar al hacer `source .env` de producción), Prisma la usa y conecta a la BD de producción ignorando el `.env` local del directorio de QA.
+- **El deploy es exclusivamente vía GitHub Actions** — `scripts/deploy.sh` fue eliminado. Push a `dev` → QA, push a `main` → producción.
+- **El `PersistentTwitchPlayer` es un componente complejo** — flota sobre todas las rutas como mini-player. El iframe de Twitch es cross-origin y no se puede controlar su `document.visibilityState`. Las pausas inesperadas se combaten con un keep-alive interval y `schedulePlaybackResume`.
+
+## Slash commands disponibles
+
+- `/release` — checklist completo de release a producción
+- `/deploy-status` — verificar estado de producción y QA
+- `/qa-db` — operaciones de base de datos en QA (imports, migraciones)
+- `/new-feature` — checklist para agregar una feature nueva
 
 ## Release
 
