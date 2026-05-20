@@ -10,6 +10,8 @@ const MINI_PLAYER_DEFAULT_WIDTH = 380;
 const MINI_PLAYER_MIN_WIDTH = 380;
 const MINI_PLAYER_MAX_WIDTH = 720;
 const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum"];
+const PLAY_RESUME_DELAYS = [0, 120, 350, 900, 1800, 3200];
+const PLAY_KEEP_ALIVE_INTERVAL_MS = 10000;
 
 function loadTwitchEmbedScript() {
   if (window.Twitch?.Player) {
@@ -52,13 +54,23 @@ function getRouteMode(pathname, hostname = "") {
   return "hidden";
 }
 
-function buildMiniStyle(width) {
+function buildMiniStyle(width, baseSize = null) {
+  const viewportWidth = typeof window === "undefined" ? width + 32 : window.innerWidth || width + 32;
+  const visualWidth = Math.min(width, Math.max(MINI_PLAYER_MIN_WIDTH, viewportWidth - 32));
+  const visualHeight = Math.round((visualWidth * 9) / 16);
+  const baseWidth = baseSize?.width > 0 ? baseSize.width : visualWidth;
+  const baseHeight = baseSize?.height > 0 ? baseSize.height : visualHeight;
+  const scale = visualWidth / baseWidth;
+
   return {
     bottom: "calc(3.6rem + env(safe-area-inset-bottom))",
-    height: `${Math.round((width * 9) / 16)}px`,
+    "--twitch-frame-height": `${baseHeight}px`,
+    "--twitch-frame-scale": scale,
+    "--twitch-frame-width": `${baseWidth}px`,
+    height: `${visualHeight}px`,
     right: "1.25rem",
     top: "auto",
-    width: `min(${width}px, calc(100vw - 2rem))`,
+    width: `${visualWidth}px`,
   };
 }
 
@@ -68,6 +80,22 @@ function buildHiddenStyle(width) {
     opacity: 0,
     pointerEvents: "none",
   };
+}
+
+function isAnchorVisible(rect) {
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    return false;
+  }
+
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+
+  return (
+    rect.bottom > 24 &&
+    rect.top < viewportHeight - 24 &&
+    rect.right > 24 &&
+    rect.left < viewportWidth - 24
+  );
 }
 
 function tryAutoplay(player, mutedPreferenceRef) {
@@ -92,6 +120,20 @@ function tryAutoplay(player, mutedPreferenceRef) {
   } catch {}
 }
 
+function schedulePlaybackResume(player, mutedPreferenceRef) {
+  const frameId = window.requestAnimationFrame(() => {
+    tryAutoplay(player, mutedPreferenceRef);
+  });
+  const timeoutIds = PLAY_RESUME_DELAYS.map((delay) => (
+    window.setTimeout(() => tryAutoplay(player, mutedPreferenceRef), delay)
+  ));
+
+  return () => {
+    window.cancelAnimationFrame(frameId);
+    timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+  };
+}
+
 function stopPlayerPlayback(player) {
   try {
     player?.setMuted?.(true);
@@ -110,20 +152,27 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const [currentHostname, setCurrentHostname] = useState("");
   const [twitchParent, setTwitchParent] = useState("");
   const [currentStream, setCurrentStream] = useState(null);
+  const [isPlayerOnline, setIsPlayerOnline] = useState(false);
+  const [hasActivatedPlayer, setHasActivatedPlayer] = useState(false);
   const [isMiniDismissed, setIsMiniDismissed] = useState(false);
   const [isSuppressingTransition, setIsSuppressingTransition] = useState(false);
   const [isDockedToHome, setIsDockedToHome] = useState(false);
   const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
+  const [playerBaseSize, setPlayerBaseSize] = useState(null);
   const [playerStyle, setPlayerStyle] = useState(buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH));
   const playerRef = useRef(null);
   const routeModeRef = useRef("hidden");
   const mutedPreferenceRef = useRef(true);
   const resizeStateRef = useRef(null);
   const resizeFrameRef = useRef(null);
+  const wasDockedToHomeRef = useRef(false);
   const isOnline = Boolean(currentStream);
+  const isStreamPlayable = isOnline || isPlayerOnline;
   const routeMode = getRouteMode(currentPath, currentHostname);
-  const isVisible = routeMode === "full" || (routeMode === "mini" && isOnline && !isMiniDismissed);
-  const showMiniControls = routeMode === "mini" || (routeMode === "full" && !isDockedToHome);
+  const shouldKeepPlayerVisible = isStreamPlayable && !isMiniDismissed;
+  const playerMode = routeMode === "hidden" && shouldKeepPlayerVisible ? "mini" : routeMode;
+  const isVisible = playerMode === "full" || (playerMode === "mini" && shouldKeepPlayerVisible);
+  const showMiniControls = playerMode === "mini" || (playerMode === "full" && !isDockedToHome);
 
   useEffect(() => {
     routeModeRef.current = routeMode;
@@ -149,10 +198,16 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [miniPlayerWidth]);
 
   useEffect(() => {
-    if (!isOnline) {
+    if (!isStreamPlayable) {
       setIsMiniDismissed(false);
     }
-  }, [isOnline]);
+  }, [isStreamPlayable]);
+
+  useEffect(() => {
+    if (routeMode === "full" || isStreamPlayable) {
+      setHasActivatedPlayer(true);
+    }
+  }, [isStreamPlayable, routeMode]);
 
   useEffect(() => {
     if (routeMode !== "mini" && isMiniDismissed) {
@@ -165,10 +220,17 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       const nextPath = event.detail?.path || window.location.pathname;
       const nextMode = getRouteMode(nextPath, window.location.hostname);
 
-      if (routeModeRef.current === "full" && nextMode === "mini") {
+      const isFullToMini = routeModeRef.current === "full" && nextMode === "mini";
+
+      if (isFullToMini) {
         setIsSuppressingTransition(true);
-        setPlayerStyle(buildMiniStyle(miniPlayerWidth));
-        window.requestAnimationFrame(() => setIsSuppressingTransition(false));
+        setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
+        window.requestAnimationFrame(() => {
+          setIsSuppressingTransition(false);
+          if (playerRef.current) {
+            schedulePlaybackResume(playerRef.current, mutedPreferenceRef);
+          }
+        });
       }
 
       setCurrentPath(nextPath);
@@ -182,7 +244,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       window.removeEventListener("popstate", notifyPathChange);
       window.removeEventListener("kala:navigation", notifyPathChange);
     };
-  }, []);
+  }, [miniPlayerWidth, playerBaseSize]);
 
   useEffect(() => {
     if (!twitchParent) {
@@ -208,7 +270,17 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
         playerRef.current = player;
         player.addEventListener(window.Twitch.Player.READY, () => tryAutoplay(player, mutedPreferenceRef));
-        player.addEventListener(window.Twitch.Player.ONLINE, () => tryAutoplay(player, mutedPreferenceRef));
+        player.addEventListener(window.Twitch.Player.ONLINE, () => {
+          setIsPlayerOnline(true);
+          setHasActivatedPlayer(true);
+          tryAutoplay(player, mutedPreferenceRef);
+        });
+
+        if (window.Twitch.Player.OFFLINE) {
+          player.addEventListener(window.Twitch.Player.OFFLINE, () => {
+            setIsPlayerOnline(false);
+          });
+        }
       })
       .catch(() => {});
 
@@ -225,11 +297,37 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [twitchChannel, twitchParent]);
 
   useEffect(() => {
-    if (isVisible || !playerRef.current) {
+    if (!playerRef.current) {
       return;
     }
 
-    stopPlayerPlayback(playerRef.current);
+    if (isMiniDismissed) {
+      stopPlayerPlayback(playerRef.current);
+    }
+  }, [isMiniDismissed]);
+
+  useEffect(() => {
+    if (!isVisible || !playerRef.current) {
+      return undefined;
+    }
+
+    return schedulePlaybackResume(playerRef.current, mutedPreferenceRef);
+  }, [isVisible, routeMode]);
+
+  useEffect(() => {
+    function resume() {
+      if (isVisible && playerRef.current) {
+        tryAutoplay(playerRef.current, mutedPreferenceRef);
+      }
+    }
+
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("focus", resume);
+
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("focus", resume);
+    };
   }, [isVisible]);
 
   useEffect(() => {
@@ -237,28 +335,13 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       return undefined;
     }
 
-    let frameId = window.requestAnimationFrame(() => {
-      tryAutoplay(playerRef.current, mutedPreferenceRef);
-    });
-    const timeoutIds = [250, 900, 1800].map((delay) => (
-      window.setTimeout(() => tryAutoplay(playerRef.current, mutedPreferenceRef), delay)
-    ));
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
-    };
-  }, [isVisible, routeMode, isOnline]);
-
-  useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible" && isVisible && playerRef.current) {
+    const intervalId = window.setInterval(() => {
+      if (playerRef.current) {
         tryAutoplay(playerRef.current, mutedPreferenceRef);
       }
-    }
+    }, PLAY_KEEP_ALIVE_INTERVAL_MS);
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () => window.clearInterval(intervalId);
   }, [isVisible]);
 
   useEffect(() => {
@@ -289,6 +372,10 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
         if (isMounted && response.ok) {
           setCurrentStream(data.stream || null);
+          if (data.stream) {
+            setIsPlayerOnline(true);
+            setHasActivatedPlayer(true);
+          }
         }
       } catch {
         if (isMounted) {
@@ -314,16 +401,31 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     function updatePlayerPosition() {
       window.cancelAnimationFrame(frameId);
       frameId = window.requestAnimationFrame(() => {
-        if (routeMode === "full") {
+        if (playerMode === "full") {
           const anchor = document.querySelector('[data-twitch-player-anchor="home"]');
 
           if (anchor) {
             const rect = anchor.getBoundingClientRect();
 
-            if (rect.width > 0 && rect.height > 0) {
+            if (isAnchorVisible(rect)) {
+              setPlayerBaseSize((currentSize) => {
+                const nextSize = {
+                  height: Math.round(rect.height),
+                  width: Math.round(rect.width),
+                };
+
+                if (currentSize?.height === nextSize.height && currentSize?.width === nextSize.width) {
+                  return currentSize;
+                }
+
+                return nextSize;
+              });
               setPlayerStyle({
                 borderRadius: window.getComputedStyle(anchor.parentElement || anchor).borderRadius,
                 bottom: "auto",
+                "--twitch-frame-height": `${rect.height}px`,
+                "--twitch-frame-scale": 1,
+                "--twitch-frame-width": `${rect.width}px`,
                 height: `${rect.height}px`,
                 left: `${rect.left}px`,
                 opacity: 1,
@@ -333,12 +435,19 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
                 width: `${rect.width}px`,
               });
               setIsDockedToHome(true);
+              wasDockedToHomeRef.current = true;
               return;
             }
           }
 
           setIsDockedToHome(false);
-          setPlayerStyle(buildMiniStyle(miniPlayerWidth));
+          setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
+
+          if (wasDockedToHomeRef.current && playerRef.current) {
+            schedulePlaybackResume(playerRef.current, mutedPreferenceRef);
+          }
+
+          wasDockedToHomeRef.current = false;
           window.clearTimeout(retryTimeoutId);
           retryTimeoutId = window.setTimeout(updatePlayerPosition, 120);
 
@@ -346,7 +455,8 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
         }
 
         setIsDockedToHome(false);
-        setPlayerStyle(buildMiniStyle(miniPlayerWidth));
+        wasDockedToHomeRef.current = false;
+        setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
       });
     }
 
@@ -367,7 +477,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       window.removeEventListener("resize", updatePlayerPosition);
       window.removeEventListener("scroll", updatePlayerPosition, true);
     };
-  }, [miniPlayerWidth, routeMode]);
+  }, [miniPlayerWidth, playerBaseSize, playerMode, routeMode]);
 
   function startMiniResize(event) {
     event.preventDefault();
@@ -427,7 +537,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   return (
     <div
-      className={`persistent-twitch-player is-${routeMode} ${isVisible ? "" : "is-hidden"}`}
+      className={`persistent-twitch-player is-${playerMode} ${!isDockedToHome ? "is-floating" : ""} ${isVisible ? "" : "is-hidden"}`}
       data-suppress-transition={isSuppressingTransition ? "true" : "false"}
       style={playerStyle}
       aria-hidden={!isVisible}
