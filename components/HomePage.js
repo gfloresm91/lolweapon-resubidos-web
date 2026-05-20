@@ -270,6 +270,15 @@ export default function HomePage({
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [pendingTrackerRestore, setPendingTrackerRestore] = useState(null);
   const [cardDensity, setCardDensity] = useState("comfortable");
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("kala_card_density");
+      if (saved === "comfortable" || saved === "compact") {
+        setCardDensity(saved);
+      }
+    } catch {}
+  }, []);
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
@@ -313,7 +322,7 @@ export default function HomePage({
 
   function redirectToLoginWithMessage(message) {
     setEditingLive(null);
-    toast.error(message || "Tu sesion de admin ya no es valida. Vuelve a iniciar sesion.");
+    toast.error(message || "Tu sesión de admin ya no es válida. Vuelve a iniciar sesión.");
     window.location.href = "/login";
   }
 
@@ -507,12 +516,18 @@ export default function HomePage({
     let isMounted = true;
 
     async function loadLives() {
-      const response = await fetch("/api/lives", { cache: "no-store" });
-      const data = await response.json();
+      try {
+        const response = await fetch("/api/lives", { cache: "no-store" });
+        const data = await response.json();
 
-      if (isMounted && response.ok) {
-        setLives(data.lives || []);
-        setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+        if (isMounted && response.ok) {
+          setLives(data.lives || []);
+          setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+        }
+      } catch {
+        if (isMounted) {
+          toast.error("No se pudieron cargar los directos.");
+        }
       }
     }
 
@@ -662,7 +677,7 @@ export default function HomePage({
 
   async function uploadImage(file) {
     if (!canCreateTracker && !canUpdateTracker && !canCreateTrackingAnime && !canUpdateTrackingAnime && !canCreateCompletedAnime && !canUpdateCompletedAnime) {
-      throw new Error("No tienes permiso para subir imagenes.");
+      throw new Error("No tienes permiso para subir imágenes.");
     }
 
     const formData = new FormData();
@@ -675,7 +690,7 @@ export default function HomePage({
     const data = await response.json();
 
     if (response.status === 401) {
-      redirectToLoginWithMessage("No autorizado para subir imagenes. Vuelve a iniciar sesion.");
+      redirectToLoginWithMessage("No autorizado para subir imágenes. Vuelve a iniciar sesión.");
       throw new Error("Sesion expirada");
     }
 
@@ -722,7 +737,7 @@ export default function HomePage({
       const data = await response.json();
 
       if (response.status === 401) {
-        redirectToLoginWithMessage("No autorizado para guardar cambios. Vuelve a iniciar sesion.");
+        redirectToLoginWithMessage("No autorizado para guardar cambios. Vuelve a iniciar sesión.");
         return;
       }
 
@@ -735,8 +750,8 @@ export default function HomePage({
       setEditingLive(null);
       toast.success("Cambios guardados correctamente.");
     } catch (error) {
-      if (error.message !== "Sesion expirada") {
-        toast.error(error.message);
+      if (error.message !== "Sesión expirada") {
+        toast.error(error.message || "No se pudo guardar el directo.");
       }
     } finally {
       setIsSaving(false);
@@ -760,7 +775,7 @@ export default function HomePage({
       const data = await response.json();
 
       if (response.status === 401) {
-        redirectToLoginWithMessage("No autorizado para borrar directos. Vuelve a iniciar sesion.");
+        redirectToLoginWithMessage("No autorizado para borrar directos. Vuelve a iniciar sesión.");
         return;
       }
 
@@ -774,19 +789,23 @@ export default function HomePage({
       setPendingDeleteId(null);
       toast.success("Directo eliminado correctamente.");
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || "No se pudo eliminar el directo.");
     } finally {
       setIsSaving(false);
     }
   }
 
   async function refreshLivesFromServer() {
-    const response = await fetch("/api/lives", { cache: "no-store" });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/lives", { cache: "no-store" });
+      const data = await response.json();
 
-    if (response.ok) {
-      setLives(data.lives || []);
-      setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+      if (response.ok) {
+        setLives(data.lives || []);
+        setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+      }
+    } catch {
+      toast.error("No se pudo actualizar el listado de directos.");
     }
   }
 
@@ -908,7 +927,7 @@ export default function HomePage({
       const data = await response.json();
 
       if (response.status === 401) {
-        redirectToLoginWithMessage("No autorizado para crear el card desde Twitch. Vuelve a iniciar sesion.");
+        redirectToLoginWithMessage("No autorizado para crear el card desde Twitch. Vuelve a iniciar sesión.");
         return;
       }
 
@@ -919,7 +938,7 @@ export default function HomePage({
       await refreshLivesFromServer();
       toast.success("Card de Twitch creado o actualizado.");
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || "No se pudo crear el card desde Twitch.");
     } finally {
       setIsTwitchActionLoading(false);
     }
@@ -938,7 +957,7 @@ export default function HomePage({
       const data = await response.json();
 
       if (response.status === 401) {
-        redirectToLoginWithMessage("No autorizado para registrar EventSub. Vuelve a iniciar sesion.");
+        redirectToLoginWithMessage("No autorizado para registrar EventSub. Vuelve a iniciar sesión.");
         return;
       }
 
@@ -948,7 +967,7 @@ export default function HomePage({
 
       toast.success("EventSub registrado. Twitch notificará el próximo directo.");
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.message || "No se pudo registrar EventSub.");
     } finally {
       setIsTwitchActionLoading(false);
     }
@@ -1086,6 +1105,7 @@ export default function HomePage({
                 twitchGame={initialTwitchGame}
                 twitchLogin={twitchLogin}
                 youtubeChannelUrl={youtubeChannelUrl}
+                streamlabsUrl={process.env.NEXT_PUBLIC_STREAMLABS_URL}
                 onTrackerOpen={() => selectView("tracker")}
               />
             ) : null}
@@ -1094,11 +1114,11 @@ export default function HomePage({
               <>
         <header id="inicio" className="main-header">
           {currentView === "tracker" ? (
-            <div className="header-badge" id="btn-show-lore" onClick={() => setIsLoreOpen(true)}>
-              🚀 ARCHIVO HISTORICO
-            </div>
+            <button type="button" className="header-badge" onClick={() => setIsLoreOpen(true)}>
+              <span aria-hidden="true">🚀</span> ARCHIVO HISTORICO
+            </button>
           ) : (
-            <div className="header-badge">⭐ LISTA PERSONAL</div>
+            <div className="header-badge"><span aria-hidden="true">⭐</span> LISTA PERSONAL</div>
           )}
           <h1 className="title">
             {currentView === "tracker" ? (
@@ -1128,7 +1148,7 @@ export default function HomePage({
               rel="noreferrer"
               className="notice-link"
             >
-              <span className="link-icon">📂</span> OneDrive
+              <span className="link-icon" aria-hidden="true">📂</span> OneDrive
             </a>
           </div>
         </div>
@@ -1255,14 +1275,20 @@ export default function HomePage({
                   <button
                     type="button"
                     className={cardDensity === "comfortable" ? "is-active" : ""}
-                    onClick={() => setCardDensity("comfortable")}
+                    onClick={() => {
+                      setCardDensity("comfortable");
+                      try { window.localStorage.setItem("kala_card_density", "comfortable"); } catch {}
+                    }}
                   >
-                    Comodo
+                    Cómodo
                   </button>
                   <button
                     type="button"
                     className={cardDensity === "compact" ? "is-active" : ""}
-                    onClick={() => setCardDensity("compact")}
+                    onClick={() => {
+                      setCardDensity("compact");
+                      try { window.localStorage.setItem("kala_card_density", "compact"); } catch {}
+                    }}
                   >
                     Compacto
                   </button>
@@ -1318,7 +1344,7 @@ export default function HomePage({
             </>
           ) : (
               <div className="empty-state">
-              <div className="empty-state-icon">📼</div>
+              <div className="empty-state-icon">VOD</div>
               <div className="empty-state-text">
                 {currentView === "myList"
                   ? "Aún no tienes directos en esta vista."
@@ -1349,9 +1375,6 @@ export default function HomePage({
           )}
         </main>
 
-        <footer className="site-footer">
-          {currentView === "myList" ? "Tu archivo personal · Directos guardados para después" : "Archivo VODs · Desarrollado para mantener la historia"}
-        </footer>
               </>
             ) : null}
 
@@ -1456,7 +1479,7 @@ export default function HomePage({
             ) : null}
           </div>
           <footer className="persistent-footer">
-            <span>Por fans para fans 💜 para Kala</span>
+            <span>Por fans para fans <span aria-hidden="true">💜</span> para Kala</span>
           </footer>
         </div>
       </div>

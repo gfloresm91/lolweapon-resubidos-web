@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { CirclePlay } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 
 function parseDate(value) {
@@ -10,15 +11,14 @@ function parseDate(value) {
 }
 
 function formatYoutubeDate(value) {
-  if (!value) {
-    return "Sin fecha";
-  }
-
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "Sin fecha";
   return new Intl.DateTimeFormat("es-CL", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function RecentLiveCard({ live }) {
@@ -31,9 +31,9 @@ function RecentLiveCard({ live }) {
     <article className="home-live-card">
       <div className="home-live-meta">
         <span>{live.date || "Sin fecha"}</span>
-        <span>{live.status || PENDING_LIVE_STATUS_LABEL}</span>
+        <span className="home-live-status-badge">{live.status || PENDING_LIVE_STATUS_LABEL}</span>
       </div>
-      <h3>{live.title || "Sin titulo"}</h3>
+      <h3>{live.title || "Sin título"}</h3>
       <div className="home-live-tags">
         {(live.tags || []).map((tag) => (
           <span key={tag}>{tag}</span>
@@ -41,7 +41,7 @@ function RecentLiveCard({ live }) {
       </div>
       <a href={detailPath} className="platform-btn platform-detail home-live-detail-link">
         <span>{detailCtaLabel}</span>
-        <span aria-hidden="true">→</span>
+        <CirclePlay size={15} aria-hidden="true" />
       </a>
     </article>
   );
@@ -52,6 +52,7 @@ function YoutubeCard({ video }) {
     <a href={video.url} target="_blank" rel="noreferrer" className="youtube-card">
       <div className="youtube-thumb">
         {video.thumbnail ? <img src={video.thumbnail} alt="" loading="lazy" /> : <span>YT</span>}
+        <div className="youtube-play-overlay" aria-hidden="true" />
       </div>
       <div className="youtube-card-body">
         <span>{formatYoutubeDate(video.publishedAt)}</span>
@@ -70,6 +71,7 @@ export default function HomeDashboard({
   twitchGame,
   twitchLogin,
   youtubeChannelUrl,
+  streamlabsUrl,
   onTrackerOpen,
   mode = "full",
 }) {
@@ -77,7 +79,7 @@ export default function HomeDashboard({
   const [currentProfile, setCurrentProfile] = useState(twitchProfile);
   const [currentChannelInfo, setCurrentChannelInfo] = useState(twitchChannelInfo);
   const [currentGame, setCurrentGame] = useState(twitchGame);
-  const [isTwitchLoading, setIsTwitchLoading] = useState(false);
+  const [isTwitchLoading, setIsTwitchLoading] = useState(!twitchChannelInfo && !twitchStream);
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
@@ -92,6 +94,8 @@ export default function HomeDashboard({
     let isMounted = true;
 
     async function refreshStatus() {
+      if (document.hidden) return;
+
       try {
         const response = await fetch("/api/twitch/status", { cache: "no-store" });
         const data = await response.json();
@@ -111,10 +115,24 @@ export default function HomeDashboard({
       }
     }
 
+    if (!twitchChannelInfo && !twitchStream) {
+      refreshStatus();
+    }
+
     const intervalId = window.setInterval(refreshStatus, 60000);
+
+    function handleVisibilityChange() {
+      if (!document.hidden) {
+        refreshStatus();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -160,7 +178,6 @@ export default function HomeDashboard({
   const twitchChatUrl = twitchParent
     ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
     : "";
-  const streamStatusClass = isTwitchLoading ? "is-loading" : isOnline ? "is-online" : "is-offline";
   const dashboardClassName = [
     "home-dashboard",
     mode === "mini" ? "is-mini-player" : "",
@@ -170,28 +187,7 @@ export default function HomeDashboard({
 
   return (
     <main className={dashboardClassName}>
-      <section className="home-hero">
-        <div>
-          <span className={`stream-status-pill ${streamStatusClass}`}>
-            <span />
-            {isTwitchLoading ? "Consultando" : isOnline ? "En directo" : "Offline"}
-          </span>
-          <h1 className="home-title">Lolweapon Resubidos</h1>
-          <p className="home-subtitle">
-            Directo, archivo reciente y actividad de YouTube en un solo lugar.
-          </p>
-        </div>
-        <a
-          href={`https://www.twitch.tv/${twitchChannel}`}
-          target="_blank"
-          rel="noreferrer"
-          className="home-twitch-link"
-        >
-          Abrir Twitch
-        </a>
-      </section>
-
-      <section className="home-section home-stream-section">
+      <section className="home-section home-stream-section" aria-label="Transmisión en directo">
         <div className="stream-block">
           <div className="stream-layout">
             <div className="stream-main-column">
@@ -214,13 +210,17 @@ export default function HomeDashboard({
                   )}
                 </div>
                 <div className="stream-details-copy">
-                  <h2>{isTwitchLoading ? "Cargando metadata de Twitch..." : currentTitle}</h2>
+                  <h2 aria-live="polite" aria-busy={isTwitchLoading}>
+                    {isTwitchLoading
+                      ? <span className="stream-title-skeleton" aria-hidden="true" />
+                      : currentTitle}
+                  </h2>
                   <div className="stream-details-meta">
                     <span>{channelName}</span>
                     {isOnline && typeof currentStream.viewer_count === "number" ? (
                       <span>{currentStream.viewer_count} viewers</span>
                     ) : null}
-                    {!isOnline ? <span>Offline</span> : null}
+                    {!isOnline && !isTwitchLoading ? <span>Offline</span> : null}
                   </div>
                   {currentCategory ? (
                     <div className="stream-category-line">
@@ -232,15 +232,25 @@ export default function HomeDashboard({
                     <p className="stream-details-description">{channelDescription}</p>
                   ) : null}
                 </div>
-                <a
-                  href="https://streamlabs.com/kalathraslolweapon/tip"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="stream-tip-button"
-                >
-                  <span className="paypal-icon" aria-hidden="true">P</span>
-                  Donar por PayPal
-                </a>
+                <div className="stream-actions">
+                  <a
+                    href={`https://www.twitch.tv/${twitchChannel}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="home-twitch-link"
+                  >
+                    Abrir en Twitch
+                  </a>
+                  <a
+                    href={streamlabsUrl || "https://streamlabs.com/kalathraslolweapon/tip"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="stream-tip-button"
+                  >
+                    <span className="paypal-icon" aria-hidden="true">P</span>
+                    Apoyar al canal
+                  </a>
+                </div>
               </div>
             </div>
             <div className="stream-frame stream-chat">
@@ -250,7 +260,7 @@ export default function HomeDashboard({
         </div>
       </section>
 
-      <section className="home-section">
+      <section className="home-section" aria-label="Últimos directos registrados">
         <div className="home-section-heading">
           <div>
             <span className="home-eyebrow">Archivo</span>
@@ -262,17 +272,27 @@ export default function HomeDashboard({
         </div>
 
         {recentLives.length ? (
-          <div className="home-live-grid">
-            {recentLives.map((live) => (
-              <RecentLiveCard key={live.id} live={live} />
-            ))}
-          </div>
+          <>
+            <div className="home-live-grid">
+              {recentLives.map((live) => (
+                <RecentLiveCard key={live.id} live={live} />
+              ))}
+            </div>
+            {lives.length > recentLives.length ? (
+              <p className="home-section-more">
+                Mostrando {recentLives.length} de {lives.length} directos.{" "}
+                <button type="button" className="home-section-more-link" onClick={onTrackerOpen}>
+                  Ver todos en el rastreador
+                </button>
+              </p>
+            ) : null}
+          </>
         ) : (
           <div className="home-empty-panel">No hay directos registrados todavía.</div>
         )}
       </section>
 
-      <section className="home-section">
+      <section className="home-section" aria-label="Últimos videos de YouTube">
         <div className="home-section-heading">
           <div>
             <span className="home-eyebrow">YouTube</span>
@@ -289,8 +309,8 @@ export default function HomeDashboard({
         </div>
 
         {isYoutubeLoading ? (
-          <div className="home-loading-panel">
-            <span />
+          <div className="home-loading-panel" role="status" aria-live="polite">
+            <span aria-hidden="true" />
             Cargando videos recientes de YouTube...
           </div>
         ) : videos.length ? (

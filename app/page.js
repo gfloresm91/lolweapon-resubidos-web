@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
-import { can } from "@/lib/repositories/platformUserRepository";
+import { can, listPlatformPermissions, listPlatformRoles, listPlatformUsers } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses, readLives } from "@/lib/repositories/liveRepository";
+import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,17 @@ export default async function Page() {
   if (!can(accessUser, "home.view")) {
     redirect("/login");
   }
+
+  const userId = currentUser?.id;
+  const canViewAdmin = can(accessUser, "admin.tracker.view") || can(accessUser, "admin.tags.view") || can(accessUser, "users.read") || can(accessUser, "roles.read");
+
+  const [animeActivity, platformUsers, platformRoles, platformPermissions] = await Promise.all([
+    userId ? getAnimeActivityMapForUser(userId) : Promise.resolve({}),
+    canViewAdmin ? listPlatformUsers() : Promise.resolve([]),
+    canViewAdmin ? listPlatformRoles() : Promise.resolve([]),
+    canViewAdmin ? listPlatformPermissions() : Promise.resolve([]),
+  ]);
+
   const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
   const youtubeChannelUrl =
     process.env.YOUTUBE_CHANNEL_URL ||
@@ -40,6 +52,10 @@ export default async function Page() {
       isAdmin={isAdmin}
       currentUser={currentUser}
       accessPermissions={accessUser?.permissions || []}
+      initialAnimeActivity={animeActivity}
+      initialPlatformUsers={platformUsers}
+      initialPlatformRoles={platformRoles}
+      initialPlatformPermissions={platformPermissions}
     />
   );
 }
