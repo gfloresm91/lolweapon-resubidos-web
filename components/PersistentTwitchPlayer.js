@@ -171,7 +171,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const routeMode = getRouteMode(currentPath, currentHostname);
   const shouldKeepPlayerVisible = isStreamPlayable && !isMiniDismissed;
   const playerMode = routeMode === "hidden" && shouldKeepPlayerVisible ? "mini" : routeMode;
-  const isVisible = playerMode === "full" || (playerMode === "mini" && shouldKeepPlayerVisible);
+  const isVisible = (playerMode === "full" && (isDockedToHome || isStreamPlayable)) || (playerMode === "mini" && shouldKeepPlayerVisible);
   const showMiniControls = playerMode === "mini" || (playerMode === "full" && !isDockedToHome);
 
   useEffect(() => {
