@@ -26,6 +26,7 @@ model Anime {
   libraryEntry       AnimeLibraryEntry?
   externalReferences AnimeExternalReference[]
   userActivity       PlatformUserAnime[]
+  ratings            AnimeRating[]
 
   @@index([formatId])
   @@index([releaseStatusId])
@@ -356,6 +357,7 @@ model PlatformUser {
   sessions       PlatformSession[]
   liveActivity   PlatformUserLive[]
   animeActivity  PlatformUserAnime[]
+  animeRatings   AnimeRating[]
 
   @@index([roleId])
   @@index([isActive])
@@ -433,4 +435,46 @@ model LoginAttempt {
   @@index([ip])
   @@index([success])
   @@index([createdAt])
+}
+
+model AnimeRating {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  animeId   Int
+  scoreTenths Int
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user      PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  anime     Anime        @relation(fields: [animeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, animeId])
+  @@index([userId])
+  @@index([animeId])
+}
+
+model AuditLog {
+  id             Int      @id @default(autoincrement())
+  createdAt      DateTime @default(now())
+  actorUserId    Int?
+  actorUsername  String?
+  actorAlias     String?
+  action         String
+  module         String
+  entityType     String
+  entityId       String?
+  entityLabel    String?
+  summary        String?
+  before         Json?
+  after          Json?
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+
+  @@index([createdAt])
+  @@index([module])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([actorUserId])
+  @@index([action])
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Eye, ListPlus, Star, Edit3, X } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +9,7 @@ import AniListSearchModal from "@/components/AniListSearchModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import FormSelect from "@/components/FormSelect";
 import TagCombobox from "@/components/TagCombobox";
+import Tooltip from "@/components/Tooltip";
 
 const AnimeImageDropzone = dynamic(() => import("@/components/AnimeImageDropzone"), { ssr: false });
 
@@ -32,6 +33,8 @@ const TRACKING_STATUS_OPTIONS = [
 const CAPS_SORT_OPTIONS = [
   { value: "purchased-desc", label: "Más caps comprados" },
   { value: "purchased-asc", label: "Menos caps comprados" },
+  { value: "rating-desc", label: "Mejor puntuados" },
+  { value: "rating-asc", label: "Menor puntuación" },
   { value: "episodes-desc", label: "Más episodios" },
   { value: "episodes-asc", label: "Menos episodios" },
 ];
@@ -39,6 +42,8 @@ const CAPS_SORT_OPTIONS = [
 const ALPHA_SORT_OPTIONS = [
   { value: "title-asc", label: "A-Z" },
   { value: "title-desc", label: "Z-A" },
+  { value: "rating-desc", label: "Mejor puntuados" },
+  { value: "rating-asc", label: "Menor puntuación" },
   { value: "episodes-desc", label: "Más episodios" },
   { value: "episodes-asc", label: "Menos episodios" },
   { value: "year-desc", label: "Más recientes" },
@@ -56,6 +61,13 @@ const ANIME_PERSONAL_STATUS_OPTIONS = [
   { key: "want", label: "Quiero ver", icon: ListPlus },
   { key: "watching", label: "Viendo", icon: Eye },
   { key: "completed", label: "Terminado", icon: CheckCircle2 },
+];
+
+const CHULOPUNTO_SCALE_LABELS = [
+  { range: "1-2", label: "Bajo" },
+  { range: "3-4", label: "Regular" },
+  { range: "5-6", label: "Bueno" },
+  { range: "7-8", label: "Excelente" },
 ];
 
 const emptyAnime = {
@@ -149,6 +161,146 @@ export function AnimePosterPlaceholder({ title, className = "" }) {
       <span>{getInitials(title)}</span>
     </div>
   );
+}
+
+const CHULOPUNTO_COLORS = ["", "#ef4444", "#ef4444", "#eab308", "#eab308", "#22d3ee", "#22d3ee", "#22c55e", "#22c55e"];
+const MIN_CHULOPUNTO = 1;
+const MAX_CHULOPUNTO = 8;
+const CHULOPUNTO_STEP = 0.1;
+
+function getDefaultSortOption({ mode, personalOnly }) {
+  if (personalOnly) {
+    return "title-asc";
+  }
+
+  if (mode === "completed") {
+    return "title-asc";
+  }
+
+  return "purchased-desc";
+}
+
+function ChulopuntoGauge({ score }) {
+  const reactId = useId();
+  const id = `cpg-${reactId.replace(/:/g, "")}`;
+  const numericScore = normalizeChulopunto(score);
+  const size = 132;
+  const cx = 66;
+  const cy = 66;
+  const r = 43;
+  const strokeWidth = 6;
+  const circumference = 2 * Math.PI * r;
+  const dash = (numericScore / MAX_CHULOPUNTO) * circumference;
+  const color = getChulopuntoColor(numericScore);
+  const displayScore = formatChulopunto(numericScore);
+
+  return (
+    <div
+      className="chulopunto-gauge"
+      style={{ "--chulopunto-color": color }}
+      aria-label={`Nota destacada por Kala: ${displayScore}/8`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        <defs>
+          <radialGradient id={`${id}-core`} cx="40%" cy="32%" r="68%">
+            <stop offset="0%" stopColor="rgba(78,91,118,0.9)" />
+            <stop offset="38%" stopColor="rgba(24,30,45,0.98)" />
+            <stop offset="100%" stopColor="rgba(4,6,12,1)" />
+          </radialGradient>
+          <radialGradient id={`${id}-shine`} cx="36%" cy="20%" r="58%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.34)" />
+            <stop offset="42%" stopColor="rgba(255,255,255,0.06)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          <linearGradient id={`${id}-ring`} x1="18%" y1="12%" x2="86%" y2="88%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.78)" />
+            <stop offset="26%" stopColor={color} />
+            <stop offset="100%" stopColor={color} />
+          </linearGradient>
+          <filter id={`${id}-glow`}>
+            <feGaussianBlur stdDeviation="4.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id={`${id}-shadow`}>
+            <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="rgba(0,0,0,0.75)" />
+          </filter>
+        </defs>
+        <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-core)`} filter={`url(#${id}-shadow)`} />
+        <circle cx={cx} cy={cy} r="52" fill="none" stroke={color} strokeWidth="3" opacity="0.85" filter={`url(#${id}-glow)`} />
+        <circle cx={cx} cy={cy} r="45" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="9" />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={`url(#${id}-ring)`}
+          strokeWidth={strokeWidth}
+          strokeDasharray={`${dash} ${circumference}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
+          filter={`url(#${id}-glow)`}
+        />
+        <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-shine)`} />
+        <ellipse cx="48" cy="37" rx="22" ry="10" fill="rgba(255,255,255,0.1)" />
+      </svg>
+      <div className="chulopunto-score-wrap">
+        <span className="chulopunto-score">{displayScore}</span>
+        <span className="chulopunto-score-denom">/8</span>
+      </div>
+    </div>
+  );
+}
+
+function getChulopuntoTone(score) {
+  const value = Number(score);
+
+  if (value >= 7) return "Excelente";
+  if (value >= 5) return "Bueno";
+  if (value >= 3) return "Regular";
+  return "Bajo";
+}
+
+function getChulopuntoColor(score) {
+  const value = Number(score);
+
+  if (value >= 7) return "#22c55e";
+  if (value >= 5) return "#22d3ee";
+  if (value >= 3) return "#eab308";
+  return "#ef4444";
+}
+
+function normalizeChulopunto(score) {
+  const value = Number(score);
+
+  if (!Number.isFinite(value)) {
+    return MIN_CHULOPUNTO;
+  }
+
+  return Math.min(MAX_CHULOPUNTO, Math.max(MIN_CHULOPUNTO, Math.round(value * 10) / 10));
+}
+
+function formatChulopunto(score) {
+  return normalizeChulopunto(score).toFixed(1);
+}
+
+function compareRatings(leftKey, rightKey, ratings, direction, fallbackCompare) {
+  const leftHasRating = ratings[leftKey] != null;
+  const rightHasRating = ratings[rightKey] != null;
+
+  if (leftHasRating !== rightHasRating) {
+    return leftHasRating ? -1 : 1;
+  }
+
+  if (leftHasRating && rightHasRating) {
+    const leftValue = normalizeChulopunto(ratings[leftKey]);
+    const rightValue = normalizeChulopunto(ratings[rightKey]);
+
+    if (leftValue !== rightValue) {
+      return (leftValue - rightValue) * direction;
+    }
+  }
+
+  return fallbackCompare();
 }
 
 function AnimeLibrarySortSelect({ options = CAPS_SORT_OPTIONS, value, onChange }) {
@@ -1160,7 +1312,11 @@ function buildTagFromTitle(title) {
 export default function AnimeLibraryPage({
   animes: initialAnimes = [],
   initialActivity = {},
+  initialStreamerRatings = {},
+  initialUserRatings = {},
   isAuthenticated = false,
+  canRate = false,
+  isStreamer = false,
   personalOnly = false,
   isAdmin = false,
   canCreate = isAdmin,
@@ -1169,20 +1325,33 @@ export default function AnimeLibraryPage({
   formVariant = "full",
   isLoading = false,
   mode = "active",
+  cardDensity = "comfortable",
+  onCardDensityChange,
   onAnimesChange,
+  onAnimeActivityChange,
+  onUserRatingsChange,
+  onStreamerRatingsChange,
 }) {
   const [animes, setAnimes] = useState(initialAnimes);
   const [animeActivity, setAnimeActivity] = useState(initialActivity || {});
+  const [userRatings, setUserRatings] = useState(initialUserRatings || {});
+  const [streamerRatings, setStreamerRatings] = useState(initialStreamerRatings || {});
+  const [ratingModal, setRatingModal] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(null);
+  const [ratingInputValue, setRatingInputValue] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [personalFilter, setPersonalFilter] = useState("all");
-  const [sortOption, setSortOption] = useState(personalOnly || mode === "completed" ? "title-asc" : "purchased-desc");
+  const [sortOption, setSortOption] = useState(getDefaultSortOption({ mode, personalOnly }));
   const [isCreateStartOpen, setIsCreateStartOpen] = useState(false);
   const [editingAnime, setEditingAnime] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingDeleteKey, setPendingDeleteKey] = useState(null);
   const pageConfig = PAGE_CONFIG[mode] || PAGE_CONFIG.active;
   const canManageAnime = canCreate || canUpdate || canDelete;
+  const ratingAnime = useMemo(() => (
+    ratingModal ? animes.find((anime) => anime.key === ratingModal) || null : null
+  ), [animes, ratingModal]);
 
   useEffect(() => {
     setAnimes(initialAnimes);
@@ -1191,6 +1360,14 @@ export default function AnimeLibraryPage({
   useEffect(() => {
     setAnimeActivity(initialActivity || {});
   }, [initialActivity]);
+
+  useEffect(() => {
+    setUserRatings(initialUserRatings || {});
+  }, [initialUserRatings]);
+
+  useEffect(() => {
+    setStreamerRatings(initialStreamerRatings || {});
+  }, [initialStreamerRatings]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1205,7 +1382,9 @@ export default function AnimeLibraryPage({
         const data = await response.json().catch(() => null);
 
         if (isMounted && response.ok && data?.success) {
-          setAnimeActivity(Object.fromEntries((data.activity || []).map((item) => [item.animeKey, item])));
+          const nextAnimeActivity = Object.fromEntries((data.activity || []).map((item) => [item.animeKey, item]));
+          setAnimeActivity(nextAnimeActivity);
+          onAnimeActivityChange?.(nextAnimeActivity);
         }
       } catch {
         // Personal anime activity is progressive enhancement.
@@ -1217,12 +1396,12 @@ export default function AnimeLibraryPage({
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, onAnimeActivityChange]);
 
   useEffect(() => {
     setStatusFilter("all");
     setPersonalFilter("all");
-    setSortOption(personalOnly || mode === "completed" ? "title-asc" : "purchased-desc");
+    setSortOption(getDefaultSortOption({ mode, personalOnly }));
   }, [mode, personalOnly]);
 
   const pageAnimes = useMemo(() => {
@@ -1346,6 +1525,14 @@ export default function AnimeLibraryPage({
     if (personalOnly || mode === "completed") {
       const direction = sortOption.endsWith("desc") ? -1 : 1;
 
+      if (sortOption.startsWith("rating")) {
+        return [...results].sort((left, right) => {
+          return compareRatings(left.key, right.key, streamerRatings, direction, () => (
+            (left.titleEs || left.title || "").localeCompare(right.titleEs || right.title || "")
+          ));
+        });
+      }
+
       if (sortOption.startsWith("episodes") || sortOption.startsWith("year")) {
         const field = sortOption.startsWith("episodes") ? "episodes" : "year";
 
@@ -1367,6 +1554,13 @@ export default function AnimeLibraryPage({
     }
 
     return [...results].sort((left, right) => {
+      if (sortOption.startsWith("rating")) {
+        const direction = sortOption.endsWith("asc") ? 1 : -1;
+        return compareRatings(left.key, right.key, streamerRatings, direction, () => (
+          (left.titleEs || left.title || "").localeCompare(right.titleEs || right.title || "")
+        ));
+      }
+
       const isEpisodeSort = sortOption.startsWith("episodes");
       const leftValue = isEpisodeSort
         ? Math.max(parseInt(left?.episodes, 10) || 0, 0)
@@ -1382,7 +1576,7 @@ export default function AnimeLibraryPage({
 
       return (left.title || "").localeCompare(right.title || "");
     });
-  }, [animeActivity, mode, pageAnimes, personalFilter, personalOnly, search, sortOption, statusFilter]);
+  }, [animeActivity, mode, pageAnimes, personalFilter, personalOnly, search, sortOption, statusFilter, streamerRatings]);
 
   async function uploadAnimeImage(file) {
     const formData = new FormData();
@@ -1392,10 +1586,10 @@ export default function AnimeLibraryPage({
       method: "POST",
       body: formData,
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => null);
 
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || "No se pudo subir la imagen");
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || "No se pudo subir la imagen");
     }
 
     return data.path;
@@ -1433,15 +1627,15 @@ export default function AnimeLibraryPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "upsert", key: form.key, anime }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (response.status === 401) {
         toast.error("Tu sesion de admin expiro. Vuelve a iniciar sesion.");
         return;
       }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "No se pudo guardar la metadata.");
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "No se pudo guardar la metadata.");
       }
 
       const nextAnimes = data.animes || [];
@@ -1483,15 +1677,15 @@ export default function AnimeLibraryPage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "remove", key }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
       if (response.status === 401) {
         toast.error("Tu sesion de admin expiro. Vuelve a iniciar sesion.");
         return;
       }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "No se pudo eliminar el anime.");
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "No se pudo eliminar el anime.");
       }
 
       const nextAnimes = data.animes || [];
@@ -1535,6 +1729,10 @@ export default function AnimeLibraryPage({
       ...current,
       [animeKey]: optimisticActivity,
     }));
+    onAnimeActivityChange?.({
+      ...animeActivity,
+      [animeKey]: optimisticActivity,
+    });
 
     try {
       const response = await fetch("/api/anime-activity", {
@@ -1545,6 +1743,12 @@ export default function AnimeLibraryPage({
       const data = await response.json().catch(() => null);
 
       if (response.status === 401) {
+        const revertedAnimeActivity = {
+          ...animeActivity,
+          [animeKey]: currentActivity,
+        };
+        setAnimeActivity(revertedAnimeActivity);
+        onAnimeActivityChange?.(revertedAnimeActivity);
         requireLoginForAnime();
         return;
       }
@@ -1553,10 +1757,12 @@ export default function AnimeLibraryPage({
         throw new Error(data?.error || "No se pudo guardar tu lista de anime.");
       }
 
-      setAnimeActivity((current) => ({
-        ...current,
+      const nextAnimeActivity = {
+        ...animeActivity,
         [animeKey]: data.activity,
-      }));
+      };
+      setAnimeActivity(nextAnimeActivity);
+      onAnimeActivityChange?.(nextAnimeActivity);
 
       if (Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
         toast.success(patch.isFavorite
@@ -1576,8 +1782,154 @@ export default function AnimeLibraryPage({
         ...current,
         [animeKey]: currentActivity,
       }));
+      onAnimeActivityChange?.({
+        ...animeActivity,
+        [animeKey]: currentActivity,
+      });
       toast.error(error.message || "No se pudo guardar tu lista de anime.");
     }
+  }
+
+  async function updateAnimeRating(animeKey, score) {
+    if (!isAuthenticated) {
+      toast("Inicia sesión para calificar.", {
+        action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
+      });
+      return;
+    }
+
+    if (!canRate) {
+      toast.error("Tu rol no tiene permiso para calificar anime.");
+      return;
+    }
+
+    const prevScore = userRatings[animeKey];
+    const isDelete = score === null;
+    const nextUserRatings = { ...userRatings };
+    if (isDelete) {
+      delete nextUserRatings[animeKey];
+    } else {
+      nextUserRatings[animeKey] = normalizeChulopunto(score);
+    }
+
+    setUserRatings(nextUserRatings);
+    onUserRatingsChange?.(nextUserRatings);
+
+    let nextStreamerRatings = null;
+    if (isStreamer) {
+      nextStreamerRatings = { ...streamerRatings };
+      if (isDelete) {
+        delete nextStreamerRatings[animeKey];
+      } else {
+        nextStreamerRatings[animeKey] = normalizeChulopunto(score);
+      }
+      setStreamerRatings(nextStreamerRatings);
+      onStreamerRatingsChange?.(nextStreamerRatings);
+    }
+
+    closeRatingModal();
+
+    try {
+      const response = await fetch("/api/anime-rating", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ animeKey, action: isDelete ? "delete" : "upsert", score: isDelete ? null : normalizeChulopunto(score) }),
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || "No se pudo guardar la puntuación.");
+      }
+
+      toast.success(isDelete ? "Puntuación eliminada." : "Puntuación guardada.");
+    } catch (error) {
+      const revertedUserRatings = { ...userRatings };
+      if (prevScore === undefined) {
+        delete revertedUserRatings[animeKey];
+      } else {
+        revertedUserRatings[animeKey] = prevScore;
+      }
+      setUserRatings(revertedUserRatings);
+      onUserRatingsChange?.(revertedUserRatings);
+
+      if (isStreamer) {
+        setStreamerRatings(streamerRatings);
+        onStreamerRatingsChange?.(streamerRatings);
+      }
+      toast.error(error.message || "No se pudo guardar la puntuación.");
+    }
+  }
+
+  function openRatingModal(animeKey) {
+    const currentRating = userRatings[animeKey] == null ? null : normalizeChulopunto(userRatings[animeKey]);
+    setRatingModal(animeKey);
+    setSelectedRating(currentRating);
+    setRatingInputValue(currentRating == null ? "" : formatChulopunto(currentRating));
+  }
+
+  function closeRatingModal() {
+    setRatingModal(null);
+    setSelectedRating(null);
+    setRatingInputValue("");
+  }
+
+  function selectRating(score) {
+    const nextRating = normalizeChulopunto(score);
+    setSelectedRating(nextRating);
+    setRatingInputValue(formatChulopunto(nextRating));
+  }
+
+  function updateRatingInput(value) {
+    if (value === "") {
+      setRatingInputValue("");
+      setSelectedRating(null);
+      return;
+    }
+
+    if (!/^\d{0,1}(?:[.,]\d?)?$/.test(value)) {
+      return;
+    }
+
+    const normalizedText = value.replace(",", ".");
+    setRatingInputValue(value);
+
+    if (/^\d(?:\.\d)?$/.test(normalizedText)) {
+      const numericValue = Number(normalizedText);
+
+      if (numericValue >= MIN_CHULOPUNTO && numericValue <= MAX_CHULOPUNTO) {
+        setSelectedRating(normalizeChulopunto(numericValue));
+      } else {
+        setSelectedRating(null);
+      }
+    }
+  }
+
+  function commitRatingInput() {
+    if (ratingInputValue === "" || selectedRating == null) {
+      setRatingInputValue("");
+      setSelectedRating(null);
+      return;
+    }
+
+    selectRating(selectedRating);
+  }
+
+  function saveSelectedRating() {
+    if (!ratingModal) {
+      return;
+    }
+
+    if (selectedRating == null) {
+      toast.error("Selecciona una puntuación antes de guardar.");
+      return;
+    }
+
+    updateAnimeRating(ratingModal, normalizeChulopunto(selectedRating));
+  }
+
+  function setDensity(nextDensity) {
+    onCardDensityChange?.(nextDensity);
+    try { window.localStorage.setItem("kala_card_density", nextDensity); } catch {}
   }
 
   return (
@@ -1676,42 +2028,64 @@ export default function AnimeLibraryPage({
             <div className="empty-state-text">Cargando biblioteca...</div>
           </div>
         ) : filteredAnimes.length ? (
-          <div className="anime-grid anime-library-grid">
-            {filteredAnimes.map((anime) => {
-              const fullSeason = isFullSeason(anime);
-              const purchasedCount = getPurchasedCount(anime);
-              const purchaseLabel = getPurchaseLabel(anime);
-              const synopsis = anime.descriptionEs || anime.description;
-              const episodeProgress = getEpisodeProgress(anime);
-              const archiveMeta = [
-                anime.year,
-                anime.episodes ? `${anime.episodes} eps` : null,
-                anime.format,
-              ].filter(Boolean);
-              const personalActivity = animeActivity[anime.key] || {};
-              const personalStatus = personalActivity.listStatus || "";
-              const hoverMeta = [
-                anime.year,
-                anime.episodes ? `${anime.episodes} eps` : null,
-                anime.format,
-              ].filter(Boolean).join(" · ");
-
-              return (
-                <article
-                  key={anime.key}
-                  className={`anime-card anime-library-card ${canUpdate ? "is-admin" : ""}`}
+          <>
+            <div className="results-meta anime-library-results-meta">
+              <span>Mostrando {filteredAnimes.length} resultados</span>
+              <div className="density-toggle" aria-label="Densidad de tarjetas de anime">
+                <button
+                  type="button"
+                  className={cardDensity === "comfortable" ? "is-active" : ""}
+                  onClick={() => setDensity("comfortable")}
                 >
-                  {canUpdate ? (
-                    <button
-                      type="button"
-                      className="anime-edit-indicator"
-                      aria-label={`Editar ${anime.titleEs || anime.title || "anime"}`}
-                      onClick={() => setEditingAnime(anime)}
-                    >
-                      <Edit3 size={14} />
-                      Editar
-                    </button>
-                  ) : null}
+                  Cómodo
+                </button>
+                <button
+                  type="button"
+                  className={cardDensity === "compact" ? "is-active" : ""}
+                  onClick={() => setDensity("compact")}
+                >
+                  Compacto
+                </button>
+              </div>
+            </div>
+            <div className={`anime-grid anime-library-grid anime-library-grid-${cardDensity}`}>
+              {cardDensity === "compact" ? (
+                <div className="anime-library-table-header" role="row" aria-hidden="true">
+                  <span>Poster</span>
+                  <span>Anime</span>
+                  <span>Progreso</span>
+                  <span>Nota</span>
+                  <span>Acciones</span>
+                </div>
+              ) : null}
+              {filteredAnimes.map((anime) => {
+                const fullSeason = isFullSeason(anime);
+                const purchasedCount = getPurchasedCount(anime);
+                const purchaseLabel = getPurchaseLabel(anime);
+                const synopsis = anime.descriptionEs || anime.description;
+                const episodeProgress = getEpisodeProgress(anime);
+                const archiveMeta = [
+                  anime.year,
+                  anime.episodes ? `${anime.episodes} eps` : null,
+                  anime.format,
+                ].filter(Boolean);
+                const personalActivity = animeActivity[anime.key] || {};
+                const personalStatus = personalActivity.listStatus || "";
+                const streamerScore = streamerRatings[anime.key];
+                const userScore = userRatings[anime.key];
+                const userScoreColor = userScore != null ? getChulopuntoColor(userScore) : null;
+                const hasTrackerUrl = Boolean(String(anime.trackerUrl || "").trim());
+                const hoverMeta = [
+                  anime.year,
+                  anime.episodes ? `${anime.episodes} eps` : null,
+                  anime.format,
+                ].filter(Boolean).join(" · ");
+
+                return (
+                  <article
+                    key={anime.key}
+                    className={`anime-card anime-library-card ${canUpdate ? "is-admin" : ""}`}
+                  >
                   <div className="poster-container anime-library-poster">
                     {anime.image ? (
                       <img src={anime.image} alt={anime.title} className="poster-img" loading="lazy" />
@@ -1719,7 +2093,7 @@ export default function AnimeLibraryPage({
                       <AnimePosterPlaceholder title={anime.titleEs || anime.title} />
                     )}
                     <div className="poster-overlay" />
-                    {mode === "completed" || anime.libraryEnabled === false ? (
+                    {anime.libraryEnabled === false ? (
                       <span className={`anime-library-status status-${anime.libraryEnabled === false ? "hidden" : anime.watchStatus || "pending"}`}>
                         {anime.libraryEnabled === false ? "Oculto" : getStatusLabel(anime.watchStatus)}
                       </span>
@@ -1736,45 +2110,71 @@ export default function AnimeLibraryPage({
                         <span style={{ width: `${episodeProgress.percent}%` }} />
                       </div>
                     ) : null}
-                    {synopsis || hoverMeta ? (
-                      <div className="anime-library-hover-info">
-                        {hoverMeta ? <p className="anime-library-hover-meta">{hoverMeta}</p> : null}
-                        {synopsis ? <p className="anime-library-hover-description">{synopsis}</p> : null}
-                      </div>
+                    {streamerScore != null ? (
+                      <Tooltip label="Nota destacada por Kala">
+                        <button
+                          type="button"
+                          className="chulopunto-gauge-trigger"
+                          aria-label={`Nota destacada por Kala: ${formatChulopunto(streamerScore)}/8`}
+                        >
+                          <ChulopuntoGauge score={streamerScore} />
+                        </button>
+                      </Tooltip>
                     ) : null}
                   </div>
                   <div className="anime-card-body anime-library-body">
-                    <div className="anime-personal-actions" aria-label="Lista personal de anime">
-                      <button
-                        type="button"
-                        className={`anime-personal-btn anime-personal-favorite ${personalActivity.isFavorite ? "is-active" : ""}`}
-                        aria-label={personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          updateAnimeActivity(anime.key, { isFavorite: !personalActivity.isFavorite });
-                        }}
-                      >
-                        <Star size={14} />
-                        <span>Favorito</span>
-                      </button>
+                    <div className="anime-library-compact-thumb" aria-hidden="true">
+                      {anime.image ? (
+                        <img src={anime.image} alt="" loading="lazy" />
+                      ) : (
+                        <AnimePosterPlaceholder title={anime.titleEs || anime.title} />
+                      )}
+                    </div>
+                    <div className="anime-library-compact-title">
+                      <h2>{anime.titleEs || anime.title}</h2>
+                      {hoverMeta ? <span>{hoverMeta}</span> : null}
+                      {streamerScore != null ? (
+                        <strong>Nota destacada por Kala: {formatChulopunto(streamerScore)}/8</strong>
+                      ) : null}
+                    </div>
+                    {hoverMeta ? <p className="anime-library-card-meta">{hoverMeta}</p> : null}
+                      <div className="anime-personal-actions" aria-label="Lista personal de anime">
+                      <Tooltip label={!isAuthenticated ? "Inicia sesión para guardar favoritos" : personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}>
+                        <button
+                          type="button"
+                          className={`anime-personal-btn anime-personal-favorite ${personalActivity.isFavorite ? "is-active" : ""}`}
+                          aria-label={personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            updateAnimeActivity(anime.key, { isFavorite: !personalActivity.isFavorite });
+                          }}
+                        >
+                          <Star size={14} />
+                          <span>Favorito</span>
+                        </button>
+                      </Tooltip>
                       <div className="anime-personal-statuses" role="group" aria-label="Estado personal">
                         {ANIME_PERSONAL_STATUS_OPTIONS.map((option) => {
                           const Icon = option.icon;
                           const isActive = personalStatus === option.key;
                           return (
-                            <button
+                            <Tooltip
                               key={option.key}
-                              type="button"
-                              className={`anime-personal-btn ${isActive ? "is-active" : ""}`}
-                              aria-pressed={isActive}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                updateAnimeActivity(anime.key, { listStatus: isActive ? "" : option.key });
-                              }}
+                              label={!isAuthenticated ? "Inicia sesión para guardar tu lista" : isActive ? `Quitar ${option.label}` : `Marcar como ${option.label}`}
                             >
-                              <Icon size={14} />
-                              <span>{option.label}</span>
-                            </button>
+                              <button
+                                type="button"
+                                className={`anime-personal-btn ${isActive ? "is-active" : ""}`}
+                                aria-pressed={isActive}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  updateAnimeActivity(anime.key, { listStatus: isActive ? "" : option.key });
+                                }}
+                              >
+                                <Icon size={14} />
+                                <span>{option.label}</span>
+                              </button>
+                            </Tooltip>
                           );
                         })}
                       </div>
@@ -1806,20 +2206,99 @@ export default function AnimeLibraryPage({
                         )}
                       </div>
                     )}
-                    <a
-                      href={anime.trackerUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="anime-tracker-button"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      Ver resubidos
-                    </a>
+                    <div className="anime-card-actions">
+                      <div className="anime-rating-cell">
+                        <Tooltip
+                          label={
+                            !isAuthenticated
+                              ? "Inicia sesión para puntuar"
+                              : !canRate
+                                ? "Tu rol no permite puntuar"
+                                : userScore != null
+                                  ? `Tu puntuación personal: ${formatChulopunto(userScore)}/8`
+                                  : "Calificar anime"
+                          }
+                        >
+                          <button
+                            type="button"
+                            className={`anime-rating-btn ${userScore != null ? "is-rated" : ""} ${isAuthenticated && !canRate ? "is-disabled" : ""}`}
+                            style={userScoreColor ? { color: userScoreColor, borderColor: `${userScoreColor}66` } : undefined}
+                            aria-label={userScore != null ? `Tu puntuación: ${formatChulopunto(userScore)}/8` : "Calificar anime"}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!isAuthenticated) {
+                                toast("Inicia sesión para calificar.", {
+                                  action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
+                                });
+                                return;
+                              }
+                              if (!canRate) {
+                                toast.error("Tu rol no tiene permiso para calificar anime.");
+                                return;
+                              }
+                              openRatingModal(anime.key);
+                            }}
+                          >
+                            {userScore != null ? (
+                              <>
+                                <span className="anime-rating-score">{formatChulopunto(userScore)}</span>
+                                <span className="anime-rating-label">Tu nota</span>
+                              </>
+                            ) : (
+                              <>
+                                <Star size={14} />
+                                <span className="anime-rating-label">Puntuar</span>
+                              </>
+                            )}
+                          </button>
+                        </Tooltip>
+                      </div>
+                      <div className="anime-primary-actions">
+                        {canUpdate ? (
+                          <Tooltip label="Editar anime">
+                            <button
+                              type="button"
+                              className="anime-rating-btn anime-edit-action"
+                              aria-label={`Editar ${anime.titleEs || anime.title || "anime"}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setEditingAnime(anime);
+                              }}
+                            >
+                              <Edit3 size={15} />
+                            </button>
+                          </Tooltip>
+                        ) : null}
+                        <Tooltip label={hasTrackerUrl ? "Abrir resubidos" : "Sin enlace de resubidos"}>
+                          {hasTrackerUrl ? (
+                            <a
+                              href={anime.trackerUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="anime-tracker-button"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Ver resubidos
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              className="anime-tracker-button is-disabled"
+                              aria-disabled="true"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Ver resubidos
+                            </button>
+                          )}
+                        </Tooltip>
+                      </div>
+                    </div>
                   </div>
                 </article>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         ) : (
           <div className="empty-state">
             <div className="empty-state-icon">AN</div>
@@ -1883,6 +2362,134 @@ export default function AnimeLibraryPage({
         onCancel={() => setPendingDeleteKey(null)}
         onConfirm={() => deleteAnimeMetadata(pendingDeleteKey)}
       />
+
+      {ratingModal ? (
+        <div className="modal-backdrop confirm-backdrop" onClick={closeRatingModal}>
+          <div className="modal-content confirm-modal chulopunto-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close-button" aria-label="Cerrar" onClick={closeRatingModal}>
+              <X size={18} />
+            </button>
+            <div className="chulopunto-modal-heading">
+              {ratingAnime ? (
+                <div className="chulopunto-modal-anime">
+                  <div className="chulopunto-modal-poster">
+                    {ratingAnime.image ? (
+                      <img src={ratingAnime.image} alt={ratingAnime.titleEs || ratingAnime.title} />
+                    ) : (
+                      <AnimePosterPlaceholder title={ratingAnime.titleEs || ratingAnime.title} />
+                    )}
+                  </div>
+                  <div>
+                    <span className="chulopunto-modal-kicker">Tu puntuación</span>
+                    <h2 className="modal-title">{ratingAnime.titleEs || ratingAnime.title}</h2>
+                    <p>Elige una nota personal para tu lista.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <span className="chulopunto-modal-kicker">Tu puntuación</span>
+                  <h2 className="modal-title">¿Cuántos chulopuntos?</h2>
+                </>
+              )}
+            </div>
+            <div className="chulopunto-modal-main">
+              <div
+                className={`chulopunto-modal-preview ${selectedRating == null ? "is-empty" : ""}`}
+                style={selectedRating == null ? undefined : { "--chulopunto-color": getChulopuntoColor(selectedRating) }}
+              >
+                {selectedRating == null ? (
+                  <div className="chulopunto-preview-empty">
+                    <span>?</span>
+                    <small>/8</small>
+                  </div>
+                ) : (
+                  <>
+                    <ChulopuntoGauge score={selectedRating} />
+                    <strong>{getChulopuntoTone(selectedRating)}</strong>
+                  </>
+                )}
+              </div>
+              <div className="chulopunto-modal-controls">
+                <div className="chulopunto-modal-control">
+                  <label htmlFor="chulopunto-range">Ajuste fino</label>
+                  <div className="chulopunto-slider-row">
+                    <input
+                      id="chulopunto-range"
+                      type="range"
+                      min={MIN_CHULOPUNTO}
+                      max={MAX_CHULOPUNTO}
+                      step={CHULOPUNTO_STEP}
+                      value={selectedRating ?? 4.5}
+                      onChange={(event) => selectRating(event.target.value)}
+                    />
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={ratingInputValue}
+                      placeholder="7.6"
+                      aria-label="Puntuación exacta"
+                      onBlur={commitRatingInput}
+                      onChange={(event) => updateRatingInput(event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="chulopunto-modal-options">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => {
+                    const color = getChulopuntoColor(n);
+                    const isSelected = selectedRating != null && Math.round(selectedRating * 10) === n * 10;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        className={`chulopunto-modal-score ${isSelected ? "is-selected" : ""}`}
+                        style={{ "--score-color": color }}
+                        aria-pressed={isSelected}
+                        onClick={() => selectRating(n)}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="chulopunto-modal-scale" aria-hidden="true">
+                  {CHULOPUNTO_SCALE_LABELS.map((item) => (
+                    <span key={item.range}>
+                      <strong>{item.range}</strong> {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="chulopunto-modal-footer">
+              <div>
+                {userRatings[ratingModal] != null ? (
+                  <button
+                    type="button"
+                    className="btn-modal btn-modal-danger chulopunto-modal-delete"
+                    onClick={() => updateAnimeRating(ratingModal, null)}
+                  >
+                    <X size={14} />
+                    Eliminar calificación
+                  </button>
+                ) : null}
+              </div>
+              <div className="chulopunto-modal-actions">
+                <button type="button" className="btn-modal btn-modal-secondary" onClick={closeRatingModal}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn-modal btn-modal-primary"
+                  disabled={selectedRating == null}
+                  onClick={saveSelectedRating}
+                >
+                  Guardar puntuación
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

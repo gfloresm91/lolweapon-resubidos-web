@@ -81,6 +81,7 @@ const INITIAL_VISIBLE_COUNT = 80;
 const LOAD_MORE_COUNT = 80;
 const EMPTY_LIST = [];
 const EMPTY_OBJECT = {};
+const GOD_EXCLUDED_PERMISSION_CODES = new Set(["anime.rating.streamer"]);
 const VIEW_LABELS = {
   home: "Inicio",
   tracker: "Rastreador de directos",
@@ -199,6 +200,8 @@ export default function HomePage({
   initialTwitchGame = null,
   initialLiveActivity = EMPTY_OBJECT,
   initialAnimeActivity = EMPTY_OBJECT,
+  initialStreamerRatings = EMPTY_OBJECT,
+  initialUserRatings = EMPTY_OBJECT,
   twitchLogin,
   youtubeChannelUrl,
   isAdmin,
@@ -207,7 +210,7 @@ export default function HomePage({
 }) {
   const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
-  const hasPermission = (permission) => currentUser?.role === "dios" || effectivePermissions.has(permission);
+  const hasPermission = (permission) => (currentUser?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || effectivePermissions.has(permission);
   const canManageUsers = hasPermission("users.read");
   const canManageRoles = hasPermission("roles.read");
   const canCreateTracker = hasPermission("tracker.create");
@@ -244,6 +247,9 @@ export default function HomePage({
   const [lives, setLives] = useState(initialLives);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
+  const [animeActivity, setAnimeActivity] = useState(initialAnimeActivity || {});
+  const [animeStreamerRatings, setAnimeStreamerRatings] = useState(initialStreamerRatings || {});
+  const [animeUserRatings, setAnimeUserRatings] = useState(initialUserRatings || {});
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
@@ -304,6 +310,14 @@ export default function HomePage({
   useEffect(() => {
     setAnimeLibrary(initialAnimeLibrary);
   }, [initialAnimeLibrary]);
+
+  useEffect(() => {
+    setAnimeStreamerRatings(initialStreamerRatings || EMPTY_OBJECT);
+  }, [initialStreamerRatings]);
+
+  useEffect(() => {
+    setAnimeUserRatings(initialUserRatings || EMPTY_OBJECT);
+  }, [initialUserRatings]);
 
   useEffect(() => {
     setCurrentView(activeView);
@@ -547,14 +561,16 @@ export default function HomePage({
   }, [currentView, isAuthenticated]);
 
   useEffect(() => {
-    if (!["animeLibraryTracking", "animeLibraryCompleted", "myAnimeList"].includes(currentView) || animeLibrary.length) {
+    if (!["animeLibraryTracking", "animeLibraryCompleted", "myAnimeList"].includes(currentView)) {
       return undefined;
     }
 
     let isMounted = true;
 
     async function loadAnimeLibrary() {
-      setIsAnimeLibraryLoading(true);
+      if (!animeLibrary.length) {
+        setIsAnimeLibraryLoading(true);
+      }
 
       try {
         const response = await fetch("/api/anime-library", { cache: "no-store" });
@@ -566,6 +582,9 @@ export default function HomePage({
 
         if (isMounted) {
           setAnimeLibrary(data.animes || []);
+          setAnimeActivity(data.activity || {});
+          setAnimeStreamerRatings(data.streamerRatings || {});
+          setAnimeUserRatings(data.userRatings || {});
         }
       } catch (error) {
         if (isMounted) {
@@ -583,7 +602,7 @@ export default function HomePage({
     return () => {
       isMounted = false;
     };
-  }, [animeLibrary.length, currentView]);
+  }, [currentView, currentUser?.id]);
 
   useEffect(() => {
     if (skipVisibleResetRef.current[currentView]) {
@@ -1387,9 +1406,18 @@ export default function HomePage({
                 formVariant={trackingAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
-                initialActivity={initialAnimeActivity}
+                cardDensity={cardDensity}
+                onCardDensityChange={setCardDensity}
+                initialActivity={animeActivity}
+                initialStreamerRatings={animeStreamerRatings}
+                initialUserRatings={animeUserRatings}
                 isAuthenticated={isAuthenticated}
+                canRate={hasPermission("anime.rating.write")}
+                isStreamer={hasPermission("anime.rating.streamer")}
                 onAnimesChange={setAnimeLibrary}
+                onAnimeActivityChange={setAnimeActivity}
+                onUserRatingsChange={setAnimeUserRatings}
+                onStreamerRatingsChange={setAnimeStreamerRatings}
               />
             ) : null}
 
@@ -1402,21 +1430,39 @@ export default function HomePage({
                 formVariant={completedAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
-                initialActivity={initialAnimeActivity}
+                cardDensity={cardDensity}
+                onCardDensityChange={setCardDensity}
+                initialActivity={animeActivity}
+                initialStreamerRatings={animeStreamerRatings}
+                initialUserRatings={animeUserRatings}
                 isAuthenticated={isAuthenticated}
+                canRate={hasPermission("anime.rating.write")}
+                isStreamer={hasPermission("anime.rating.streamer")}
                 onAnimesChange={setAnimeLibrary}
+                onAnimeActivityChange={setAnimeActivity}
+                onUserRatingsChange={setAnimeUserRatings}
+                onStreamerRatingsChange={setAnimeStreamerRatings}
               />
             ) : null}
 
             {currentView === "myAnimeList" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
-                initialActivity={initialAnimeActivity}
+                initialActivity={animeActivity}
+                initialStreamerRatings={animeStreamerRatings}
+                initialUserRatings={animeUserRatings}
                 isAuthenticated={isAuthenticated}
+                canRate={hasPermission("anime.rating.write")}
+                isStreamer={hasPermission("anime.rating.streamer")}
                 isLoading={isAnimeLibraryLoading}
                 mode="personal"
+                cardDensity={cardDensity}
+                onCardDensityChange={setCardDensity}
                 personalOnly
                 onAnimesChange={setAnimeLibrary}
+                onAnimeActivityChange={setAnimeActivity}
+                onUserRatingsChange={setAnimeUserRatings}
+                onStreamerRatingsChange={setAnimeStreamerRatings}
               />
             ) : null}
 

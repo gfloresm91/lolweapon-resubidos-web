@@ -110,13 +110,29 @@ YOUTUBE_UPLOADS_PLAYLIST_ID
 | `PlatformRolePermission` | Relación rol ↔ permiso |
 | `PlatformSession` | Sesión activa (token, expiresAt — 14 días) |
 | `LoginAttempt` | Auditoría de intentos de login |
+| `AuditLog` | Historial de acciones administrativas por mantenedor |
 
 ### Actividad del usuario
 
 | Modelo | Descripción |
 |---|---|
 | `PlatformUserAnime` | Favorito, listStatus, isHidden por anime |
+| `AnimeRating` | Puntuación personal por anime en décimas (`scoreTenths`) |
 | `PlatformUserLive` | isSaved, isWatched por directo |
+
+### Historial administrativo
+
+Los mantenedores del módulo Administración registran acciones en `AuditLog`: usuario actor, fecha, módulo, tipo de registro, ID/etiqueta, resumen y snapshots `before`/`after` sanitizados. La API `/api/audit-logs` expone el historial filtrable por módulo para usuarios con permisos de administración relacionados.
+
+Módulos auditados:
+- `admin.users`
+- `admin.roles`
+- `admin.tracker`
+- `admin.tags`
+- `admin.anime.tracking`
+- `admin.anime.completed`
+
+Antes de desplegar cambios que incluyan auditoría, aplicar la migración Prisma que crea la tabla `AuditLog`.
 
 ### SpaceDrum
 
@@ -167,6 +183,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Admin: Terminados | `admin.anime.completed.view` |
 | Anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
 | Anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
+| Anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
 | Rastreador | `tracker.view/create/update/delete`, `tracker.form.full/compact` |
 | SpaceDrum | `spacedrum.view` |
 
@@ -181,8 +198,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/inicio` | Home: stream en vivo, últimos directos, últimos videos de YouTube |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
-| `/biblioteca-anime/viendo` | Anime en seguimiento |
-| `/biblioteca-anime/terminados` | Anime completado |
+| `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
+| `/biblioteca-anime/terminados` | Anime terminado, pausado, pendiente o dropeado |
 | `/mi-lista` | Lista personal del usuario (guardados, vistos, favoritos) |
 | `/login` | Login manual |
 | `/registro` | Registro de usuario |
