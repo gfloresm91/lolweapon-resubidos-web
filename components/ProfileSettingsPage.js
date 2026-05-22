@@ -20,6 +20,8 @@ import {
   validateProfileFields,
 } from "@/lib/platformUserValidation";
 
+const GOD_EXCLUDED_PERMISSION_CODES = new Set(["anime.rating.streamer"]);
+
 function PasswordInput({
   id,
   label,
@@ -87,7 +89,7 @@ export default function ProfileSettingsPage({ currentUser }) {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const permissions = useMemo(() => new Set(user?.permissions || []), [user?.permissions]);
-  const canAccess = (permission) => user?.role === "dios" || permissions.has(permission);
+  const canAccess = (permission) => (user?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || permissions.has(permission);
   const canManageUsers = canAccess("users.read");
   const canManageRoles = canAccess("roles.read");
   const passwordStrength = getPasswordStrength(passwordForm.password);

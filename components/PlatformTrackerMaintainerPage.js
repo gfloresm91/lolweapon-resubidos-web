@@ -7,9 +7,10 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Edit3, Plus, Power, Radio, Trash2, Zap } from "lucide-react";
+import { Edit3, History, Plus, Power, Radio, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
+import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import FormSelect from "@/components/FormSelect";
@@ -145,6 +146,7 @@ export default function PlatformTrackerMaintainerPage({
   const [deleteLive, setDeleteLive] = useState(null);
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const [isEventSubConfirmOpen, setIsEventSubConfirmOpen] = useState(false);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialLives.length);
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
@@ -583,24 +585,30 @@ export default function PlatformTrackerMaintainerPage({
           <span className="tracker-actions-label">Rastreador</span>
           <p className="tracker-actions-copy">Gestiona los registros del archivo histórico.</p>
         </div>
-        {canCreate ? (
-          <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
-            <Plus size={18} />
-            Nuevo directo
+        <div className="tracker-actions-buttons">
+          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+            <History size={17} />
+            Historial
           </button>
-        ) : null}
-        {canCreate ? (
-          <button type="button" className="tracker-action-secondary" onClick={() => setIsArchiveConfirmOpen(true)} disabled={isTwitchActionLoading}>
-            <Radio size={17} />
-            Crear desde Twitch
-          </button>
-        ) : null}
-        {canUpdate ? (
-          <button type="button" className="tracker-action-secondary" onClick={() => setIsEventSubConfirmOpen(true)} disabled={isTwitchActionLoading}>
-            <Zap size={17} />
-            Registrar EventSub
-          </button>
-        ) : null}
+          {canCreate ? (
+            <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
+              <Plus size={18} />
+              Nuevo directo
+            </button>
+          ) : null}
+          {canCreate ? (
+            <button type="button" className="tracker-action-secondary" onClick={() => setIsArchiveConfirmOpen(true)} disabled={isTwitchActionLoading}>
+              <Radio size={17} />
+              Crear desde Twitch
+            </button>
+          ) : null}
+          {canUpdate ? (
+            <button type="button" className="tracker-action-secondary" onClick={() => setIsEventSubConfirmOpen(true)} disabled={isTwitchActionLoading}>
+              <Zap size={17} />
+              Registrar EventSub
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <MaintainerToolbar
@@ -839,6 +847,14 @@ export default function PlatformTrackerMaintainerPage({
         isLoading={isTwitchActionLoading}
         onCancel={() => setIsEventSubConfirmOpen(false)}
         onConfirm={registerTwitchEventSub}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditOpen}
+        module="admin.tracker"
+        title="Historial del rastreador"
+        subtitle="Últimas acciones realizadas en el mantenedor del rastreador."
+        onClose={() => setIsAuditOpen(false)}
       />
     </>
   );

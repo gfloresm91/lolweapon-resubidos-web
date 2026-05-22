@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Plus, Power, Trash2 } from "lucide-react";
+import { Edit3, History, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
 import { AnimeLibraryModal, AnimePosterPlaceholder, editableFields, getStatusLabel } from "@/components/AnimeLibraryPage";
+import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerStats from "@/components/MaintainerStats";
@@ -180,6 +181,7 @@ export default function PlatformAnimeMaintainerPage({
   const [editingAnime, setEditingAnime] = useState(null);
   const [statusAnime, setStatusAnime] = useState(null);
   const [deleteAnime, setDeleteAnime] = useState(null);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialAnimes.length);
   const modeAnimes = useMemo(() => animes.filter((anime) => isModeAnime(anime, mode)), [animes, mode]);
@@ -479,12 +481,18 @@ export default function PlatformAnimeMaintainerPage({
           <span className="tracker-actions-label">Biblioteca de anime</span>
           <p className="tracker-actions-copy">{config.title}</p>
         </div>
-        {canCreate ? (
-          <button type="button" className="tracker-action-primary" onClick={() => setIsCreateStartOpen(true)}>
-            <Plus size={18} />
-            {config.createLabel}
+        <div className="tracker-actions-buttons">
+          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+            <History size={17} />
+            Historial
           </button>
-        ) : null}
+          {canCreate ? (
+            <button type="button" className="tracker-action-primary" onClick={() => setIsCreateStartOpen(true)}>
+              <Plus size={18} />
+              {config.createLabel}
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <MaintainerToolbar
@@ -674,6 +682,14 @@ export default function PlatformAnimeMaintainerPage({
         isLoading={isSaving}
         onCancel={() => setDeleteAnime(null)}
         onConfirm={confirmDelete}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditOpen}
+        module={mode === "completed" ? "admin.anime.completed" : "admin.anime.tracking"}
+        title={mode === "completed" ? "Historial de terminados" : "Historial de viendo"}
+        subtitle={`Últimas acciones realizadas en ${config.title.toLowerCase()}.`}
+        onClose={() => setIsAuditOpen(false)}
       />
     </>
   );

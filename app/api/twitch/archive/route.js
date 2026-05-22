@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { upsertTwitchLive } from "@/lib/twitchArchive";
 
@@ -23,6 +24,18 @@ export async function POST(request) {
         { status: 404 },
       );
     }
+
+    await createAuditLog({
+      actor: authorization.user,
+      action: "twitch_archive",
+      module: "admin.tracker",
+      entityType: "Live",
+      entityId: live.dbId || live.id,
+      entityLabel: live.title || live.id,
+      summary: "Creó directo desde Twitch",
+      after: live,
+      request,
+    });
 
     return NextResponse.json({ success: true, live });
   } catch (error) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { createStreamOnlineSubscription } from "@/lib/twitch";
 
@@ -14,6 +15,18 @@ export async function POST(request) {
 
   try {
     const subscription = await createStreamOnlineSubscription();
+    await createAuditLog({
+      actor: authorization.user,
+      action: "eventsub_subscribe",
+      module: "admin.tracker",
+      entityType: "TwitchEventSub",
+      entityId: subscription?.id || process.env.TWITCH_BROADCASTER_LOGIN || "stream.online",
+      entityLabel: process.env.TWITCH_BROADCASTER_LOGIN || "stream.online",
+      summary: "Registró EventSub de Twitch",
+      after: subscription,
+      request,
+    });
+
     return NextResponse.json({ success: true, subscription });
   } catch (error) {
     return NextResponse.json(

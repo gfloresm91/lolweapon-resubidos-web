@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Edit3, History, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import FormSelect from "@/components/FormSelect";
 import MaintainerModal from "@/components/MaintainerModal";
@@ -89,6 +90,7 @@ export default function PlatformTagsMaintainerPage({
   const [deletingCategory, setDeletingCategory] = useState(null);
   const [categoryDraft, setCategoryDraft] = useState({ key: "", label: "", icon: DEFAULT_CATEGORY_ICON, exactText: "", keywordsText: "", custom: true });
   const [categoryError, setCategoryError] = useState("");
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -449,12 +451,18 @@ export default function PlatformTagsMaintainerPage({
           <span className="tracker-actions-label">Tags</span>
           <p className="tracker-actions-copy">Gestiona cómo se agrupan los tags del rastreador.</p>
         </div>
-        {canCreate ? (
-          <button type="button" className="tracker-action-primary" onClick={openCreateCategory}>
-            <Plus size={18} />
-            Nueva categoría
+        <div className="tracker-actions-buttons">
+          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+            <History size={17} />
+            Historial
           </button>
-        ) : null}
+          {canCreate ? (
+            <button type="button" className="tracker-action-primary" onClick={openCreateCategory}>
+              <Plus size={18} />
+              Nueva categoría
+            </button>
+          ) : null}
+        </div>
       </section>
 
       <section className="tag-category-manager" aria-label="Categorías de tags">
@@ -720,6 +728,14 @@ export default function PlatformTagsMaintainerPage({
         isLoading={isSaving}
         onCancel={() => setDeletingCategory(null)}
         onConfirm={confirmDeleteCategory}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditOpen}
+        module="admin.tags"
+        title="Historial de tags"
+        subtitle="Últimas acciones realizadas en el mantenedor de tags."
+        onClose={() => setIsAuditOpen(false)}
       />
     </>
   );
