@@ -7,6 +7,7 @@ import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionTo
 import { can } from "@/lib/repositories/platformUserRepository";
 import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 import { getAnimeLibrary } from "@/lib/repositories/animeLibraryRepository";
+import { getStreamerRatingMap, getUserRatingMap } from "@/lib/repositories/animeRatingRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,11 @@ export default async function AnimeLibraryCompletedPage() {
     "anime.completed.update",
     "anime.completed.delete",
   ].some((permission) => can(accessUser, permission));
-  const [animeLibrary, initialAnimeActivity] = await Promise.all([
+  const [animeLibrary, initialAnimeActivity, initialStreamerRatings, initialUserRatings] = await Promise.all([
     getAnimeLibrary({ includeHidden }),
     currentUser?.id ? getAnimeActivityMapForUser(currentUser.id) : {},
+    getStreamerRatingMap(),
+    currentUser?.id ? getUserRatingMap(currentUser.id) : {},
   ]);
 
   return (
@@ -40,6 +43,8 @@ export default async function AnimeLibraryCompletedPage() {
       initialLives={[]}
       initialAnimeLibrary={animeLibrary}
       initialAnimeActivity={initialAnimeActivity}
+      initialStreamerRatings={initialStreamerRatings}
+      initialUserRatings={initialUserRatings}
       isAdmin={isAdmin}
       currentUser={currentUser}
       accessPermissions={accessUser?.permissions || []}

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit3, Eye, EyeOff, KeyRound, Plus, Power, Trash2 } from "lucide-react";
+import { Edit3, Eye, EyeOff, History, KeyRound, Plus, Power, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import AvatarUploader, { uploadAvatarFile } from "@/components/AvatarUploader";
+import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerModal from "@/components/MaintainerModal";
@@ -120,10 +121,23 @@ function formatDate(value) {
     return "Nunca";
   }
 
-  return new Intl.DateTimeFormat("es-CL", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  const parts = new Intl.DateTimeFormat("es-CL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Santiago",
+  }).formatToParts(new Date(value));
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const day = byType.day || "00";
+  const month = byType.month || "00";
+  const year = byType.year || "0000";
+  const hours = byType.hour || "00";
+  const minutes = byType.minute || "00";
+
+  return `${day}-${month}-${year}, ${hours}:${minutes}`;
 }
 
 function getUserOrigin(user) {
@@ -587,6 +601,7 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
   const [passwordUser, setPasswordUser] = useState(null);
   const [statusUser, setStatusUser] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const stats = useMemo(() => ({
     total: users.length,
@@ -891,10 +906,16 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
           <span className="tracker-actions-label">Administración</span>
           <p className="tracker-actions-copy">Crea usuarios antes de que inicien sesión con Twitch o ajusta sus permisos.</p>
         </div>
-        <button type="button" className="tracker-action-primary" onClick={() => setEditingUser(EMPTY_USER)}>
-          <Plus size={18} />
-          Nuevo usuario
-        </button>
+        <div className="tracker-actions-buttons">
+          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+            <History size={17} />
+            Historial
+          </button>
+          <button type="button" className="tracker-action-primary" onClick={() => setEditingUser(EMPTY_USER)}>
+            <Plus size={18} />
+            Nuevo usuario
+          </button>
+        </div>
       </section>
 
       <MaintainerToolbar
@@ -1085,6 +1106,14 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
         isLoading={isSaving}
         onCancel={() => setPendingDelete(null)}
         onConfirm={deleteUser}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditOpen}
+        module="admin.users"
+        title="Historial de usuarios"
+        subtitle="Últimas acciones realizadas en el mantenedor de usuarios."
+        onClose={() => setIsAuditOpen(false)}
       />
     </>
   );

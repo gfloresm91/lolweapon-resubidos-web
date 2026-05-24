@@ -24,7 +24,8 @@ coverage/
 .env.production.local
 
 # Claude Code — contexto local, no versionar
-.claude/commands/
+.claude/
+!.claude/commands/
 
 # Deploy script — backup temporal del build anterior
 .next_backup/

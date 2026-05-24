@@ -2,6 +2,22 @@
 
 Archivo VOD y biblioteca de anime para el streamer Lolweapon. Sirve dos dominios desde la misma app Next.js: el tracker de resubidos y la biblioteca de anime. El middleware distingue el dominio usando `RESUBIDOS_HOST` / `VIENDO_HOST` del `.env`.
 
+## Fuente compartida para agentes
+
+`AGENTS.md` es la fuente principal compartida para Codex, Claude y otros agentes. Leerlo primero y mantenerlo sincronizado con este archivo.
+
+Documentación complementaria:
+- `docs/project-overview.md` — arquitectura, modelos, rutas, permisos y features.
+- `docs/design-system.md` — estándares visuales de modales, tablas, botones, cards y formularios.
+- `docs/backlog.md` — tareas diferidas y decisiones pendientes.
+- `docs/workflows/` — flujos operativos versionados para release, deploy, QA DB y nuevas features.
+- `docs/postgres-migration.md` — PostgreSQL, migraciones e imports.
+- `docs/release-and-production.md` — versionado, commits, tags y deploy.
+
+Memoria externa de Claude:
+- `/Users/gabriel/.claude/projects/-Users-gabriel-Developer-kala-apps-lolweapon-resubidos-web/memory/`
+- Archivos: `server-infrastructure.md`, `project-overview.md`, `user-profile.md`, `feedback.md`.
+
 ## Stack
 
 - **Next.js 15** App Router, React Server Components
@@ -84,6 +100,8 @@ docs/
 - Validación solo en boundaries del sistema (input de usuario, APIs externas)
 - Toast con acción en lugar de redirección forzada para usuarios no autenticados
 - `loading.js` en cada ruta para skeleton states (comparten `AppShellLoading`)
+- Para fechas renderizadas server/client, usar formato determinístico para evitar hydration mismatch.
+- Para cambios solo de documentación, no es necesario correr `npm run build` salvo que el usuario lo pida.
 
 **Nombrado:** PascalCase para componentes, camelCase para utils y helpers.
 
@@ -126,6 +144,41 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 - **El deploy es exclusivamente vía GitHub Actions** — `scripts/deploy.sh` fue eliminado. Push a `dev` → QA, push a `main` → producción.
 - **El `PersistentTwitchPlayer` es un componente complejo** — flota sobre todas las rutas como mini-player. El iframe de Twitch es cross-origin y no se puede controlar su `document.visibilityState`. Las pausas inesperadas se combaten con un keep-alive interval y `schedulePlaybackResume`.
 
+## Infraestructura oficial
+
+Producción:
+- Directorio: `/home/kalaplex/resubidos`
+- Servicio: `resubidos.service`
+- Puerto interno: `3001`
+
+QA:
+- Directorio: `/home/kalaplex/resubidos-qa`
+- Servicio: `resubidos-qa.service`
+- Puerto interno: `3000`
+
+PostgreSQL:
+- Container Docker: `lolweapon-resubidos-postgres`
+- Producción DB: `lolweapon_resubidos`
+- QA DB: `lolweapon_resubidos_qa`
+
+Comandos systemd de referencia:
+
+```bash
+sudo systemctl status resubidos.service
+sudo journalctl -u resubidos.service -f
+sudo systemctl status resubidos-qa.service
+sudo journalctl -u resubidos-qa.service -f
+```
+
+## Preferencias de colaboración
+
+- Responder en español neutro.
+- Dar información completa cuando ayude a decidir, operar producción, documentar Git/deploy o entender trade-offs.
+- Para cierres de implementación, incluir cambios relevantes, comandos ejecutados y pendientes operativos si existen.
+- Si el usuario difiere una tarea, registrarla en `docs/backlog.md` y no insistir.
+- No sugerir tags salvo en releases hacia producción.
+- Para cambios visuales con trade-off, explicar la opción en 2-3 líneas y esperar confirmación antes de aplicar.
+
 ## Slash commands disponibles
 
 - `/release` — checklist completo de release a producción
@@ -136,3 +189,5 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 ## Release
 
 Ver `/release` para el checklist completo de release a producción.
+
+Regla importante: si el usuario menciona release, producción, merge a `main` o deploy productivo, recordar siempre bump de versión en `package.json`/`package-lock.json` y tag `vX.Y.Z`. El tag debe apuntar al commit que contiene el bump de versión.

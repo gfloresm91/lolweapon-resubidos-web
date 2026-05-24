@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readJsonRequest } from "@/lib/http";
 import { getPrismaClient } from "@/lib/prisma";
+import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { readLives } from "@/lib/repositories/liveRepository";
 import { ensureAnyPermissionAuthorized, ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { readTagSettings, writeTagSettings } from "@/lib/tagSettings";
@@ -171,6 +172,18 @@ export async function POST(request) {
         overrides: currentSettings.overrides,
         categoryRules: (currentSettings.ruleCategories || []).filter((item) => item.key !== categoryKey),
       });
+      await createAuditLog({
+        actor: authorization.user,
+        action: "delete",
+        module: "admin.tags",
+        entityType: "TagCategory",
+        entityId: categoryKey,
+        entityLabel: category.label,
+        summary: "Eliminó categoría de tags",
+        before: category,
+        after: null,
+        request,
+      });
 
       return NextResponse.json({ success: true, ...settings });
     }
@@ -201,6 +214,18 @@ export async function POST(request) {
       overrides: currentSettings.overrides,
       categoryRules: ruleCategories,
     });
+    await createAuditLog({
+      actor: authorization.user,
+      action: action === "create-category" ? "create" : "update",
+      module: "admin.tags",
+      entityType: "TagCategory",
+      entityId: normalizedCategory.key,
+      entityLabel: normalizedCategory.label,
+      summary: action === "create-category" ? "Creó categoría de tags" : "Editó categoría de tags",
+      before: categories.find((item) => item.key === normalizedCategory.key) || null,
+      after: normalizedCategory,
+      request,
+    });
 
     return NextResponse.json({ success: true, ...settings });
   }
@@ -229,14 +254,39 @@ export async function POST(request) {
       overrides,
       categoryRules: currentSettings.ruleCategories,
     });
+    await createAuditLog({
+      actor: authorization.user,
+      action: "update",
+      module: "admin.tags",
+      entityType: "Tag",
+      entityId: slug,
+      entityLabel: payload?.tag || slug,
+      summary: "Cambió categoría de tag",
+      before: { categoryKey: currentSettings.overrides?.[slug] || "auto" },
+      after: { categoryKey: overrides[slug] || "auto" },
+      request,
+    });
 
     return NextResponse.json({ success: true, ...settings });
   }
 
+  const beforeSettings = await readTagSettings();
   const settings = await writeTagSettings({
     categories: payload?.categories,
     overrides: payload?.overrides,
     categoryRules: payload?.categoryRules,
+  });
+  await createAuditLog({
+    actor: authorization.user,
+    action: "update",
+    module: "admin.tags",
+    entityType: "TagSettings",
+    entityId: "settings",
+    entityLabel: "Configuración de tags",
+    summary: "Editó configuración de tags",
+    before: beforeSettings,
+    after: settings,
+    request,
   });
 
   return NextResponse.json({ success: true, ...settings });
@@ -281,6 +331,18 @@ export async function DELETE(request) {
   }
 
   await prisma.tag.delete({ where: { slug } });
+  await createAuditLog({
+    actor: authorization.user,
+    action: "delete",
+    module: "admin.tags",
+    entityType: "Tag",
+    entityId: slug,
+    entityLabel: tag.name,
+    summary: "Eliminó tag",
+    before: tag,
+    after: null,
+    request,
+  });
 
   return NextResponse.json({ success: true });
 }

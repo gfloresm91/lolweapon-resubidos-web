@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Edit3, Plus, Power } from "lucide-react";
+import { Edit3, Eye, FilePenLine, History, LayoutPanelTop, Plus, Power, ShieldAlert, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerModal from "@/components/MaintainerModal";
@@ -30,8 +31,26 @@ const ROLE_COLUMNS = [
   { key: "actions", label: "Acciones" },
 ];
 const PROTECTED_ROLE_CODES = new Set(["dios", "invitado"]);
+const RATING_WRITE_PERMISSION_CODE = "anime.rating.write";
+const STREAMER_RATING_PERMISSION_CODE = "anime.rating.streamer";
+const GOD_EXCLUDED_PERMISSION_CODES = new Set([STREAMER_RATING_PERMISSION_CODE]);
 const ROLE_CODE_MAX_LENGTH = 40;
 const ROLE_LABEL_MAX_LENGTH = 60;
+const PERMISSION_GROUP_ORDER = [
+  "Inicio",
+  "Rastreador",
+  "Anime: Viendo",
+  "Anime: Terminados",
+  "Anime: Puntuación",
+  "Usuarios",
+  "Roles",
+  "Administración: Rastreador",
+  "Administración: Tags",
+  "Administración: Viendo",
+  "Administración: Terminados",
+  "SpaceDrum",
+];
+const PERMISSION_GROUP_ORDER_MAP = new Map(PERMISSION_GROUP_ORDER.map((group, index) => [group, index]));
 const ROLE_CODE_RULES = z
   .string()
   .trim()
@@ -59,6 +78,10 @@ function groupPermissions(permissions) {
   }, {});
 }
 
+function getPermissionGroupOrder(group) {
+  return PERMISSION_GROUP_ORDER_MAP.has(group) ? PERMISSION_GROUP_ORDER_MAP.get(group) : 999;
+}
+
 function normalizeRole(role) {
   return {
     ...EMPTY_ROLE,
@@ -69,7 +92,7 @@ function normalizeRole(role) {
 
 function getRolePermissionCount(role, permissions) {
   if (role.code === "dios") {
-    return permissions.length;
+    return permissions.filter((permission) => !GOD_EXCLUDED_PERMISSION_CODES.has(permission.code)).length;
   }
 
   return Array.isArray(role.permissions) ? role.permissions.length : 0;
@@ -77,7 +100,9 @@ function getRolePermissionCount(role, permissions) {
 
 function getRolePermissionGroups(role, permissions) {
   const rolePermissions = role.code === "dios"
-    ? permissions.map((permission) => permission.code)
+    ? permissions
+      .map((permission) => permission.code)
+      .filter((permissionCode) => !GOD_EXCLUDED_PERMISSION_CODES.has(permissionCode))
     : role.permissions || [];
 
   return permissions
@@ -127,6 +152,71 @@ function isSensitivePermission(permission) {
     || permission.code.endsWith(".form.full");
 }
 
+function getPermissionAction(permission) {
+  const code = permission.code || "";
+
+  if (code.endsWith(".view") || code.endsWith(".read")) {
+    return { label: "Ver pantalla", icon: Eye };
+  }
+
+  if (code.endsWith(".create")) {
+    return { label: "Crear", icon: Plus };
+  }
+
+  if (code.endsWith(".update")) {
+    return { label: "Editar", icon: FilePenLine };
+  }
+
+  if (code.endsWith(".delete")) {
+    return { label: "Eliminar", icon: Trash2 };
+  }
+
+  if (code.endsWith(".form.full")) {
+    return { label: "Formulario completo", icon: LayoutPanelTop };
+  }
+
+  if (code.endsWith(".form.compact")) {
+    return { label: "Formulario compacto", icon: LayoutPanelTop };
+  }
+
+  if (code === "anime.rating.write") {
+    return { label: "Calificar anime", icon: Sparkles };
+  }
+
+  if (code === "anime.rating.streamer") {
+    return { label: "Mostrar nota destacada", icon: Sparkles };
+  }
+
+  return { label: permission.label || code, icon: ShieldCheck };
+}
+
+function getPermissionDescription(permission) {
+  if (permission.description) {
+    return permission.description;
+  }
+
+  const code = permission.code || "";
+  const group = permission.group || "General";
+
+  if (code.endsWith(".form.full")) {
+    return "Permite usar el formulario completo en esta pantalla.";
+  }
+
+  if (code.endsWith(".form.compact")) {
+    return "Permite usar el formulario compacto en esta pantalla.";
+  }
+
+  if (code.endsWith(".delete")) {
+    return "Operación sensible: puede borrar o desactivar registros.";
+  }
+
+  if (code === STREAMER_RATING_PERMISSION_CODE) {
+    return "Permite que las puntuaciones de este rol se muestren como nota destacada en las cards. Solo un rol puede tenerlo.";
+  }
+
+  return `${group} · ${code}`;
+}
+
 function getRoleErrorField(message) {
   const normalized = String(message || "").toLowerCase();
 
@@ -146,30 +236,41 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
   const rolePermissionsKey = normalizedRole.permissions.join("|");
   const [draftPermissions, setDraftPermissions] = useState(normalizedRole.permissions);
   const [permissionSearch, setPermissionSearch] = useState("");
+  const [activePermissionGroup, setActivePermissionGroup] = useState("");
   const groupedPermissions = useMemo(() => groupPermissions(permissions), [permissions]);
-  const filteredGroupedPermissions = useMemo(() => {
+  const permissionGroups = useMemo(() => (
+    Object.entries(groupedPermissions)
+      .map(([group, groupPermissions]) => ({
+        group,
+        permissions: groupPermissions,
+        groupOrder: getPermissionGroupOrder(group),
+        sortOrder: Math.min(...groupPermissions.map((permission) => permission.sortOrder || 0)),
+      }))
+      .sort((left, right) => (left.groupOrder - right.groupOrder) || (left.sortOrder - right.sortOrder) || left.group.localeCompare(right.group, "es"))
+  ), [groupedPermissions]);
+  const selectedGroup = activePermissionGroup || permissionGroups[0]?.group || "";
+  const visiblePermissions = useMemo(() => {
     const query = permissionSearch.trim().toLowerCase();
 
-    if (!query) {
-      return groupedPermissions;
-    }
-
-    return Object.entries(groupedPermissions).reduce((groups, [group, groupPermissions]) => {
-      const filteredPermissions = groupPermissions.filter((permission) => [
+    if (query) {
+      return permissions.filter((permission) => [
         permission.code,
         permission.label,
         permission.group,
       ].some((value) => String(value || "").toLowerCase().includes(query)));
+    }
 
-      if (filteredPermissions.length) {
-        groups[group] = filteredPermissions;
-      }
-
-      return groups;
-    }, {});
-  }, [groupedPermissions, permissionSearch]);
+    return groupedPermissions[selectedGroup] || [];
+  }, [groupedPermissions, permissionSearch, permissions, selectedGroup]);
+  const selectedGroupPermissions = groupedPermissions[selectedGroup] || [];
   const isGod = normalizedRole.code === "dios";
   const isGuest = normalizedRole.code === "invitado";
+  const isPermissionChecked = (permission) => isGod
+    ? !GOD_EXCLUDED_PERMISSION_CODES.has(permission.code)
+    : draftPermissions.includes(permission.code);
+  const selectedGroupCount = selectedGroupPermissions.filter(isPermissionChecked).length;
+  const selectedSensitiveCount = permissions.filter((permission) => draftPermissions.includes(permission.code) && isSensitivePermission(permission)).length;
+  const selectedModuleCount = getRolePermissionGroups({ ...normalizedRole, permissions: draftPermissions }, permissions).length;
   const {
     formState: { errors },
     handleSubmit,
@@ -196,16 +297,33 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
 
   useEffect(() => {
     if (isGod) {
-      setDraftPermissions(permissions.map((permission) => permission.code));
+      setDraftPermissions(permissions
+        .map((permission) => permission.code)
+        .filter((permissionCode) => !GOD_EXCLUDED_PERMISSION_CODES.has(permissionCode)));
     }
   }, [isGod, permissions]);
+
+  useEffect(() => {
+    if (!permissionGroups.length) {
+      return;
+    }
+
+    if (!activePermissionGroup || !permissionGroups.some((item) => item.group === activePermissionGroup)) {
+      setActivePermissionGroup(permissionGroups[0].group);
+    }
+  }, [activePermissionGroup, permissionGroups]);
 
   function updatePermissions(nextPermissions) {
     if (isGod) {
       return;
     }
 
-    setDraftPermissions(Array.from(new Set(nextPermissions)));
+    const normalizedPermissions = Array.from(new Set(nextPermissions));
+    if (normalizedPermissions.includes(STREAMER_RATING_PERMISSION_CODE) && !normalizedPermissions.includes(RATING_WRITE_PERMISSION_CODE)) {
+      normalizedPermissions.push(RATING_WRITE_PERMISSION_CODE);
+    }
+
+    setDraftPermissions(normalizedPermissions);
   }
 
   function togglePermission(code) {
@@ -213,9 +331,13 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
       return;
     }
 
-    const nextPermissions = draftPermissions.includes(code)
+    let nextPermissions = draftPermissions.includes(code)
       ? draftPermissions.filter((permission) => permission !== code)
       : [...draftPermissions, code];
+
+    if (code === RATING_WRITE_PERMISSION_CODE && draftPermissions.includes(STREAMER_RATING_PERMISSION_CODE)) {
+      nextPermissions = nextPermissions.filter((permission) => permission !== STREAMER_RATING_PERMISSION_CODE);
+    }
 
     updatePermissions(nextPermissions);
   }
@@ -229,13 +351,31 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
     updatePermissions(draftPermissions.filter((permission) => !groupCodes.has(permission)));
   }
 
+  function selectReadOnly(groupPermissions) {
+    const groupCodes = new Set(groupPermissions.map((permission) => permission.code));
+    const readOnlyCodes = groupPermissions
+      .filter((permission) => permission.code.endsWith(".view") || permission.code.endsWith(".read"))
+      .map((permission) => permission.code);
+
+    updatePermissions([
+      ...draftPermissions.filter((permission) => !groupCodes.has(permission)),
+      ...readOnlyCodes,
+    ]);
+  }
+
   async function submitRole(values) {
     try {
+      const nextPermissions = isGod
+        ? permissions
+          .map((permission) => permission.code)
+          .filter((permissionCode) => !GOD_EXCLUDED_PERMISSION_CODES.has(permissionCode))
+        : draftPermissions;
+
       await onSubmit({
         ...normalizedRole,
         code: values.code.trim().toLowerCase(),
         label: values.label.trim(),
-        permissions: isGod ? permissions.map((permission) => permission.code) : draftPermissions,
+        permissions: nextPermissions,
       });
     } catch (error) {
       const errorField = getRoleErrorField(error.message);
@@ -251,6 +391,7 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
   return (
     <MaintainerModal
       as="form"
+      className="admin-modal role-modal"
       title={normalizedRole.id ? "Editar rol" : "Nuevo rol"}
       onClose={onCancel}
       onSubmit={handleSubmit(submitRole)}
@@ -300,6 +441,20 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
               {errors.label ? <span id="platform-role-label-error" className="field-error">{errors.label.message}</span> : null}
             </div>
           </div>
+          <div className="role-permission-summary-cards" aria-label="Resumen del rol">
+            <div>
+              <span>Permisos activos</span>
+              <strong>{isGod ? permissions.filter((permission) => !GOD_EXCLUDED_PERMISSION_CODES.has(permission.code)).length : draftPermissions.length}</strong>
+            </div>
+            <div>
+              <span>Módulos con acceso</span>
+              <strong>{isGod ? permissionGroups.length : selectedModuleCount}</strong>
+            </div>
+            <div className={selectedSensitiveCount ? "is-sensitive" : ""}>
+              <span>Permisos críticos</span>
+              <strong>{isGod ? permissions.filter((permission) => isSensitivePermission(permission) && !GOD_EXCLUDED_PERMISSION_CODES.has(permission.code)).length : selectedSensitiveCount}</strong>
+            </div>
+          </div>
         </div>
 
         <div className="admin-modal-section">
@@ -321,36 +476,70 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
               placeholder="Buscar por nombre, código o área"
             />
           </div>
-          <div className="permissions-grid">
-            {Object.entries(filteredGroupedPermissions).map(([group, groupPermissions]) => (
-              <fieldset className="permission-group" key={group}>
-                <legend>
-                  <span>{group}</span>
-                  {!isGod ? (
-                    <em>{groupPermissions.filter((permission) => draftPermissions.includes(permission.code)).length}/{groupPermissions.length}</em>
-                  ) : null}
-                </legend>
-                {!isGod ? (
+          <div className="role-permission-layout">
+            <nav className="role-permission-tabs" aria-label="Módulos de permisos">
+              {permissionGroups.map(({ group, permissions: groupPermissions }) => {
+                const selectedCount = groupPermissions.filter(isPermissionChecked).length;
+                const isActive = !permissionSearch.trim() && selectedGroup === group;
+
+                return (
+                  <button
+                    type="button"
+                    key={group}
+                    className={isActive ? "is-active" : ""}
+                    onClick={() => {
+                      setPermissionSearch("");
+                      setActivePermissionGroup(group);
+                    }}
+                  >
+                    <span>{group}</span>
+                    <em>{isGod ? groupPermissions.length : selectedCount}/{groupPermissions.length}</em>
+                  </button>
+                );
+              })}
+            </nav>
+            <section className="role-permission-panel">
+              <div className="role-permission-panel-heading">
+                <div>
+                  <span>{permissionSearch.trim() ? "Resultados" : selectedGroup}</span>
+                  <strong>{permissionSearch.trim() ? `${visiblePermissions.length} coincidencias` : `${selectedGroupCount}/${selectedGroupPermissions.length} permisos activos`}</strong>
+                </div>
+                {!isGod && !permissionSearch.trim() ? (
                   <div className="permission-group-actions">
-                    <button type="button" onClick={() => selectGroup(groupPermissions)}>Todo</button>
-                    <button type="button" onClick={() => clearGroup(groupPermissions)}>Limpiar</button>
+                    <button type="button" onClick={() => selectGroup(selectedGroupPermissions)}>Seleccionar todo</button>
+                    <button type="button" onClick={() => selectReadOnly(selectedGroupPermissions)}>Solo lectura</button>
+                    <button type="button" onClick={() => clearGroup(selectedGroupPermissions)}>Limpiar</button>
                   </div>
                 ) : null}
-                {groupPermissions.map((permission) => (
-                  <label key={permission.code} className={`permission-check ${isSensitivePermission(permission) ? "is-sensitive" : ""}`}>
-                    <input
-                      type="checkbox"
-                      checked={isGod || draftPermissions.includes(permission.code)}
-                      disabled={isGod}
-                      onChange={() => togglePermission(permission.code)}
-                    />
-                    <span>{permission.label}</span>
-                  </label>
-                ))}
-              </fieldset>
-            ))}
+              </div>
+              <div className="role-permission-list">
+                {visiblePermissions.map((permission) => {
+                  const action = getPermissionAction(permission);
+                  const Icon = action.icon;
+                  const checked = isPermissionChecked(permission);
+
+                  return (
+                    <label key={permission.code} className={`permission-row ${checked ? "is-checked" : ""} ${isSensitivePermission(permission) ? "is-sensitive" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={isGod}
+                        onChange={() => togglePermission(permission.code)}
+                      />
+                      <span className="permission-row-icon"><Icon size={16} /></span>
+                      <span className="permission-row-copy">
+                        <strong>{action.label}</strong>
+                        <small>{getPermissionDescription(permission)}</small>
+                      </span>
+                      {isSensitivePermission(permission) ? <em>Crítico</em> : null}
+                      <span className="permission-row-toggle" aria-hidden="true" />
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
           </div>
-          {Object.keys(filteredGroupedPermissions).length ? null : (
+          {visiblePermissions.length ? null : (
             <p className="admin-modal-empty">No hay permisos que coincidan con la búsqueda.</p>
           )}
         </div>
@@ -368,6 +557,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editingRole, setEditingRole] = useState(null);
   const [statusRole, setStatusRole] = useState(null);
+  const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialRoles.length);
   const filteredRoles = useMemo(() => {
@@ -556,10 +746,16 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
           <span className="tracker-actions-label">Administración</span>
           <p className="tracker-actions-copy">Crea roles y asigna permisos por área del sistema.</p>
         </div>
-        <button type="button" className="tracker-action-primary" onClick={() => setEditingRole(EMPTY_ROLE)}>
-          <Plus size={18} />
-          Nuevo rol
-        </button>
+        <div className="tracker-actions-buttons">
+          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+            <History size={17} />
+            Historial
+          </button>
+          <button type="button" className="tracker-action-primary" onClick={() => setEditingRole(EMPTY_ROLE)}>
+            <Plus size={18} />
+            Nuevo rol
+          </button>
+        </div>
       </section>
 
       <MaintainerToolbar
@@ -672,6 +868,14 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
         isLoading={isSaving}
         onCancel={() => setStatusRole(null)}
         onConfirm={confirmStatusChange}
+      />
+
+      <AuditLogModal
+        isOpen={isAuditOpen}
+        module="admin.roles"
+        title="Historial de roles"
+        subtitle="Últimas acciones realizadas en el mantenedor de roles."
+        onClose={() => setIsAuditOpen(false)}
       />
     </>
   );
