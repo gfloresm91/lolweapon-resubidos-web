@@ -177,6 +177,7 @@ sudo journalctl -u resubidos-qa.service -f
 - Para cierres de implementación, incluir cambios relevantes, comandos ejecutados y pendientes operativos si existen.
 - Si el usuario difiere una tarea, registrarla en `docs/backlog.md` y no insistir.
 - No sugerir tags salvo en releases hacia producción.
+- El usuario ejecuta manualmente `git add`, `git commit`, `git tag` y `git push`. El agente debe entregar el paso a paso exacto y validar estado/diff/build cuando aplique, pero no ejecutar esos comandos salvo instrucción explícita en esa conversación.
 - Para cambios visuales con trade-off, explicar la opción en 2-3 líneas y esperar confirmación antes de aplicar.
 
 ## Slash commands disponibles
