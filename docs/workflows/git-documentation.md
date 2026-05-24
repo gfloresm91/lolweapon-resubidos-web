@@ -2,6 +2,17 @@
 
 Guía para preparar commit, push, versión y tag cuando corresponda.
 
+## Regla Operativa
+
+El usuario ejecuta manualmente los comandos de Git de escritura:
+
+- `git add`
+- `git commit`
+- `git tag`
+- `git push`
+
+El agente debe revisar estado/diff, validar con los comandos necesarios y entregar el paso a paso exacto para que el usuario lo ejecute. Solo ejecutar esos comandos si el usuario lo pide explícitamente en esa conversación.
+
 ## 1. Revisar Estado
 
 ```bash

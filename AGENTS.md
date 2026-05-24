@@ -204,6 +204,8 @@ npm run db:migrate:deploy
 
 ## Git, Versionado Y Deploy
 
+- Regla de colaboración: el usuario ejecuta manualmente los comandos de Git relacionados con staging, commits, tags y pushes.
+- El agente debe revisar estado/diff, validar cuando aplique y entregar el paso a paso exacto, pero no debe ejecutar `git add`, `git commit`, `git tag` ni `git push` salvo que el usuario lo pida explícitamente en esa conversación.
 - Commits con convención:
   - `feat(scope): ...`
   - `fix(scope): ...`
