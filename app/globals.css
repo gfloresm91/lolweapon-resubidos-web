@@ -3719,12 +3719,16 @@ body::before {
 .audit-modal {
   width: min(1120px, calc(100vw - 2rem));
   max-width: 1120px;
+  height: min(760px, calc(100dvh - var(--topbar-height) - var(--persistent-footer-height) - var(--modal-viewport-gap-total)));
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
   background: rgba(14, 16, 24, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-xl);
   box-shadow: 0 32px 64px rgba(0, 0, 0, 0.6);
   gap: 1rem;
+  overflow: hidden;
   padding: 2.5rem;
 }
 
@@ -3739,13 +3743,17 @@ body::before {
 
 .audit-modal-body {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
   gap: 1rem;
-  min-height: min(620px, 68vh);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .audit-log-list,
 .audit-log-detail {
+  min-height: 0;
+  max-height: 100%;
   overflow: auto;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
@@ -3927,6 +3935,11 @@ body::before {
 }
 
 @media (max-width: 860px) {
+  .audit-modal {
+    height: auto;
+    overflow: auto;
+  }
+
   .audit-modal-body {
     grid-template-columns: 1fr;
     max-height: 70vh;
