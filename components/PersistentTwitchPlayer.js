@@ -524,7 +524,6 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setIsMiniDismissed(false);
-    window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: "/inicio" } }));
     router.push("/inicio");
   }
 

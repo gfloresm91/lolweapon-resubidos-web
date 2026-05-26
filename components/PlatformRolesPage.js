@@ -42,13 +42,13 @@ const PERMISSION_GROUP_ORDER = [
   "Anime: Viendo",
   "Anime: Terminados",
   "Anime: Puntuación",
+  "Lecturas",
   "Usuarios",
   "Roles",
   "Administración: Rastreador",
   "Administración: Tags",
   "Administración: Viendo",
   "Administración: Terminados",
-  "SpaceDrum",
 ];
 const PERMISSION_GROUP_ORDER_MAP = new Map(PERMISSION_GROUP_ORDER.map((group, index) => [group, index]));
 const ROLE_CODE_RULES = z

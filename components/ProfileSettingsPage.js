@@ -265,7 +265,6 @@ export default function ProfileSettingsPage({ currentUser }) {
           activeView=""
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
-          isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
           canAccess={canAccess}
         />
 

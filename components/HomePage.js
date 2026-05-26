@@ -14,6 +14,10 @@ import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
+import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
+import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
+import PlatformSpaceDrumPagesPage from "@/components/PlatformSpaceDrumPagesPage";
+import PlatformSpaceDrumSettingsPage from "@/components/PlatformSpaceDrumSettingsPage";
 import PlatformTagsMaintainerPage from "@/components/PlatformTagsMaintainerPage";
 import PlatformTrackerMaintainerPage from "@/components/PlatformTrackerMaintainerPage";
 import PlatformUsersPage from "@/components/PlatformUsersPage";
@@ -91,6 +95,10 @@ const VIEW_LABELS = {
   animeLibraryCompleted: "Anime terminados",
   platformTracker: "Mantenedor Rastreador",
   platformTags: "Mantenedor Tags",
+  platformSpaceDrumChapters: "Mantenedor SpaceDrum",
+  platformSpaceDrumPages: "Páginas SpaceDrum",
+  platformSpaceDrumSettings: "Configuración SpaceDrum",
+  platformSpaceDrumImport: "Importación SpaceDrum",
   platformAnimeTracking: "Mantenedor Viendo",
   platformAnimeCompleted: "Mantenedor Terminados",
   platformUsers: "Usuarios",
@@ -107,6 +115,10 @@ const VIEW_PATHS = {
   animeLibraryCompleted: "/biblioteca-anime/terminados",
   platformTracker: "/administracion/rastreador",
   platformTags: "/administracion/tags",
+  platformSpaceDrumChapters: "/administracion/spacedrum/capitulos",
+  platformSpaceDrumPages: "/administracion/spacedrum/paginas",
+  platformSpaceDrumSettings: "/administracion/spacedrum/configuracion",
+  platformSpaceDrumImport: "/administracion/spacedrum/importacion",
   platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformUsers: "/administracion/usuarios",
@@ -170,6 +182,49 @@ function areLiveActivityMapsEqual(left = EMPTY_OBJECT, right = EMPTY_OBJECT) {
   });
 }
 
+function areSpaceDrumProgressMapsEqual(left = EMPTY_OBJECT, right = EMPTY_OBJECT) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    const leftItem = left[key] || {};
+    const rightItem = right[key] || {};
+    const leftReadIds = Array.isArray(leftItem.readChapterIds) ? leftItem.readChapterIds : [];
+    const rightReadIds = Array.isArray(rightItem.readChapterIds) ? rightItem.readChapterIds : [];
+
+    return (
+      rightKeys.includes(key) &&
+      leftItem.language === rightItem.language &&
+      leftItem.lastChapterId === rightItem.lastChapterId &&
+      leftItem.updatedAt === rightItem.updatedAt &&
+      leftReadIds.length === rightReadIds.length &&
+      leftReadIds.every((id, index) => id === rightReadIds[index])
+    );
+  });
+}
+
+function hasSpaceDrumLibraryContent(data) {
+  if (!data) {
+    return false;
+  }
+
+  if (data.languages) {
+    return Object.values(data.languages).some((language) => Array.isArray(language?.chapters) && language.chapters.length > 0);
+  }
+
+  return Array.isArray(data.chapters) && data.chapters.length > 0;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  return JSON.parse(text);
+}
+
 function wasDiscoveryToastShown(key) {
   try {
     const storageKey = `kala_discovery_${key}`;
@@ -193,6 +248,11 @@ export default function HomePage({
   initialPlatformRoles = EMPTY_LIST,
   initialPlatformPermissions = EMPTY_LIST,
   initialSpaceDrum = null,
+  initialSpaceDrumChapters = EMPTY_LIST,
+  initialSpaceDrumPages = EMPTY_LIST,
+  initialSpaceDrumSettings = EMPTY_LIST,
+  initialSpaceDrumImportSummary = null,
+  initialSpaceDrumProgress = EMPTY_OBJECT,
   initialYoutubeVideos = EMPTY_LIST,
   initialTwitchStream = null,
   initialTwitchProfile = null,
@@ -208,7 +268,6 @@ export default function HomePage({
   currentUser = null,
   accessPermissions = EMPTY_LIST,
 }) {
-  const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
   const hasPermission = (permission) => (currentUser?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || effectivePermissions.has(permission);
   const canManageUsers = hasPermission("users.read");
@@ -242,6 +301,22 @@ export default function HomePage({
   const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
   const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
   const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
+  const canViewSpaceDrumChaptersMaintainer = hasPermission("admin.spacedrum.chapters.view");
+  const canCreateSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.create");
+  const canUpdateSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.update");
+  const canDeleteSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.delete");
+  const canViewSpaceDrumPagesMaintainer = hasPermission("admin.spacedrum.pages.view");
+  const canCreateSpaceDrumPages = hasPermission("admin.spacedrum.pages.create");
+  const canUpdateSpaceDrumPages = hasPermission("admin.spacedrum.pages.update");
+  const canDeleteSpaceDrumPages = hasPermission("admin.spacedrum.pages.delete");
+  const canViewSpaceDrumSettingsMaintainer = hasPermission("admin.spacedrum.settings.view");
+  const canUpdateSpaceDrumSettings = hasPermission("admin.spacedrum.settings.update");
+  const canViewSpaceDrumImportMaintainer = hasPermission("admin.spacedrum.import.view");
+  const canRunSpaceDrumImport = hasPermission("admin.spacedrum.import.run");
+  const canManageSpaceDrum = canViewSpaceDrumChaptersMaintainer
+    || canViewSpaceDrumPagesMaintainer
+    || canViewSpaceDrumSettingsMaintainer
+    || canViewSpaceDrumImportMaintainer;
   const isAuthenticated = Boolean(currentUser?.id);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
@@ -251,6 +326,13 @@ export default function HomePage({
   const [animeStreamerRatings, setAnimeStreamerRatings] = useState(initialStreamerRatings || {});
   const [animeUserRatings, setAnimeUserRatings] = useState(initialUserRatings || {});
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
+  const [spaceDrumData, setSpaceDrumData] = useState(initialSpaceDrum);
+  const [spaceDrumProgress, setSpaceDrumProgress] = useState(initialSpaceDrumProgress || EMPTY_OBJECT);
+  const [isSpaceDrumLoading, setIsSpaceDrumLoading] = useState(false);
+  const [spaceDrumAdminChapters, setSpaceDrumAdminChapters] = useState(initialSpaceDrumChapters);
+  const [spaceDrumAdminPages, setSpaceDrumAdminPages] = useState(initialSpaceDrumPages);
+  const [spaceDrumAdminSettings, setSpaceDrumAdminSettings] = useState(initialSpaceDrumSettings);
+  const [spaceDrumAdminImportSummary, setSpaceDrumAdminImportSummary] = useState(initialSpaceDrumImportSummary);
   const [currentView, setCurrentView] = useState(activeView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [trackerViewStates, setTrackerViewStates] = useState(() => {
@@ -289,6 +371,7 @@ export default function HomePage({
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
   const didRestoreTrackerRef = useRef(false);
+  const didSyncInitialViewRef = useRef(false);
   const skipVisibleResetRef = useRef({ tracker: false, myList: false });
 
   useEffect(() => {
@@ -320,6 +403,164 @@ export default function HomePage({
   }, [initialUserRatings]);
 
   useEffect(() => {
+    setSpaceDrumData(initialSpaceDrum);
+  }, [initialSpaceDrum]);
+
+  useEffect(() => {
+    setSpaceDrumAdminChapters(initialSpaceDrumChapters);
+  }, [initialSpaceDrumChapters]);
+
+  useEffect(() => {
+    setSpaceDrumAdminPages(initialSpaceDrumPages);
+  }, [initialSpaceDrumPages]);
+
+  useEffect(() => {
+    setSpaceDrumAdminSettings(initialSpaceDrumSettings);
+  }, [initialSpaceDrumSettings]);
+
+  useEffect(() => {
+    setSpaceDrumAdminImportSummary(initialSpaceDrumImportSummary);
+  }, [initialSpaceDrumImportSummary]);
+
+  useEffect(() => {
+    setSpaceDrumProgress((current) => (
+      areSpaceDrumProgressMapsEqual(current, initialSpaceDrumProgress || EMPTY_OBJECT)
+        ? current
+        : initialSpaceDrumProgress || EMPTY_OBJECT
+    ));
+  }, [initialSpaceDrumProgress]);
+
+  useEffect(() => {
+    if (currentView !== "spacedrum" || !hasPermission("spacedrum.view")) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadSpaceDrum() {
+      if (!hasSpaceDrumLibraryContent(spaceDrumData)) {
+        setIsSpaceDrumLoading(true);
+      }
+
+      try {
+        const response = await fetch("/api/spacedrum", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          toast.error("No tienes permiso para ver SpaceDrum.");
+          return;
+        }
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || "No se pudo cargar SpaceDrum.");
+        }
+
+        setSpaceDrumData(payload.spacedrum || null);
+        setSpaceDrumProgress(payload.progress || EMPTY_OBJECT);
+      } catch (error) {
+        if (isMounted) {
+          toast.error(error.message || "No se pudo cargar SpaceDrum.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsSpaceDrumLoading(false);
+        }
+      }
+    }
+
+    loadSpaceDrum();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentView, currentUser?.id, effectivePermissions]);
+
+  useEffect(() => {
+    const canViewCurrentSpaceDrumAdminView = (
+      (currentView === "platformSpaceDrumChapters" && canViewSpaceDrumChaptersMaintainer)
+      || (currentView === "platformSpaceDrumPages" && canViewSpaceDrumPagesMaintainer)
+      || (currentView === "platformSpaceDrumSettings" && canViewSpaceDrumSettingsMaintainer)
+      || (currentView === "platformSpaceDrumImport" && canViewSpaceDrumImportMaintainer)
+    );
+
+    if (!canViewCurrentSpaceDrumAdminView) {
+      return undefined;
+    }
+
+    const endpointByView = {
+      platformSpaceDrumChapters: "/api/admin/spacedrum/chapters",
+      platformSpaceDrumPages: "/api/admin/spacedrum/pages",
+      platformSpaceDrumSettings: "/api/admin/spacedrum/settings",
+      platformSpaceDrumImport: "/api/admin/spacedrum/import",
+    };
+
+    let isMounted = true;
+
+    async function loadSpaceDrumAdminData() {
+      try {
+        const response = await fetch(endpointByView[currentView], { cache: "no-store" });
+        const payload = await readJsonResponse(response);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          toast.error("Tu sesión ya no es válida. Vuelve a iniciar sesión.");
+          window.location.href = "/login";
+          return;
+        }
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || "No se pudo cargar SpaceDrum administración.");
+        }
+
+        if (currentView === "platformSpaceDrumChapters") {
+          setSpaceDrumAdminChapters(payload.chapters || []);
+        }
+
+        if (currentView === "platformSpaceDrumPages") {
+          setSpaceDrumAdminPages(payload.pages || []);
+          setSpaceDrumAdminChapters(payload.chapters || []);
+        }
+
+        if (currentView === "platformSpaceDrumSettings") {
+          setSpaceDrumAdminSettings(payload.settings || []);
+        }
+
+        if (currentView === "platformSpaceDrumImport") {
+          setSpaceDrumAdminImportSummary(payload.summary || null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error(error.message || "No se pudo cargar SpaceDrum administración.");
+        }
+      }
+    }
+
+    loadSpaceDrumAdminData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    canViewSpaceDrumChaptersMaintainer,
+    canViewSpaceDrumImportMaintainer,
+    canViewSpaceDrumPagesMaintainer,
+    canViewSpaceDrumSettingsMaintainer,
+    currentView,
+  ]);
+
+  useEffect(() => {
+    if (!didSyncInitialViewRef.current) {
+      didSyncInitialViewRef.current = true;
+      return;
+    }
+
     setCurrentView(activeView);
   }, [activeView]);
 
@@ -1004,6 +1245,10 @@ export default function HomePage({
       platformAnimeCompleted: "admin.anime.completed.view",
       platformTracker: "admin.tracker.view",
       platformTags: "admin.tags.view",
+      platformSpaceDrumChapters: "admin.spacedrum.chapters.view",
+      platformSpaceDrumPages: "admin.spacedrum.pages.view",
+      platformSpaceDrumSettings: "admin.spacedrum.settings.view",
+      platformSpaceDrumImport: "admin.spacedrum.import.view",
       platformUsers: "users.read",
       platformRoles: "roles.read",
       spacedrum: "spacedrum.view",
@@ -1018,6 +1263,7 @@ export default function HomePage({
     const nextPath = VIEW_PATHS[view] || "/inicio";
     window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
+
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: "instant" });
 
@@ -1093,10 +1339,10 @@ export default function HomePage({
           canManageRoles={canManageRoles}
           canManageTracker={canManageTracker}
           canManageTags={canViewTagsMaintainer}
+          canManageSpaceDrum={canManageSpaceDrum}
           canManageAnimeTracking={canManageTrackingAnime}
           canManageAnimeCompleted={canManageCompletedAnime}
           isAuthenticated={isAuthenticated}
-          isSpaceDrumEnabled={isSpaceDrumEnabled}
           canAccess={hasPermission}
           onSelect={selectView}
         />
@@ -1466,8 +1712,13 @@ export default function HomePage({
               />
             ) : null}
 
-            {isSpaceDrumEnabled && currentView === "spacedrum" ? (
-              <SpaceDrumPage data={initialSpaceDrum} />
+            {currentView === "spacedrum" && hasPermission("spacedrum.view") ? (
+              <SpaceDrumPage
+                data={spaceDrumData}
+                initialProgress={spaceDrumProgress}
+                isAuthenticated={Boolean(currentUser?.id)}
+                isLoading={isSpaceDrumLoading}
+              />
             ) : null}
 
             {currentView === "platformUsers" && canManageUsers ? (
@@ -1497,6 +1748,46 @@ export default function HomePage({
                 canCreate={canCreateTags}
                 canUpdate={canUpdateTags}
                 canDelete={canDeleteTags}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumChapters" && canViewSpaceDrumChaptersMaintainer ? (
+              <PlatformSpaceDrumChaptersPage
+                initialChapters={spaceDrumAdminChapters}
+                canCreate={canCreateSpaceDrumChapters}
+                canUpdate={canUpdateSpaceDrumChapters}
+                canDelete={canDeleteSpaceDrumChapters}
+                canUpdatePages={canViewSpaceDrumPagesMaintainer}
+                onChaptersChange={setSpaceDrumAdminChapters}
+                onOpenPages={() => selectView("platformSpaceDrumPages")}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumPages" && canViewSpaceDrumPagesMaintainer ? (
+              <PlatformSpaceDrumPagesPage
+                initialPages={spaceDrumAdminPages}
+                chapters={spaceDrumAdminChapters}
+                canCreate={canCreateSpaceDrumPages}
+                canUpdate={canUpdateSpaceDrumPages}
+                canDelete={canDeleteSpaceDrumPages}
+                onPagesChange={setSpaceDrumAdminPages}
+                onChaptersChange={setSpaceDrumAdminChapters}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumSettings" && canViewSpaceDrumSettingsMaintainer ? (
+              <PlatformSpaceDrumSettingsPage
+                initialSettings={spaceDrumAdminSettings}
+                canUpdate={canUpdateSpaceDrumSettings}
+                onSettingsChange={setSpaceDrumAdminSettings}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumImport" && canViewSpaceDrumImportMaintainer ? (
+              <PlatformSpaceDrumImportPage
+                initialSummary={spaceDrumAdminImportSummary}
+                canRun={canRunSpaceDrumImport}
+                onSummaryChange={setSpaceDrumAdminImportSummary}
               />
             ) : null}
 

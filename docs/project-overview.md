@@ -138,10 +138,17 @@ Antes de desplegar cambios que incluyan auditoría, aplicar la migración Prisma
 
 | Modelo | Descripción |
 |---|---|
-| `SpaceDrum` | Contenido principal (título, estado, imágenes) |
-| `SpaceDrumChapter` | Capítulos con fecha y resumen |
+| `SpaceDrum` | Contenido principal por idioma (`spacedrum-es-es`, `spacedrum-en-us`) |
+| `SpaceDrumChapter` | Capítulos/ciclos con fecha, idioma y resumen |
 | `SpaceDrumPage` | Páginas de cada capítulo (imágenes) |
 | `SpaceDrumMeta` / `SpaceDrumLink` | Metadatos y links asociados |
+
+SpaceDrum se importa desde la web original usando endpoints JSON públicos:
+
+- `https://www.mangaspacedrum.com/chapters?lan=es-es`
+- `https://www.mangaspacedrum.com/chapters?lan=en-us`
+
+El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/capítulo y lectura vertical de páginas.
 
 ### Tags
 
@@ -185,7 +192,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
 | Anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
 | Rastreador | `tracker.view/create/update/delete`, `tracker.form.full/compact` |
-| SpaceDrum | `spacedrum.view` |
+| Lecturas | `spacedrum.view` |
 
 ---
 
@@ -201,11 +208,11 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
 | `/biblioteca-anime/terminados` | Anime terminado, pausado, pendiente o dropeado |
 | `/mi-lista` | Lista personal del usuario (guardados, vistos, favoritos) |
+| `/spacedrum` | Lector bilingüe de SpaceDrum, controlado por permiso `spacedrum.view` |
 | `/login` | Login manual |
 | `/registro` | Registro de usuario |
 | `/perfil` | Perfil del usuario (avatar, datos) |
 | `/administracion/...` | Panel de administración |
-| `/spacedrum` | Contenido SpaceDrum (feature flag) |
 
 ### API Routes
 

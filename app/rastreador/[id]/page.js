@@ -131,7 +131,6 @@ export default async function LiveDetailPage({ params }) {
           canManageAnimeTracking={canManageAnimeTracking}
           canManageAnimeCompleted={canManageAnimeCompleted}
           isAuthenticated={isAuthenticated}
-          isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
           canAccess={(permission) => can(accessUser, permission)}
         />
 

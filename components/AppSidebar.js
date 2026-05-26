@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bookmark, BookOpenText, CheckCircle2, CircleDot, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
+import { Archive, Bookmark, BookOpenText, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -55,13 +55,23 @@ const ANIME_ITEMS = [
   },
 ];
 
-const SPACEDRUM_ITEM = {
-  key: "spacedrum",
-  href: "/spacedrum",
-  label: "SpaceDrum",
-  icon: BookOpenText,
-  permission: "spacedrum.view",
-};
+const READING_ITEMS = [
+  {
+    key: "spacedrum",
+    href: "/spacedrum",
+    label: "SpaceDrum",
+    icon: BookOpenText,
+    permission: "spacedrum.view",
+  },
+  {
+    key: "lightNovel",
+    href: "/lecturas/novela-ligera",
+    label: "Novela ligera",
+    icon: FileText,
+    permission: "lightnovel.view",
+    isFuture: true,
+  },
+];
 
 const ADMIN_ITEMS = [
   {
@@ -91,6 +101,42 @@ const ADMIN_ITEMS = [
     label: "Tags",
     icon: Tags,
     permission: "admin.tags.view",
+  },
+  {
+    key: "platformSpaceDrum",
+    label: "SpaceDrum",
+    icon: BookOpenText,
+    permission: "admin.spacedrum.chapters.view",
+    children: [
+      {
+        key: "platformSpaceDrumChapters",
+        href: "/administracion/spacedrum/capitulos",
+        label: "Capítulos",
+        icon: BookOpenText,
+        permission: "admin.spacedrum.chapters.view",
+      },
+      {
+        key: "platformSpaceDrumPages",
+        href: "/administracion/spacedrum/paginas",
+        label: "Páginas",
+        icon: FileText,
+        permission: "admin.spacedrum.pages.view",
+      },
+      {
+        key: "platformSpaceDrumSettings",
+        href: "/administracion/spacedrum/configuracion",
+        label: "Configuración",
+        icon: ShieldCheck,
+        permission: "admin.spacedrum.settings.view",
+      },
+      {
+        key: "platformSpaceDrumImport",
+        href: "/administracion/spacedrum/importacion",
+        label: "Importación",
+        icon: DownloadCloud,
+        permission: "admin.spacedrum.import.view",
+      },
+    ],
   },
   {
     key: "platformAnimeTracking",
@@ -140,6 +186,38 @@ function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
   );
 }
 
+function isNavItemActive(item, activeView) {
+  return item.key === activeView || item.children?.some((child) => child.key === activeView);
+}
+
+function SidebarNavGroup({ item, activeView, onSelect }) {
+  const Icon = item.icon;
+  const isActive = isNavItemActive(item, activeView);
+
+  return (
+    <div className={`sidebar-nav-group ${isActive ? "is-active" : ""}`}>
+      <div className={`sidebar-link sidebar-section-link sidebar-parent-link ${isActive ? "is-active" : ""}`}>
+        <span className="sidebar-icon" aria-hidden="true">
+          <Icon />
+        </span>
+        <span>{item.label}</span>
+        <ChevronDown className="sidebar-parent-chevron" size={14} aria-hidden="true" />
+      </div>
+      <div className="sidebar-submenu" aria-label={`${item.label} submenu`}>
+        {item.children.map((child) => (
+          <SidebarNavItem
+            key={child.key}
+            item={child}
+            activeView={activeView}
+            isSectionLink
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AppSidebar({
   activeView,
   className = "",
@@ -148,10 +226,10 @@ export default function AppSidebar({
   canManageRoles = false,
   canManageTracker = false,
   canManageTags = false,
+  canManageSpaceDrum = false,
   canManageAnimeTracking = false,
   canManageAnimeCompleted = false,
   isAuthenticated = false,
-  isSpaceDrumEnabled = false,
   canAccess = () => true,
   onSelect,
   // isAdmin is intentionally omitted — permissions are controlled individually above
@@ -160,7 +238,14 @@ export default function AppSidebar({
   const sidebarItems = SIDEBAR_ITEMS.filter((item) => canAccess(item.permission));
   const authItems = isAuthenticated ? AUTH_ITEMS.filter((item) => canAccess(item.permission)) : [];
   const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission) && (!item.authOnly || isAuthenticated));
+  const readingItems = READING_ITEMS.filter((item) => !item.isFuture && canAccess(item.permission));
   const adminItems = ADMIN_ITEMS.filter((item) => {
+    if (item.children?.length) {
+      if (item.key === "platformSpaceDrum") {
+        return canManageSpaceDrum && item.children.some((child) => canAccess(child.permission));
+      }
+      return item.children.some((child) => canAccess(child.permission));
+    }
     if (item.key === "platformAnimeTracking") return canManageAnimeTracking && canAccess(item.permission);
     if (item.key === "platformAnimeCompleted") return canManageAnimeCompleted && canAccess(item.permission);
     if (item.key === "platformTracker") return canManageTracker && canAccess(item.permission);
@@ -217,11 +302,11 @@ export default function AppSidebar({
           </div>
         </div> : null}
 
-        {adminItems.length ? (
+        {readingItems.length ? (
           <div className="sidebar-section">
-            <span className="sidebar-section-label">Administración</span>
-            <div className="sidebar-section-links" aria-label="Administración">
-              {adminItems.map((item) => (
+            <span className="sidebar-section-label">Lecturas</span>
+            <div className="sidebar-section-links" aria-label="Lecturas">
+              {readingItems.map((item) => (
                 <SidebarNavItem
                   key={item.key}
                   item={item}
@@ -234,9 +319,35 @@ export default function AppSidebar({
           </div>
         ) : null}
 
-        {isSpaceDrumEnabled && canAccess(SPACEDRUM_ITEM.permission) ? (
-          <SidebarNavItem item={SPACEDRUM_ITEM} activeView={activeView} onSelect={onSelect} />
+        {adminItems.length ? (
+          <div className="sidebar-section">
+            <span className="sidebar-section-label">Administración</span>
+            <div className="sidebar-section-links" aria-label="Administración">
+              {adminItems.map((item) => (
+                item.children?.length ? (
+                  <SidebarNavGroup
+                    key={item.key}
+                    item={{
+                      ...item,
+                      children: item.children.filter((child) => canAccess(child.permission)),
+                    }}
+                    activeView={activeView}
+                    onSelect={onSelect}
+                  />
+                ) : (
+                  <SidebarNavItem
+                    key={item.key}
+                    item={item}
+                    activeView={activeView}
+                    isSectionLink
+                    onSelect={onSelect}
+                  />
+                )
+              ))}
+            </div>
+          </div>
         ) : null}
+
       </nav>
 
       <div className="sidebar-social-block">

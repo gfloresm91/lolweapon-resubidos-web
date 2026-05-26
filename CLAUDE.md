@@ -67,6 +67,7 @@ npm run db:import:lives        # importar tracker desde JSON
 npm run db:import:anime        # importar biblioteca desde JSON
 npm run db:import:tags         # importar tags desde JSON
 npm run db:import:spacedrum    # importar SpaceDrum desde JSON
+npm run db:import:spacedrum:remote # importar SpaceDrum ES/EN desde la web original
 npm run db:reset-sequences     # resetear autoincrement tras imports
 npm run audit:data             # auditar consistencia de datos
 ```

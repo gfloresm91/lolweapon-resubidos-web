@@ -62,6 +62,7 @@ npm run db:import:lives
 npm run db:import:anime
 npm run db:import:tags
 npm run db:import:spacedrum
+npm run db:import:spacedrum:remote
 npm run db:reset-sequences
 npm run audit:data
 ```
@@ -104,6 +105,15 @@ npm run db:migrate:deploy
 
 - Server Components cargan datos y pasan props a Client Components cuando sea posible.
 - Evitar `useEffect` para fetch inicial si se puede resolver en Server Component.
+- Las vistas montadas dentro de `HomePage` deben respetar a `HomePage` como dueño de la navegación interna.
+  - No usar `router.push`/`router.replace` para cambiar vistas internas.
+  - No mezclar `pushState`/`kala:navigation` con `window.location.href`; `window.location.href` solo para salidas reales como login/logout o enlaces externos.
+  - Si una vista necesita reflejar estado propio en querystring, usar `history.replaceState` únicamente cuando `window.location.pathname` ya corresponde a esa vista.
+- Toda vista nueva que se pueda abrir desde el menú interno y por URL directa debe soportar ambos caminos de carga.
+  - La entrada directa debe recibir datos desde el Server Component.
+  - La navegación interna SPA debe cargar datos desde `HomePage` al cambiar `currentView` si los props iniciales vienen vacíos.
+  - No depender de recargar la página para poblar datos.
+  - Al crear una pantalla nueva, probar navegación desde `/inicio`, desde otra vista existente y acceso directo por URL.
 - Validar en boundaries: formularios, route handlers y APIs externas.
 - Route handlers deben responder JSON estructurado con status HTTP claro.
 - Usar comentarios solo cuando expliquen un “por qué” no obvio.

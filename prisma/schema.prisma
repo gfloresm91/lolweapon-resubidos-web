@@ -263,6 +263,7 @@ model SpaceDrumChapter {
   title       String
   releaseDate String?
   summary     String?
+  status      String           @default("published")
   position    Int              @default(0)
 
   spaceDrum   SpaceDrum        @relation(fields: [spaceDrumId], references: [id], onDelete: Cascade)
@@ -282,6 +283,22 @@ model SpaceDrumPage {
   chapter   SpaceDrumChapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
   @@index([chapterId])
+}
+
+model PlatformUserSpaceDrumProgress {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  language       String
+  lastChapterId  String?
+  readChapterIds String[]     @default([])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user           PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, language])
+  @@index([userId])
+  @@index([language])
 }
 
 model PlatformRole {
@@ -358,6 +375,7 @@ model PlatformUser {
   liveActivity   PlatformUserLive[]
   animeActivity  PlatformUserAnime[]
   animeRatings   AnimeRating[]
+  spaceDrumProgress PlatformUserSpaceDrumProgress[]
 
   @@index([roleId])
   @@index([isActive])
