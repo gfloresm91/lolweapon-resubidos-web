@@ -8,6 +8,7 @@ import { Toaster, toast } from "sonner";
 import AccountMenu from "@/components/AccountMenu";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import AppSidebar from "@/components/AppSidebar";
+import AppSidebarShell from "@/components/AppSidebarShell";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
@@ -334,7 +335,6 @@ export default function HomePage({
   const [spaceDrumAdminSettings, setSpaceDrumAdminSettings] = useState(initialSpaceDrumSettings);
   const [spaceDrumAdminImportSummary, setSpaceDrumAdminImportSummary] = useState(initialSpaceDrumImportSummary);
   const [currentView, setCurrentView] = useState(activeView);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [trackerViewStates, setTrackerViewStates] = useState(() => {
     const queryState = activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams) : null;
     return {
@@ -367,6 +367,8 @@ export default function HomePage({
       }
     } catch {}
   }, []);
+
+
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
@@ -764,7 +766,7 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    if (!["tracker", "myList"].includes(currentView) || lives.length) {
+    if (!["home", "tracker", "myList"].includes(currentView) || lives.length) {
       return undefined;
     }
 
@@ -780,7 +782,7 @@ export default function HomePage({
           setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
         }
       } catch {
-        if (isMounted) {
+        if (isMounted && currentView !== "home") {
           toast.error("No se pudieron cargar los directos.");
         }
       }
@@ -882,18 +884,6 @@ export default function HomePage({
     });
   }, [currentView, pendingTrackerRestore, visibleLives.length]);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 901px)");
-
-    function syncSidebarState(event) {
-      setIsSidebarOpen(event.matches);
-    }
-
-    setIsSidebarOpen(mediaQuery.matches);
-    mediaQuery.addEventListener("change", syncSidebarState);
-
-    return () => mediaQuery.removeEventListener("change", syncSidebarState);
-  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 899px)");
@@ -1268,18 +1258,8 @@ export default function HomePage({
     window.scrollTo({ top: 0, behavior: "instant" });
 
     if (window.matchMedia("(max-width: 900px)").matches) {
-      setIsSidebarOpen(false);
+      window.dispatchEvent(new CustomEvent("kala:sidebar:close"));
     }
-  }
-
-  function toggleSidebar() {
-    setIsSidebarOpen((current) => {
-      if (current === null) {
-        return !window.matchMedia("(min-width: 901px)").matches;
-      }
-
-      return !current;
-    });
   }
 
   function saveTrackerReturnState(liveId) {
@@ -1307,33 +1287,10 @@ export default function HomePage({
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
 
-      <div className={`app-shell ${isSidebarOpen === false ? "is-sidebar-closed" : ""}`}>
-        <button
-          type="button"
-          className={`hamburger-button ${isSidebarOpen ? "is-open" : ""}`}
-          aria-label={isSidebarOpen === false ? "Abrir menu" : "Cerrar menu"}
-          aria-expanded={Boolean(isSidebarOpen)}
-          aria-controls="main-sidebar"
-          onClick={toggleSidebar}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-
-        {isSidebarOpen ? (
-          <button
-            type="button"
-            className="sidebar-overlay"
-            aria-label="Cerrar menu"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        ) : null}
-
+      <AppSidebarShell>
         <AppSidebar
           id="main-sidebar"
           activeView={currentView}
-          className={`${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
           isAdmin={isAdmin}
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
@@ -1559,48 +1516,86 @@ export default function HomePage({
                   </button>
                 </div>
               </div>
-              <div id="lives-grid" className={`lives-grid lives-grid-${cardDensity}`}>
-                {cardDensity === "compact" ? (
-                  <div className="lives-table-header" role="row" aria-hidden="true">
-                    <span>Fecha</span>
-                    <span>Título</span>
-                    <span>Estado</span>
-                    <span>Tags</span>
-                    <span>Disponibilidad</span>
-                    <span>Acciones</span>
+              {cardDensity === "compact" ? (
+                <div className="lives-compact-shell">
+                  <div className="lives-compact-scroll-hint" aria-hidden="true">
+                    Desliza horizontalmente para ver más columnas
                   </div>
-                ) : null}
-                {visibleLives.map((live) => (
-                  <LiveCard
-                    key={live.id}
-                    live={live}
-                    isAdmin={canUpdateTracker}
-                    activity={liveActivity[live.id]}
-                    isAuthenticated={isAuthenticated}
-                    searchTerm={deferredSearch}
-                    onEdit={() => setEditingLive(live)}
-                    onLoginRequired={requireLoginForTracker}
-                    onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
-                    onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
-                    onFilterTag={(tag) =>
-                      startTransition(() => {
-                        setCurrentSelectedTag(tag);
-                      })
-                    }
-                    onFilterYear={(year) =>
-                      startTransition(() => {
-                        setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
-                      })
-                    }
-                    onFilterStatus={(status) =>
-                      startTransition(() => {
-                        setCurrentFilters((current) => ({ ...current, status: status || "all" }));
-                      })
-                    }
-                    onOpenDetail={handleOpenLiveDetail}
-                  />
-                ))}
-              </div>
+                  <div id="lives-grid" className="lives-grid lives-grid-compact">
+                    <div className="lives-table-header" role="row" aria-hidden="true">
+                      <span>Fecha</span>
+                      <span>Título</span>
+                      <span>Estado</span>
+                      <span>Tags</span>
+                      <span>Disponibilidad</span>
+                      <span>Acciones</span>
+                    </div>
+                    {visibleLives.map((live) => (
+                      <LiveCard
+                        key={live.id}
+                        live={live}
+                        isAdmin={canUpdateTracker}
+                        activity={liveActivity[live.id]}
+                        isAuthenticated={isAuthenticated}
+                        searchTerm={deferredSearch}
+                        onEdit={() => setEditingLive(live)}
+                        onLoginRequired={requireLoginForTracker}
+                        onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
+                        onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
+                        onFilterTag={(tag) =>
+                          startTransition(() => {
+                            setCurrentSelectedTag(tag);
+                          })
+                        }
+                        onFilterYear={(year) =>
+                          startTransition(() => {
+                            setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+                          })
+                        }
+                        onFilterStatus={(status) =>
+                          startTransition(() => {
+                            setCurrentFilters((current) => ({ ...current, status: status || "all" }));
+                          })
+                        }
+                        onOpenDetail={handleOpenLiveDetail}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div id="lives-grid" className="lives-grid lives-grid-comfortable">
+                  {visibleLives.map((live) => (
+                    <LiveCard
+                      key={live.id}
+                      live={live}
+                      isAdmin={canUpdateTracker}
+                      activity={liveActivity[live.id]}
+                      isAuthenticated={isAuthenticated}
+                      searchTerm={deferredSearch}
+                      onEdit={() => setEditingLive(live)}
+                      onLoginRequired={requireLoginForTracker}
+                      onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
+                      onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
+                      onFilterTag={(tag) =>
+                        startTransition(() => {
+                          setCurrentSelectedTag(tag);
+                        })
+                      }
+                      onFilterYear={(year) =>
+                        startTransition(() => {
+                          setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+                        })
+                      }
+                      onFilterStatus={(status) =>
+                        startTransition(() => {
+                          setCurrentFilters((current) => ({ ...current, status: status || "all" }));
+                        })
+                      }
+                      onOpenDetail={handleOpenLiveDetail}
+                    />
+                  ))}
+                </div>
+              )}
               {hasMoreLives ? (
                 <div ref={loadMoreRef} className="infinite-scroll-sentinel" aria-hidden="true">
                   <span className="infinite-scroll-label">Cargando más resultados…</span>
@@ -1819,7 +1814,7 @@ export default function HomePage({
             <span>Por fans para fans <span aria-hidden="true">💜</span> para Kala</span>
           </footer>
         </div>
-      </div>
+      </AppSidebarShell>
 
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}

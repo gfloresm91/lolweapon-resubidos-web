@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { getSpaceDrumThumbnailPage } from "@/lib/spacedrumThumbnail";
 
 const LANGUAGE_OPTIONS = [
   { code: "es-es", label: "Español", shortLabel: "ES", chapterLabel: "Capítulos" },
@@ -20,19 +21,6 @@ const LANGUAGE_OPTIONS = [
 const STORAGE_LANGUAGE_KEY = "spacedrum_language";
 const STORAGE_LAST_READ_PREFIX = "spacedrum_last_read";
 const STORAGE_READER_POSITION_PREFIX = "spacedrum_reader_position";
-const SECOND_PAGE_THUMBNAIL_TITLES = new Set([
-  "Ciclo 1.1",
-  "Ciclo 2",
-  "Ciclo 3",
-  "Ciclo 4",
-  "Ciclo 5",
-  "Cycle 1",
-  "Cycle 2",
-  "Cycle 3",
-  "Cycle 4",
-  "Cycle 5",
-]);
-
 function formatDate(value, language) {
   if (!value) {
     return language === "en-us" ? "No date" : "Sin fecha";
@@ -205,14 +193,6 @@ function findMatchingChapter(nextChapters, currentChapter, fallbackId) {
     || nextChapters[currentChapter.position || 0]?.id
     || fallbackId
     || nextChapters[0].id;
-}
-
-function getChapterThumbnailPage(chapter) {
-  if (SECOND_PAGE_THUMBNAIL_TITLES.has(chapter?.title) && chapter?.pages?.[1]) {
-    return chapter.pages[1];
-  }
-
-  return chapter?.pages?.[0] || chapter?.pages?.[1] || null;
 }
 
 export default function SpaceDrumPage({ data, initialProgress = {}, isAuthenticated = false, isLoading = false }) {
@@ -722,7 +702,7 @@ export default function SpaceDrumPage({ data, initialProgress = {}, isAuthentica
             {orderedChapters.map((chapter) => {
               const isLastRead = chapter.id === lastReadChapter?.id;
               const isRead = readChapterIds.has(chapter.id);
-              const thumbnailPage = getChapterThumbnailPage(chapter);
+              const thumbnailPage = getSpaceDrumThumbnailPage(chapter);
 
               return (
                 <article
@@ -771,7 +751,7 @@ export default function SpaceDrumPage({ data, initialProgress = {}, isAuthentica
           {selectedChapter ? (
             <>
               <div className="spacedrum-reader-toolbar">
-                <div>
+                <div className="spacedrum-reader-heading">
                   <span>{formatDate(selectedChapter.releaseDate, currentLanguage)}</span>
                   <h2>{selectedChapter.title}</h2>
                   <small>
@@ -779,7 +759,7 @@ export default function SpaceDrumPage({ data, initialProgress = {}, isAuthentica
                   </small>
                 </div>
                 <div className="spacedrum-reader-controls">
-                  <button type="button" className="spacedrum-nav-button spacedrum-nav-button-secondary" onClick={returnToChapters}>
+                  <button type="button" className="spacedrum-quick-button spacedrum-quick-button-accent spacedrum-toolbar-back" onClick={returnToChapters}>
                     <ListTree aria-hidden="true" />
                     {copy.backToChapters}
                   </button>

@@ -155,6 +155,11 @@ npm run db:migrate:deploy
 - Botones que requieren sesión:
   - No redirigir de golpe si el usuario no está autenticado.
   - Mostrar toast/modal con explicación y acción para iniciar sesión.
+- Responsive:
+  - No basta con medir overflow global. Para cambios visuales, revisar screenshots móviles reales de las pantallas afectadas.
+  - Probar estados autenticados cuando cambien acciones visibles por permiso, especialmente rol `Dios`.
+  - Probar estados interactivos: menú lateral abierto, modales, dropdowns, tablas compactas y cards con todas sus acciones.
+  - El menú lateral debe poder hacer scroll en mobile cuando existan más módulos que altura disponible.
 
 ## Roles Y Permisos
 

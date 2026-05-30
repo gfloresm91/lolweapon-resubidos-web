@@ -128,7 +128,7 @@ export default function FiltersBar({
         type="search"
         id="search-input"
         className="search-input"
-        placeholder="🔍 Buscar por titulo o etiquetas..."
+        placeholder="Buscar por titulo o etiquetas..."
         value={filters.search}
         onChange={(event) => onSearchChange(event.target.value)}
       />

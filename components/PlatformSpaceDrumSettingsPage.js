@@ -129,7 +129,7 @@ export default function PlatformSpaceDrumSettingsPage({
 
   return (
     <>
-      <header className="watching-header admin-users-header">
+      <header className="watching-header admin-users-header spacedrum-settings-page-header">
         <div className="header-badge">
           <span className="dot" />
           ADMINISTRACIÓN
@@ -149,7 +149,7 @@ export default function PlatformSpaceDrumSettingsPage({
         ]}
       />
 
-      <section className="tracker-actions" aria-label="Acciones de configuración SpaceDrum">
+      <section className="tracker-actions spacedrum-settings-action-bar" aria-label="Acciones de configuración SpaceDrum">
         <div>
           <span className="tracker-actions-label">Configuración</span>
           <p className="tracker-actions-copy">Estos cambios afectan la portada pública de SpaceDrum, sin modificar capítulos ni páginas.</p>
@@ -164,7 +164,7 @@ export default function PlatformSpaceDrumSettingsPage({
 
       <form className="spacedrum-settings-form" onSubmit={saveSettings} noValidate>
         <section className="spacedrum-settings-panel">
-          <div className="spacedrum-settings-header">
+          <div className="spacedrum-settings-header spacedrum-settings-language-header">
             <div>
               <span className="tracker-actions-label">Idioma</span>
               <h2>{form.title || "SpaceDrum"}</h2>
