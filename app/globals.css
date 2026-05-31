@@ -8155,7 +8155,7 @@ body::before {
 
 .watch-player-stage.is-theater .watch-player-wrap,
 .watch-player-stage.is-theater .watch-player-placeholder {
-  width: min(1400px, 100%);
+  width: min(calc((100dvh - 20rem) * (16 / 9)), min(1400px, 100%));
   margin: 0 auto;
 }
 
