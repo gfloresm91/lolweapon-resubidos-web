@@ -4,9 +4,9 @@ import { notFound, redirect } from "next/navigation";
 import { Toaster } from "sonner";
 
 import AppSidebar from "@/components/AppSidebar";
+import AppSidebarShell from "@/components/AppSidebarShell";
 import DetailActivityButtons from "@/components/DetailActivityButtons";
 import DetailBackLink from "@/components/DetailBackLink";
-import DetailSidebarControls from "@/components/DetailSidebarControls";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
@@ -118,20 +118,19 @@ export default async function LiveDetailPage({ params }) {
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
 
-      <div className="app-shell live-detail-app-shell">
-        <DetailSidebarControls />
-
+      <AppSidebarShell extraShellClass="live-detail-app-shell">
         <AppSidebar
+          id="main-sidebar"
           activeView="tracker"
           isAdmin={isAdmin}
           canManageUsers={can(accessUser, "users.read")}
           canManageRoles={can(accessUser, "roles.read")}
           canManageTracker={canManageTracker}
           canManageTags={can(accessUser, "admin.tags.view")}
+          canManageSpaceDrum={can(accessUser, "admin.spacedrum.chapters.view")}
           canManageAnimeTracking={canManageAnimeTracking}
           canManageAnimeCompleted={canManageAnimeCompleted}
           isAuthenticated={isAuthenticated}
-          isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
           canAccess={(permission) => can(accessUser, permission)}
         />
 
@@ -248,7 +247,7 @@ export default async function LiveDetailPage({ params }) {
             <span>Por fans para fans 💜 para Kala</span>
           </footer>
         </div>
-      </div>
+      </AppSidebarShell>
     </>
   );
 }

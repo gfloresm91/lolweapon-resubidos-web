@@ -163,6 +163,28 @@ export function AnimePosterPlaceholder({ title, className = "" }) {
   );
 }
 
+function AnimePosterImage({ src, title, className = "", decorative = false }) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (!src || hasError) {
+    return <AnimePosterPlaceholder title={title} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={decorative ? "" : title}
+      className={className}
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
+  );
+}
+
 const CHULOPUNTO_COLORS = ["", "#ef4444", "#ef4444", "#eab308", "#eab308", "#22d3ee", "#22d3ee", "#22c55e", "#22c55e"];
 const MIN_CHULOPUNTO = 1;
 const MAX_CHULOPUNTO = 8;
@@ -2048,17 +2070,23 @@ export default function AnimeLibraryPage({
                 </button>
               </div>
             </div>
-            <div className={`anime-grid anime-library-grid anime-library-grid-${cardDensity}`}>
+            <div className={cardDensity === "compact" ? "anime-compact-shell" : ""}>
               {cardDensity === "compact" ? (
-                <div className="anime-library-table-header" role="row" aria-hidden="true">
-                  <span>Poster</span>
-                  <span>Anime</span>
-                  <span>Progreso</span>
-                  <span>Nota</span>
-                  <span>Acciones</span>
+                <div className="lives-compact-scroll-hint" aria-hidden="true">
+                  Desliza horizontalmente para ver más columnas
                 </div>
               ) : null}
-              {filteredAnimes.map((anime) => {
+              <div className={`anime-grid anime-library-grid anime-library-grid-${cardDensity}`}>
+                {cardDensity === "compact" ? (
+                  <div className="anime-library-table-header" role="row" aria-hidden="true">
+                    <span>Poster</span>
+                    <span>Anime</span>
+                    <span>Progreso</span>
+                    <span>Nota</span>
+                    <span>Acciones</span>
+                  </div>
+                ) : null}
+                {filteredAnimes.map((anime) => {
                 const fullSeason = isFullSeason(anime);
                 const purchasedCount = getPurchasedCount(anime);
                 const purchaseLabel = getPurchaseLabel(anime);
@@ -2087,11 +2115,11 @@ export default function AnimeLibraryPage({
                     className={`anime-card anime-library-card ${canUpdate ? "is-admin" : ""}`}
                   >
                   <div className="poster-container anime-library-poster">
-                    {anime.image ? (
-                      <img src={anime.image} alt={anime.title} className="poster-img" loading="lazy" />
-                    ) : (
-                      <AnimePosterPlaceholder title={anime.titleEs || anime.title} />
-                    )}
+                    <AnimePosterImage
+                      src={anime.image}
+                      title={anime.titleEs || anime.title}
+                      className="poster-img"
+                    />
                     <div className="poster-overlay" />
                     {anime.libraryEnabled === false ? (
                       <span className={`anime-library-status status-${anime.libraryEnabled === false ? "hidden" : anime.watchStatus || "pending"}`}>
@@ -2124,11 +2152,11 @@ export default function AnimeLibraryPage({
                   </div>
                   <div className="anime-card-body anime-library-body">
                     <div className="anime-library-compact-thumb" aria-hidden="true">
-                      {anime.image ? (
-                        <img src={anime.image} alt="" loading="lazy" />
-                      ) : (
-                        <AnimePosterPlaceholder title={anime.titleEs || anime.title} />
-                      )}
+                      <AnimePosterImage
+                        src={anime.image}
+                        title={anime.titleEs || anime.title}
+                        decorative
+                      />
                     </div>
                     <div className="anime-library-compact-title">
                       <h2>{anime.titleEs || anime.title}</h2>
@@ -2297,6 +2325,7 @@ export default function AnimeLibraryPage({
                 </article>
                 );
               })}
+              </div>
             </div>
           </>
         ) : (

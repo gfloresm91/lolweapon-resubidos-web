@@ -260,6 +260,18 @@ Import reads `data/spacedrum.local.json` when present, otherwise `data/spacedrum
 DATA_SOURCE=postgres npm run db:import:spacedrum
 ```
 
+Remote import downloads the current Spanish and English chapters from the original SpaceDrum API, writes `data/spacedrum.local.json` as a fallback, and imports the normalized data into PostgreSQL when `DATA_SOURCE=postgres`:
+
+```bash
+DATA_SOURCE=postgres npm run db:import:spacedrum:remote
+```
+
+If the environment should only write to PostgreSQL and avoid updating the ignored JSON fallback file:
+
+```bash
+DATA_SOURCE=postgres npm run db:import:spacedrum:remote -- --no-write-json
+```
+
 Export writes a new safety file and does not overwrite the source JSON:
 
 ```bash
@@ -274,10 +286,10 @@ data/spacedrum.export.json
 
 SpaceDrum is normalized into:
 
-- `SpaceDrum`: main page data.
-- `SpaceDrumMeta`: ordered metadata items.
-- `SpaceDrumLink`: ordered external links.
-- `SpaceDrumChapter`: ordered chapters.
+- `SpaceDrum`: main page data per language (`spacedrum-es-es`, `spacedrum-en-us`).
+- `SpaceDrumMeta`: ordered metadata items per language.
+- `SpaceDrumLink`: ordered external links per language.
+- `SpaceDrumChapter`: ordered chapters/cycles per language.
 - `SpaceDrumPage`: ordered pages per chapter.
 
 The export should keep the same page and chapter structure as the source JSON.

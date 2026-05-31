@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 function getOkruEmbedUrl(href) {
   try {
@@ -46,7 +46,6 @@ function buildSafeFilename(title, partNumber) {
 
 export default function OkruWatchPlayer({ links, liveId, title, telegramFallbackHref }) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const storageKey = `kala_okru_part_${liveId || pathname}`;
   const playableLinks = useMemo(
@@ -153,7 +152,14 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
     } catch {
       // Some browser privacy modes can block localStorage.
     }
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+    if (window.location.pathname === pathname) {
+      const queryString = params.toString();
+      const nextUrl = queryString ? `${pathname}?${queryString}` : pathname;
+      if (`${window.location.pathname}${window.location.search}` !== nextUrl) {
+        window.history.replaceState(window.history.state, "", nextUrl);
+      }
+    }
   }
 
   function buildPartUrl() {

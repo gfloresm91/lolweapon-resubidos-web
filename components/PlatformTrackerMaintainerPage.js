@@ -706,7 +706,9 @@ export default function PlatformTrackerMaintainerPage({
             <span className={`admin-user-status ${getStatusClassName(live.status)}`}>{live.status || "Sin estado"}</span>
             <div className="admin-user-cell admin-tracker-tags">
               {(live.tags || []).slice(0, 2).map((tag) => (
-                <span key={tag}>{tag}</span>
+                <button type="button" key={tag} className="tag-pill" onClick={() => setTagFilter(tag)}>
+                  {tag}
+                </button>
               ))}
               {(live.tags || []).length > 2 ? <small>+{live.tags.length - 2}</small> : null}
               {!live.tags?.length ? <small>Sin tags</small> : null}

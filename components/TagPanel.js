@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 import { buildTagGroups, normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
@@ -242,7 +243,7 @@ export default function TagPanel({
     return null;
   }
 
-  return (
+  return createPortal(
     <>
       <div id="tag-panel-overlay" className="tag-panel-overlay visible" onClick={onClose} />
       <aside
@@ -536,6 +537,7 @@ export default function TagPanel({
           </form>
         </div>
       ) : null}
-    </>
+    </>,
+    document.body
   );
 }

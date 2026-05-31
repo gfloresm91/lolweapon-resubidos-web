@@ -26,12 +26,14 @@ function RecentLiveCard({ live }) {
   const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
   const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
+  const liveStatus = live.status || PENDING_LIVE_STATUS_LABEL;
 
   return (
     <article className="home-live-card">
       <div className="home-live-meta">
         <span>{live.date || "Sin fecha"}</span>
-        <span className="home-live-status-badge">{live.status || PENDING_LIVE_STATUS_LABEL}</span>
+        <span aria-hidden="true">·</span>
+        <span>{liveStatus}</span>
       </div>
       <h3>{live.title || "Sin título"}</h3>
       <div className="home-live-tags">
@@ -55,7 +57,7 @@ function YoutubeCard({ video }) {
         <div className="youtube-play-overlay" aria-hidden="true" />
       </div>
       <div className="youtube-card-body">
-        <span>{formatYoutubeDate(video.publishedAt)}</span>
+        <span>Publicado · {formatYoutubeDate(video.publishedAt)}</span>
         <h3>{video.title}</h3>
       </div>
     </a>
@@ -261,10 +263,11 @@ export default function HomeDashboard({
       </section>
 
       <section className="home-section" aria-label="Últimos directos registrados">
-        <div className="home-section-heading">
+        <div className="home-section-heading home-section-heading-with-action">
           <div>
             <span className="home-eyebrow">Archivo</span>
             <h2>Últimos directos registrados</h2>
+            <p className="home-section-subtitle">Lo más reciente del archivo VOD.</p>
           </div>
           <button type="button" className="home-section-action" onClick={onTrackerOpen}>
             Ver rastreador
@@ -293,10 +296,11 @@ export default function HomeDashboard({
       </section>
 
       <section className="home-section" aria-label="Últimos videos de YouTube">
-        <div className="home-section-heading">
+        <div className="home-section-heading home-section-heading-with-action">
           <div>
             <span className="home-eyebrow">YouTube</span>
             <h2>Últimos videos</h2>
+            <p className="home-section-subtitle">Publicaciones recientes del canal.</p>
           </div>
           <a
             href={youtubeChannelUrl || "https://www.youtube.com/@Lolweapon"}

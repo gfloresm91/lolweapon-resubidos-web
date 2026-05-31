@@ -8,12 +8,17 @@ import { Toaster, toast } from "sonner";
 import AccountMenu from "@/components/AccountMenu";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import AppSidebar from "@/components/AppSidebar";
+import AppSidebarShell from "@/components/AppSidebarShell";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
+import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
+import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
+import PlatformSpaceDrumPagesPage from "@/components/PlatformSpaceDrumPagesPage";
+import PlatformSpaceDrumSettingsPage from "@/components/PlatformSpaceDrumSettingsPage";
 import PlatformTagsMaintainerPage from "@/components/PlatformTagsMaintainerPage";
 import PlatformTrackerMaintainerPage from "@/components/PlatformTrackerMaintainerPage";
 import PlatformUsersPage from "@/components/PlatformUsersPage";
@@ -91,6 +96,10 @@ const VIEW_LABELS = {
   animeLibraryCompleted: "Anime terminados",
   platformTracker: "Mantenedor Rastreador",
   platformTags: "Mantenedor Tags",
+  platformSpaceDrumChapters: "Mantenedor SpaceDrum",
+  platformSpaceDrumPages: "Páginas SpaceDrum",
+  platformSpaceDrumSettings: "Configuración SpaceDrum",
+  platformSpaceDrumImport: "Importación SpaceDrum",
   platformAnimeTracking: "Mantenedor Viendo",
   platformAnimeCompleted: "Mantenedor Terminados",
   platformUsers: "Usuarios",
@@ -107,6 +116,10 @@ const VIEW_PATHS = {
   animeLibraryCompleted: "/biblioteca-anime/terminados",
   platformTracker: "/administracion/rastreador",
   platformTags: "/administracion/tags",
+  platformSpaceDrumChapters: "/administracion/spacedrum/capitulos",
+  platformSpaceDrumPages: "/administracion/spacedrum/paginas",
+  platformSpaceDrumSettings: "/administracion/spacedrum/configuracion",
+  platformSpaceDrumImport: "/administracion/spacedrum/importacion",
   platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformUsers: "/administracion/usuarios",
@@ -170,6 +183,49 @@ function areLiveActivityMapsEqual(left = EMPTY_OBJECT, right = EMPTY_OBJECT) {
   });
 }
 
+function areSpaceDrumProgressMapsEqual(left = EMPTY_OBJECT, right = EMPTY_OBJECT) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    const leftItem = left[key] || {};
+    const rightItem = right[key] || {};
+    const leftReadIds = Array.isArray(leftItem.readChapterIds) ? leftItem.readChapterIds : [];
+    const rightReadIds = Array.isArray(rightItem.readChapterIds) ? rightItem.readChapterIds : [];
+
+    return (
+      rightKeys.includes(key) &&
+      leftItem.language === rightItem.language &&
+      leftItem.lastChapterId === rightItem.lastChapterId &&
+      leftItem.updatedAt === rightItem.updatedAt &&
+      leftReadIds.length === rightReadIds.length &&
+      leftReadIds.every((id, index) => id === rightReadIds[index])
+    );
+  });
+}
+
+function hasSpaceDrumLibraryContent(data) {
+  if (!data) {
+    return false;
+  }
+
+  if (data.languages) {
+    return Object.values(data.languages).some((language) => Array.isArray(language?.chapters) && language.chapters.length > 0);
+  }
+
+  return Array.isArray(data.chapters) && data.chapters.length > 0;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  return JSON.parse(text);
+}
+
 function wasDiscoveryToastShown(key) {
   try {
     const storageKey = `kala_discovery_${key}`;
@@ -193,6 +249,11 @@ export default function HomePage({
   initialPlatformRoles = EMPTY_LIST,
   initialPlatformPermissions = EMPTY_LIST,
   initialSpaceDrum = null,
+  initialSpaceDrumChapters = EMPTY_LIST,
+  initialSpaceDrumPages = EMPTY_LIST,
+  initialSpaceDrumSettings = EMPTY_LIST,
+  initialSpaceDrumImportSummary = null,
+  initialSpaceDrumProgress = EMPTY_OBJECT,
   initialYoutubeVideos = EMPTY_LIST,
   initialTwitchStream = null,
   initialTwitchProfile = null,
@@ -208,7 +269,6 @@ export default function HomePage({
   currentUser = null,
   accessPermissions = EMPTY_LIST,
 }) {
-  const isSpaceDrumEnabled = process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true";
   const effectivePermissions = useMemo(() => new Set(accessPermissions.length ? accessPermissions : currentUser?.permissions || []), [accessPermissions, currentUser?.permissions]);
   const hasPermission = (permission) => (currentUser?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || effectivePermissions.has(permission);
   const canManageUsers = hasPermission("users.read");
@@ -242,6 +302,22 @@ export default function HomePage({
   const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
   const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
   const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
+  const canViewSpaceDrumChaptersMaintainer = hasPermission("admin.spacedrum.chapters.view");
+  const canCreateSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.create");
+  const canUpdateSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.update");
+  const canDeleteSpaceDrumChapters = hasPermission("admin.spacedrum.chapters.delete");
+  const canViewSpaceDrumPagesMaintainer = hasPermission("admin.spacedrum.pages.view");
+  const canCreateSpaceDrumPages = hasPermission("admin.spacedrum.pages.create");
+  const canUpdateSpaceDrumPages = hasPermission("admin.spacedrum.pages.update");
+  const canDeleteSpaceDrumPages = hasPermission("admin.spacedrum.pages.delete");
+  const canViewSpaceDrumSettingsMaintainer = hasPermission("admin.spacedrum.settings.view");
+  const canUpdateSpaceDrumSettings = hasPermission("admin.spacedrum.settings.update");
+  const canViewSpaceDrumImportMaintainer = hasPermission("admin.spacedrum.import.view");
+  const canRunSpaceDrumImport = hasPermission("admin.spacedrum.import.run");
+  const canManageSpaceDrum = canViewSpaceDrumChaptersMaintainer
+    || canViewSpaceDrumPagesMaintainer
+    || canViewSpaceDrumSettingsMaintainer
+    || canViewSpaceDrumImportMaintainer;
   const isAuthenticated = Boolean(currentUser?.id);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
@@ -251,8 +327,14 @@ export default function HomePage({
   const [animeStreamerRatings, setAnimeStreamerRatings] = useState(initialStreamerRatings || {});
   const [animeUserRatings, setAnimeUserRatings] = useState(initialUserRatings || {});
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
+  const [spaceDrumData, setSpaceDrumData] = useState(initialSpaceDrum);
+  const [spaceDrumProgress, setSpaceDrumProgress] = useState(initialSpaceDrumProgress || EMPTY_OBJECT);
+  const [isSpaceDrumLoading, setIsSpaceDrumLoading] = useState(false);
+  const [spaceDrumAdminChapters, setSpaceDrumAdminChapters] = useState(initialSpaceDrumChapters);
+  const [spaceDrumAdminPages, setSpaceDrumAdminPages] = useState(initialSpaceDrumPages);
+  const [spaceDrumAdminSettings, setSpaceDrumAdminSettings] = useState(initialSpaceDrumSettings);
+  const [spaceDrumAdminImportSummary, setSpaceDrumAdminImportSummary] = useState(initialSpaceDrumImportSummary);
   const [currentView, setCurrentView] = useState(activeView);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(null);
   const [trackerViewStates, setTrackerViewStates] = useState(() => {
     const queryState = activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams) : null;
     return {
@@ -285,10 +367,13 @@ export default function HomePage({
       }
     } catch {}
   }, []);
+
+
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
   const loadMoreRef = useRef(null);
   const didRestoreTrackerRef = useRef(false);
+  const didSyncInitialViewRef = useRef(false);
   const skipVisibleResetRef = useRef({ tracker: false, myList: false });
 
   useEffect(() => {
@@ -320,6 +405,164 @@ export default function HomePage({
   }, [initialUserRatings]);
 
   useEffect(() => {
+    setSpaceDrumData(initialSpaceDrum);
+  }, [initialSpaceDrum]);
+
+  useEffect(() => {
+    setSpaceDrumAdminChapters(initialSpaceDrumChapters);
+  }, [initialSpaceDrumChapters]);
+
+  useEffect(() => {
+    setSpaceDrumAdminPages(initialSpaceDrumPages);
+  }, [initialSpaceDrumPages]);
+
+  useEffect(() => {
+    setSpaceDrumAdminSettings(initialSpaceDrumSettings);
+  }, [initialSpaceDrumSettings]);
+
+  useEffect(() => {
+    setSpaceDrumAdminImportSummary(initialSpaceDrumImportSummary);
+  }, [initialSpaceDrumImportSummary]);
+
+  useEffect(() => {
+    setSpaceDrumProgress((current) => (
+      areSpaceDrumProgressMapsEqual(current, initialSpaceDrumProgress || EMPTY_OBJECT)
+        ? current
+        : initialSpaceDrumProgress || EMPTY_OBJECT
+    ));
+  }, [initialSpaceDrumProgress]);
+
+  useEffect(() => {
+    if (currentView !== "spacedrum" || !hasPermission("spacedrum.view")) {
+      return undefined;
+    }
+
+    let isMounted = true;
+
+    async function loadSpaceDrum() {
+      if (!hasSpaceDrumLibraryContent(spaceDrumData)) {
+        setIsSpaceDrumLoading(true);
+      }
+
+      try {
+        const response = await fetch("/api/spacedrum", { cache: "no-store" });
+        const payload = await response.json().catch(() => null);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          toast.error("No tienes permiso para ver SpaceDrum.");
+          return;
+        }
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || "No se pudo cargar SpaceDrum.");
+        }
+
+        setSpaceDrumData(payload.spacedrum || null);
+        setSpaceDrumProgress(payload.progress || EMPTY_OBJECT);
+      } catch (error) {
+        if (isMounted) {
+          toast.error(error.message || "No se pudo cargar SpaceDrum.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsSpaceDrumLoading(false);
+        }
+      }
+    }
+
+    loadSpaceDrum();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentView, currentUser?.id, effectivePermissions]);
+
+  useEffect(() => {
+    const canViewCurrentSpaceDrumAdminView = (
+      (currentView === "platformSpaceDrumChapters" && canViewSpaceDrumChaptersMaintainer)
+      || (currentView === "platformSpaceDrumPages" && canViewSpaceDrumPagesMaintainer)
+      || (currentView === "platformSpaceDrumSettings" && canViewSpaceDrumSettingsMaintainer)
+      || (currentView === "platformSpaceDrumImport" && canViewSpaceDrumImportMaintainer)
+    );
+
+    if (!canViewCurrentSpaceDrumAdminView) {
+      return undefined;
+    }
+
+    const endpointByView = {
+      platformSpaceDrumChapters: "/api/admin/spacedrum/chapters",
+      platformSpaceDrumPages: "/api/admin/spacedrum/pages",
+      platformSpaceDrumSettings: "/api/admin/spacedrum/settings",
+      platformSpaceDrumImport: "/api/admin/spacedrum/import",
+    };
+
+    let isMounted = true;
+
+    async function loadSpaceDrumAdminData() {
+      try {
+        const response = await fetch(endpointByView[currentView], { cache: "no-store" });
+        const payload = await readJsonResponse(response);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (response.status === 401) {
+          toast.error("Tu sesión ya no es válida. Vuelve a iniciar sesión.");
+          window.location.href = "/login";
+          return;
+        }
+
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || "No se pudo cargar SpaceDrum administración.");
+        }
+
+        if (currentView === "platformSpaceDrumChapters") {
+          setSpaceDrumAdminChapters(payload.chapters || []);
+        }
+
+        if (currentView === "platformSpaceDrumPages") {
+          setSpaceDrumAdminPages(payload.pages || []);
+          setSpaceDrumAdminChapters(payload.chapters || []);
+        }
+
+        if (currentView === "platformSpaceDrumSettings") {
+          setSpaceDrumAdminSettings(payload.settings || []);
+        }
+
+        if (currentView === "platformSpaceDrumImport") {
+          setSpaceDrumAdminImportSummary(payload.summary || null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          toast.error(error.message || "No se pudo cargar SpaceDrum administración.");
+        }
+      }
+    }
+
+    loadSpaceDrumAdminData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    canViewSpaceDrumChaptersMaintainer,
+    canViewSpaceDrumImportMaintainer,
+    canViewSpaceDrumPagesMaintainer,
+    canViewSpaceDrumSettingsMaintainer,
+    currentView,
+  ]);
+
+  useEffect(() => {
+    if (!didSyncInitialViewRef.current) {
+      didSyncInitialViewRef.current = true;
+      return;
+    }
+
     setCurrentView(activeView);
   }, [activeView]);
 
@@ -523,7 +766,7 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    if (!["tracker", "myList"].includes(currentView) || lives.length) {
+    if (!["home", "tracker", "myList"].includes(currentView) || lives.length) {
       return undefined;
     }
 
@@ -539,7 +782,7 @@ export default function HomePage({
           setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
         }
       } catch {
-        if (isMounted) {
+        if (isMounted && currentView !== "home") {
           toast.error("No se pudieron cargar los directos.");
         }
       }
@@ -641,18 +884,6 @@ export default function HomePage({
     });
   }, [currentView, pendingTrackerRestore, visibleLives.length]);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 901px)");
-
-    function syncSidebarState(event) {
-      setIsSidebarOpen(event.matches);
-    }
-
-    setIsSidebarOpen(mediaQuery.matches);
-    mediaQuery.addEventListener("change", syncSidebarState);
-
-    return () => mediaQuery.removeEventListener("change", syncSidebarState);
-  }, []);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 899px)");
@@ -1004,6 +1235,10 @@ export default function HomePage({
       platformAnimeCompleted: "admin.anime.completed.view",
       platformTracker: "admin.tracker.view",
       platformTags: "admin.tags.view",
+      platformSpaceDrumChapters: "admin.spacedrum.chapters.view",
+      platformSpaceDrumPages: "admin.spacedrum.pages.view",
+      platformSpaceDrumSettings: "admin.spacedrum.settings.view",
+      platformSpaceDrumImport: "admin.spacedrum.import.view",
       platformUsers: "users.read",
       platformRoles: "roles.read",
       spacedrum: "spacedrum.view",
@@ -1018,22 +1253,13 @@ export default function HomePage({
     const nextPath = VIEW_PATHS[view] || "/inicio";
     window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
+
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: "instant" });
 
     if (window.matchMedia("(max-width: 900px)").matches) {
-      setIsSidebarOpen(false);
+      window.dispatchEvent(new CustomEvent("kala:sidebar:close"));
     }
-  }
-
-  function toggleSidebar() {
-    setIsSidebarOpen((current) => {
-      if (current === null) {
-        return !window.matchMedia("(min-width: 901px)").matches;
-      }
-
-      return !current;
-    });
   }
 
   function saveTrackerReturnState(liveId) {
@@ -1061,42 +1287,19 @@ export default function HomePage({
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
 
-      <div className={`app-shell ${isSidebarOpen === false ? "is-sidebar-closed" : ""}`}>
-        <button
-          type="button"
-          className={`hamburger-button ${isSidebarOpen ? "is-open" : ""}`}
-          aria-label={isSidebarOpen === false ? "Abrir menu" : "Cerrar menu"}
-          aria-expanded={Boolean(isSidebarOpen)}
-          aria-controls="main-sidebar"
-          onClick={toggleSidebar}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-
-        {isSidebarOpen ? (
-          <button
-            type="button"
-            className="sidebar-overlay"
-            aria-label="Cerrar menu"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        ) : null}
-
+      <AppSidebarShell>
         <AppSidebar
           id="main-sidebar"
           activeView={currentView}
-          className={`${isSidebarOpen ? "is-open" : ""} ${isSidebarOpen === false ? "is-closed" : ""}`}
           isAdmin={isAdmin}
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
           canManageTracker={canManageTracker}
           canManageTags={canViewTagsMaintainer}
+          canManageSpaceDrum={canManageSpaceDrum}
           canManageAnimeTracking={canManageTrackingAnime}
           canManageAnimeCompleted={canManageCompletedAnime}
           isAuthenticated={isAuthenticated}
-          isSpaceDrumEnabled={isSpaceDrumEnabled}
           canAccess={hasPermission}
           onSelect={selectView}
         />
@@ -1313,48 +1516,86 @@ export default function HomePage({
                   </button>
                 </div>
               </div>
-              <div id="lives-grid" className={`lives-grid lives-grid-${cardDensity}`}>
-                {cardDensity === "compact" ? (
-                  <div className="lives-table-header" role="row" aria-hidden="true">
-                    <span>Fecha</span>
-                    <span>Título</span>
-                    <span>Estado</span>
-                    <span>Tags</span>
-                    <span>Disponibilidad</span>
-                    <span>Acciones</span>
+              {cardDensity === "compact" ? (
+                <div className="lives-compact-shell">
+                  <div className="lives-compact-scroll-hint" aria-hidden="true">
+                    Desliza horizontalmente para ver más columnas
                   </div>
-                ) : null}
-                {visibleLives.map((live) => (
-                  <LiveCard
-                    key={live.id}
-                    live={live}
-                    isAdmin={canUpdateTracker}
-                    activity={liveActivity[live.id]}
-                    isAuthenticated={isAuthenticated}
-                    searchTerm={deferredSearch}
-                    onEdit={() => setEditingLive(live)}
-                    onLoginRequired={requireLoginForTracker}
-                    onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
-                    onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
-                    onFilterTag={(tag) =>
-                      startTransition(() => {
-                        setCurrentSelectedTag(tag);
-                      })
-                    }
-                    onFilterYear={(year) =>
-                      startTransition(() => {
-                        setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
-                      })
-                    }
-                    onFilterStatus={(status) =>
-                      startTransition(() => {
-                        setCurrentFilters((current) => ({ ...current, status: status || "all" }));
-                      })
-                    }
-                    onOpenDetail={handleOpenLiveDetail}
-                  />
-                ))}
-              </div>
+                  <div id="lives-grid" className="lives-grid lives-grid-compact">
+                    <div className="lives-table-header" role="row" aria-hidden="true">
+                      <span>Fecha</span>
+                      <span>Título</span>
+                      <span>Estado</span>
+                      <span>Tags</span>
+                      <span>Disponibilidad</span>
+                      <span>Acciones</span>
+                    </div>
+                    {visibleLives.map((live) => (
+                      <LiveCard
+                        key={live.id}
+                        live={live}
+                        isAdmin={canUpdateTracker}
+                        activity={liveActivity[live.id]}
+                        isAuthenticated={isAuthenticated}
+                        searchTerm={deferredSearch}
+                        onEdit={() => setEditingLive(live)}
+                        onLoginRequired={requireLoginForTracker}
+                        onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
+                        onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
+                        onFilterTag={(tag) =>
+                          startTransition(() => {
+                            setCurrentSelectedTag(tag);
+                          })
+                        }
+                        onFilterYear={(year) =>
+                          startTransition(() => {
+                            setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+                          })
+                        }
+                        onFilterStatus={(status) =>
+                          startTransition(() => {
+                            setCurrentFilters((current) => ({ ...current, status: status || "all" }));
+                          })
+                        }
+                        onOpenDetail={handleOpenLiveDetail}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div id="lives-grid" className="lives-grid lives-grid-comfortable">
+                  {visibleLives.map((live) => (
+                    <LiveCard
+                      key={live.id}
+                      live={live}
+                      isAdmin={canUpdateTracker}
+                      activity={liveActivity[live.id]}
+                      isAuthenticated={isAuthenticated}
+                      searchTerm={deferredSearch}
+                      onEdit={() => setEditingLive(live)}
+                      onLoginRequired={requireLoginForTracker}
+                      onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
+                      onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
+                      onFilterTag={(tag) =>
+                        startTransition(() => {
+                          setCurrentSelectedTag(tag);
+                        })
+                      }
+                      onFilterYear={(year) =>
+                        startTransition(() => {
+                          setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+                        })
+                      }
+                      onFilterStatus={(status) =>
+                        startTransition(() => {
+                          setCurrentFilters((current) => ({ ...current, status: status || "all" }));
+                        })
+                      }
+                      onOpenDetail={handleOpenLiveDetail}
+                    />
+                  ))}
+                </div>
+              )}
               {hasMoreLives ? (
                 <div ref={loadMoreRef} className="infinite-scroll-sentinel" aria-hidden="true">
                   <span className="infinite-scroll-label">Cargando más resultados…</span>
@@ -1466,8 +1707,13 @@ export default function HomePage({
               />
             ) : null}
 
-            {isSpaceDrumEnabled && currentView === "spacedrum" ? (
-              <SpaceDrumPage data={initialSpaceDrum} />
+            {currentView === "spacedrum" && hasPermission("spacedrum.view") ? (
+              <SpaceDrumPage
+                data={spaceDrumData}
+                initialProgress={spaceDrumProgress}
+                isAuthenticated={Boolean(currentUser?.id)}
+                isLoading={isSpaceDrumLoading}
+              />
             ) : null}
 
             {currentView === "platformUsers" && canManageUsers ? (
@@ -1500,6 +1746,46 @@ export default function HomePage({
               />
             ) : null}
 
+            {currentView === "platformSpaceDrumChapters" && canViewSpaceDrumChaptersMaintainer ? (
+              <PlatformSpaceDrumChaptersPage
+                initialChapters={spaceDrumAdminChapters}
+                canCreate={canCreateSpaceDrumChapters}
+                canUpdate={canUpdateSpaceDrumChapters}
+                canDelete={canDeleteSpaceDrumChapters}
+                canUpdatePages={canViewSpaceDrumPagesMaintainer}
+                onChaptersChange={setSpaceDrumAdminChapters}
+                onOpenPages={() => selectView("platformSpaceDrumPages")}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumPages" && canViewSpaceDrumPagesMaintainer ? (
+              <PlatformSpaceDrumPagesPage
+                initialPages={spaceDrumAdminPages}
+                chapters={spaceDrumAdminChapters}
+                canCreate={canCreateSpaceDrumPages}
+                canUpdate={canUpdateSpaceDrumPages}
+                canDelete={canDeleteSpaceDrumPages}
+                onPagesChange={setSpaceDrumAdminPages}
+                onChaptersChange={setSpaceDrumAdminChapters}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumSettings" && canViewSpaceDrumSettingsMaintainer ? (
+              <PlatformSpaceDrumSettingsPage
+                initialSettings={spaceDrumAdminSettings}
+                canUpdate={canUpdateSpaceDrumSettings}
+                onSettingsChange={setSpaceDrumAdminSettings}
+              />
+            ) : null}
+
+            {currentView === "platformSpaceDrumImport" && canViewSpaceDrumImportMaintainer ? (
+              <PlatformSpaceDrumImportPage
+                initialSummary={spaceDrumAdminImportSummary}
+                canRun={canRunSpaceDrumImport}
+                onSummaryChange={setSpaceDrumAdminImportSummary}
+              />
+            ) : null}
+
             {currentView === "platformAnimeTracking" && canManageTrackingAnime ? (
               <PlatformAnimeMaintainerPage
                 initialAnimes={animeLibrary}
@@ -1528,7 +1814,7 @@ export default function HomePage({
             <span>Por fans para fans <span aria-hidden="true">💜</span> para Kala</span>
           </footer>
         </div>
-      </div>
+      </AppSidebarShell>
 
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}

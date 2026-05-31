@@ -17,6 +17,9 @@ export default function MaintainerTable({
 }) {
   return (
     <main className={`maintainer-table-shell ${className}`.trim()}>
+      <div className="maintainer-scroll-hint" aria-hidden="true">
+        Desliza horizontalmente para ver más columnas
+      </div>
       <div className="maintainer-table" role="table" aria-label={ariaLabel}>
         <div className="maintainer-table-row maintainer-table-head" role="row">
           {columns.map((column) => (

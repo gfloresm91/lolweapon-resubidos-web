@@ -36,6 +36,14 @@ export default function AccountMenu({ user }) {
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("is-account-menu-open", isOpen);
+
+    return () => {
+      document.body.classList.remove("is-account-menu-open");
+    };
+  }, [isOpen]);
+
   async function logout() {
     setIsOpen(false);
     await fetch("/api/logout", { method: "POST" });

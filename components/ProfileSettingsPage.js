@@ -8,7 +8,7 @@ import { Toaster, toast } from "sonner";
 import AccountMenu from "@/components/AccountMenu";
 import AvatarUploader, { uploadAvatarFile } from "@/components/AvatarUploader";
 import AppSidebar from "@/components/AppSidebar";
-import DetailSidebarControls from "@/components/DetailSidebarControls";
+import AppSidebarShell from "@/components/AppSidebarShell";
 import {
   ALIAS_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
@@ -258,14 +258,11 @@ export default function ProfileSettingsPage({ currentUser }) {
       <div className="bg-orb orb-2" aria-hidden="true" />
       <div className="bg-orb orb-3" aria-hidden="true" />
 
-      <div className="app-shell">
-        <DetailSidebarControls />
-
+      <AppSidebarShell>
         <AppSidebar
           activeView=""
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
-          isSpaceDrumEnabled={process.env.NEXT_PUBLIC_ENABLE_SPACEDRUM === "true"}
           canAccess={canAccess}
         />
 
@@ -422,7 +419,7 @@ export default function ProfileSettingsPage({ currentUser }) {
             </section>
           </main>
         </div>
-      </div>
+      </AppSidebarShell>
     </>
   );
 }
