@@ -152,6 +152,7 @@ npm run db:migrate:deploy
   - Validación visual bajo el campo.
   - Toast para errores globales o de operación.
   - Mantener validaciones homologadas entre registro, perfil y mantenedores.
+  - No usar `<select>` nativos en UI visible; usar `FilterSelect` para filtros y `FormSelect` para formularios.
 - Botones que requieren sesión:
   - No redirigir de golpe si el usuario no está autenticado.
   - Mostrar toast/modal con explicación y acción para iniciar sesión.
@@ -160,6 +161,13 @@ npm run db:migrate:deploy
   - Probar estados autenticados cuando cambien acciones visibles por permiso, especialmente rol `Dios`.
   - Probar estados interactivos: menú lateral abierto, modales, dropdowns, tablas compactas y cards con todas sus acciones.
   - El menú lateral debe poder hacer scroll en mobile cuando existan más módulos que altura disponible.
+- Parpadeos al hacer scroll:
+  - Si una pantalla parpadea o titila solo al hacer scroll, revisar primero CSS antes de asumir un bug de datos o React.
+  - Causa común en este proyecto: muchas cards con gradientes apilados, sombras grandes, filtros/backdrop-filter o transiciones de `transform` fuerzan repintados caros en Chromium.
+  - Corrección rápida aplicada en `Novedades`: aislar solo el contenedor (`isolation: isolate`), reemplazar sombras grandes por sombras internas sutiles y retirar `contain: paint` de hero/cards repetidas.
+  - No usar `contain: paint` como parche en páginas largas con muchas cards y gradientes; puede crear recomposición visible al hacer scroll en Chromium.
+  - Evitar hover con `transform` en grids largos de cards informativas; preferir cambios de borde, fondo, color u opacidad.
+  - Después de corregir, validar con scroll real en la pantalla afectada y ejecutar `npm run build` si hubo cambios de código/CSS.
 
 ## Roles Y Permisos
 

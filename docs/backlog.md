@@ -68,6 +68,12 @@ _(vacío)_
 
 ## Ideas / Mejoras futuras
 
+### Mantenedor de novedades
+
+- La primera versión de `/novedades` y `/changelog` usa contenido estático versionado en el repositorio.
+- Evolución futura: crear un mantenedor administrativo para publicar novedades, marcar cambios como destacados, definir audiencia, programar fechas y registrar auditoría.
+- Ideas adicionales: marcar novedades como leídas por usuario, métricas de interacción, notificaciones internas y generación parcial del changelog desde tags/releases de Git.
+
 ### Doble polling de Twitch status
 
 - `HomeDashboard` y `PersistentTwitchPlayer` hacen fetch a `/api/twitch/status` de forma independiente cada 60 segundos.

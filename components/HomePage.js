@@ -9,11 +9,13 @@ import AccountMenu from "@/components/AccountMenu";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
 import AppSidebar from "@/components/AppSidebar";
 import AppSidebarShell from "@/components/AppSidebarShell";
+import ChangelogPage from "@/components/ChangelogPage";
 import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
+import NewsGuidePage from "@/components/NewsGuidePage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
@@ -89,6 +91,8 @@ const EMPTY_OBJECT = {};
 const GOD_EXCLUDED_PERMISSION_CODES = new Set(["anime.rating.streamer"]);
 const VIEW_LABELS = {
   home: "Inicio",
+  news: "Novedades",
+  changelog: "Historial de cambios",
   tracker: "Rastreador de directos",
   myList: "Mi lista",
   myAnimeList: "Mi lista anime",
@@ -109,6 +113,8 @@ const VIEW_LABELS = {
 
 const VIEW_PATHS = {
   home: "/inicio",
+  news: "/novedades",
+  changelog: "/changelog",
   tracker: "/rastreador",
   myList: "/mi-lista",
   myAnimeList: "/mi-lista/anime",
@@ -1226,6 +1232,8 @@ export default function HomePage({
   function selectView(view) {
     const viewPermissions = {
       home: "home.view",
+      news: "news.view",
+      changelog: "changelog.view",
       tracker: "tracker.view",
       myList: "tracker.view",
       myAnimeList: "anime.tracking.view",
@@ -1330,6 +1338,17 @@ export default function HomePage({
                 streamlabsUrl={process.env.NEXT_PUBLIC_STREAMLABS_URL}
                 onTrackerOpen={() => selectView("tracker")}
               />
+            ) : null}
+
+            {currentView === "news" && hasPermission("news.view") ? (
+              <NewsGuidePage
+                currentUser={currentUser}
+                permissions={Array.from(effectivePermissions)}
+              />
+            ) : null}
+
+            {currentView === "changelog" && hasPermission("changelog.view") ? (
+              <ChangelogPage />
             ) : null}
 
             {["tracker", "myList"].includes(currentView) ? (

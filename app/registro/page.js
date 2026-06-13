@@ -36,6 +36,19 @@ const registerSchema = z.object({
   message: "Las contraseñas no coinciden.",
 });
 
+function getSafeReturnPath(value) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/api/")) {
+    return null;
+  }
+
+  const pathname = value.split("?")[0].split("#")[0];
+  if (["/login", "/registro"].includes(pathname)) {
+    return null;
+  }
+
+  return value;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,8 +57,12 @@ export default function RegisterPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const next = params.get("next");
-    if (next?.startsWith("/") && !next.startsWith("//")) {
-      setNextPath(next);
+    const returnTo = params.get("returnTo");
+    const safeReturnTo = getSafeReturnPath(returnTo);
+    const safeNext = getSafeReturnPath(next);
+
+    if (safeReturnTo || safeNext) {
+      setNextPath(safeReturnTo || safeNext);
     }
   }, []);
   const [visiblePasswords, setVisiblePasswords] = useState({
@@ -104,7 +121,7 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/inicio");
+      router.push(nextPath);
       router.refresh();
     } catch {
       toast.error("No se pudo crear la cuenta. Intenta nuevamente.");
@@ -235,10 +252,10 @@ export default function RegisterPage() {
         </form>
 
         <p className="auth-footer-copy">
-          ¿Ya tienes cuenta? <Link href="/login">Iniciar sesión</Link>
+          ¿Ya tienes cuenta? <Link href={`/login?returnTo=${encodeURIComponent(nextPath)}`}>Iniciar sesión</Link>
         </p>
 
-        <AuthBackButton fallbackHref={nextPath} />
+        <AuthBackButton fallbackHref="/inicio" returnHref={nextPath} />
       </section>
     </main>
   );
