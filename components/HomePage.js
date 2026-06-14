@@ -31,6 +31,15 @@ import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
 import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
+const CARD_DENSITY_STORAGE_KEY = "kala_card_density";
+const CARD_DENSITY_VERSION_KEY = "kala_card_density_version";
+const CURRENT_CARD_DENSITY_VERSION = "3";
+const TABLE_VIEW_MEDIA_QUERY = "(min-width: 768px)";
+
+function normalizeCardDensity(value) {
+  return value === "comfortable" || value === "compact" || value === "table" ? value : "comfortable";
+}
+
 function getAllTags(lives) {
   return Array.from(
     new Set(
@@ -364,16 +373,40 @@ export default function HomePage({
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [pendingTrackerRestore, setPendingTrackerRestore] = useState(null);
   const [cardDensity, setCardDensity] = useState("comfortable");
+  const [isTableViewAvailable, setIsTableViewAvailable] = useState(false);
 
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem("kala_card_density");
-      if (saved === "comfortable" || saved === "compact") {
-        setCardDensity(saved);
-      }
+      const saved = window.localStorage.getItem(CARD_DENSITY_STORAGE_KEY);
+      const version = window.localStorage.getItem(CARD_DENSITY_VERSION_KEY);
+      setCardDensity(saved === "compact" && version !== CURRENT_CARD_DENSITY_VERSION ? "table" : normalizeCardDensity(saved));
     } catch {}
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(TABLE_VIEW_MEDIA_QUERY);
+    const syncTableAvailability = () => setIsTableViewAvailable(mediaQuery.matches);
+
+    syncTableAvailability();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", syncTableAvailability);
+      return () => mediaQuery.removeEventListener("change", syncTableAvailability);
+    }
+
+    mediaQuery.addListener(syncTableAvailability);
+    return () => mediaQuery.removeListener(syncTableAvailability);
+  }, []);
+
+  const effectiveCardDensity = cardDensity === "table" && !isTableViewAvailable ? "compact" : cardDensity;
+
+  function setPreferredCardDensity(nextDensity) {
+    const normalizedDensity = normalizeCardDensity(nextDensity);
+    setCardDensity(normalizedDensity);
+    try {
+      window.localStorage.setItem(CARD_DENSITY_STORAGE_KEY, normalizedDensity);
+      window.localStorage.setItem(CARD_DENSITY_VERSION_KEY, CURRENT_CARD_DENSITY_VERSION);
+    } catch {}
+  }
 
   const [isPending, startTransition] = useTransition();
   const deferredSearch = useDeferredValue(filters.search);
@@ -1515,32 +1548,33 @@ export default function HomePage({
                 <div className="density-toggle" aria-label="Densidad de tarjetas">
                   <button
                     type="button"
-                    className={cardDensity === "comfortable" ? "is-active" : ""}
-                    onClick={() => {
-                      setCardDensity("comfortable");
-                      try { window.localStorage.setItem("kala_card_density", "comfortable"); } catch {}
-                    }}
+                    className={effectiveCardDensity === "comfortable" ? "is-active" : ""}
+                    onClick={() => setPreferredCardDensity("comfortable")}
                   >
                     Cómodo
                   </button>
                   <button
                     type="button"
-                    className={cardDensity === "compact" ? "is-active" : ""}
-                    onClick={() => {
-                      setCardDensity("compact");
-                      try { window.localStorage.setItem("kala_card_density", "compact"); } catch {}
-                    }}
+                    className={effectiveCardDensity === "compact" ? "is-active" : ""}
+                    onClick={() => setPreferredCardDensity("compact")}
                   >
                     Compacto
                   </button>
+                  <button
+                    type="button"
+                    className={`density-table-option ${effectiveCardDensity === "table" ? "is-active" : ""}`}
+                    onClick={() => setPreferredCardDensity("table")}
+                  >
+                    Tabla
+                  </button>
                 </div>
               </div>
-              {cardDensity === "compact" ? (
+              {effectiveCardDensity === "table" ? (
                 <div className="lives-compact-shell">
                   <div className="lives-compact-scroll-hint" aria-hidden="true">
                     Desliza horizontalmente para ver más columnas
                   </div>
-                  <div id="lives-grid" className="lives-grid lives-grid-compact">
+                  <div id="lives-grid" className="lives-grid lives-grid-compact lives-grid-table">
                     <div className="lives-table-header" role="row" aria-hidden="true">
                       <span>Fecha</span>
                       <span>Título</span>
@@ -1582,11 +1616,12 @@ export default function HomePage({
                   </div>
                 </div>
               ) : (
-                <div id="lives-grid" className="lives-grid lives-grid-comfortable">
+                <div id="lives-grid" className={`lives-grid ${effectiveCardDensity === "compact" ? "lives-grid-card-compact" : "lives-grid-comfortable"}`}>
                   {visibleLives.map((live) => (
                     <LiveCard
                       key={live.id}
                       live={live}
+                      cardDensity={effectiveCardDensity}
                       isAdmin={canUpdateTracker}
                       activity={liveActivity[live.id]}
                       isAuthenticated={isAuthenticated}
@@ -1666,8 +1701,8 @@ export default function HomePage({
                 formVariant={trackingAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="active"
-                cardDensity={cardDensity}
-                onCardDensityChange={setCardDensity}
+                cardDensity={effectiveCardDensity}
+                onCardDensityChange={setPreferredCardDensity}
                 initialActivity={animeActivity}
                 initialStreamerRatings={animeStreamerRatings}
                 initialUserRatings={animeUserRatings}
@@ -1690,8 +1725,8 @@ export default function HomePage({
                 formVariant={completedAnimeFormVariant || "compact"}
                 isLoading={isAnimeLibraryLoading}
                 mode="completed"
-                cardDensity={cardDensity}
-                onCardDensityChange={setCardDensity}
+                cardDensity={effectiveCardDensity}
+                onCardDensityChange={setPreferredCardDensity}
                 initialActivity={animeActivity}
                 initialStreamerRatings={animeStreamerRatings}
                 initialUserRatings={animeUserRatings}
@@ -1716,8 +1751,8 @@ export default function HomePage({
                 isStreamer={hasPermission("anime.rating.streamer")}
                 isLoading={isAnimeLibraryLoading}
                 mode="personal"
-                cardDensity={cardDensity}
-                onCardDensityChange={setCardDensity}
+                cardDensity={effectiveCardDensity}
+                onCardDensityChange={setPreferredCardDensity}
                 personalOnly
                 onAnimesChange={setAnimeLibrary}
                 onAnimeActivityChange={setAnimeActivity}
