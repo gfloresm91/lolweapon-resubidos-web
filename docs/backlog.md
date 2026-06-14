@@ -72,7 +72,13 @@ _(vacío)_
 
 - La primera versión de `/novedades` y `/changelog` usa contenido estático versionado en el repositorio.
 - Evolución futura: crear un mantenedor administrativo para publicar novedades, marcar cambios como destacados, definir audiencia, programar fechas y registrar auditoría.
-- Ideas adicionales: marcar novedades como leídas por usuario, métricas de interacción, notificaciones internas y generación parcial del changelog desde tags/releases de Git.
+- Agregar CRUD administrativo para novedades/changelog, idealmente con permisos separados para ver, crear, editar, publicar y eliminar.
+- Permitir marcar novedades como leídas por usuario y mostrar un badge en el menú cuando existan novedades pendientes.
+- Agregar métricas de vistas e interacción: aperturas de página, clicks en CTAs, módulos más consultados y novedades más vistas.
+- Evaluar notificaciones internas o avisos suaves cuando haya novedades importantes.
+- Generar parcial o totalmente el changelog desde tags/releases de Git, manteniendo posibilidad de editar el texto visible para usuarios.
+- Explorar un editor Markdown o contenido enriquecido para novedades largas, sin convertir la página pública en un manual pesado.
+- Agregar tutoriales interactivos/contextuales por módulo como evolución de las guías rápidas actuales.
 
 ### Doble polling de Twitch status
 
