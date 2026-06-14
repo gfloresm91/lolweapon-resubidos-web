@@ -177,11 +177,13 @@ El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/c
 
 La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`.
 
-### Permisos (41 en total)
+### Permisos principales
 
 | Grupo | Códigos |
 |---|---|
 | Inicio | `home.view` |
+| Novedades | `news.view` |
+| Historial de cambios | `changelog.view` |
 | Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Roles | `roles.read`, `roles.create`, `roles.update` |
 | Admin: Rastreador | `admin.tracker.view` |
@@ -203,6 +205,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Ruta | Descripción |
 |---|---|
 | `/inicio` | Home: stream en vivo, últimos directos, últimos videos de YouTube |
+| `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
+| `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |

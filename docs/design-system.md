@@ -67,6 +67,14 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Inputs y selects deben usar clases estándar (`modal-input`, `FormSelect`, `FilterSelect`).
 - Campos de imagen local deben usar uploader con drag and drop y botón de selección.
 
+## Selectores
+
+- No usar `<select>` nativos en pantallas visibles de la app, porque el menú desplegable lo pinta el sistema operativo/navegador y rompe la línea visual oscura del proyecto.
+- Para filtros de páginas, toolbars y listados usar siempre `FilterSelect`.
+- Para campos dentro de formularios o modales usar siempre `FormSelect`.
+- Si se necesita un selector nuevo, primero adaptar `FilterSelect` o `FormSelect`; crear una variante nueva solo si el comportamiento no encaja con esos componentes.
+- Caso documentado: en `/changelog`, los filtros `Módulo` y `Tipo` se implementaron inicialmente con `<select>`. Al abrirlos, el dropdown aparecía con estilo nativo claro/gris y no respetaba bordes, contraste ni estados del diseño. Se corrigió reemplazándolos por `FilterSelect` y eliminando el CSS específico del selector nativo.
+
 ## Botones
 
 - Acciones primarias: fondo/acento morado.
@@ -78,6 +86,13 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Evitar texto que no quepa dentro del botón; si ocurre, ajustar layout antes que reducir excesivamente fuente.
 
 ## Cards
+
+### Novedades
+
+- Usar cards informativas de una sola capa para beneficios, novedades y tutoriales.
+- La primera pantalla debe priorizar beneficios por tipo de usuario antes que una lista de cambios.
+- Las CTAs se adaptan a la sesión: invitado, usuario registrado y administración.
+- Las comparativas deben ser livianas y responsivas; evitar tablas densas de administración.
 
 ### Rastreador
 
@@ -120,6 +135,16 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Usar grids con `minmax`, `auto`, `aspect-ratio` y constraints estables.
 - Evitar solapes con header, footer persistente y sidebars.
 - Probar visualmente cambios grandes en desktop y mobile.
+
+## Rendimiento Visual
+
+- En pantallas con muchas cards, evitar combinar sombras grandes, múltiples gradientes, filtros y transiciones de `transform`; esa mezcla puede provocar parpadeos al hacer scroll.
+- Si aparece flicker/titileo durante el scroll, estabilizar primero el CSS:
+  - aislar el contenedor principal con `isolation: isolate`;
+  - usar `contain: paint` en hero/cards repetidas;
+  - reemplazar `box-shadow` grandes por sombras internas o bordes sutiles;
+  - quitar hover basado en `transform` cuando el grid es largo.
+- Caso documentado: la página `Novedades` parpadeaba al hacer scroll por repintados caros de cards con gradientes y sombras. Se resolvió conteniendo pintura y reduciendo sombras sin cambiar la estructura visual.
 
 ## Accesibilidad
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bookmark, BookOpenText, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, House, Library, ShieldCheck, Tags, Users } from "lucide-react";
+import { Archive, Bookmark, BookOpenText, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -10,6 +10,20 @@ const SIDEBAR_ITEMS = [
     label: "Inicio",
     icon: House,
     permission: "home.view",
+  },
+  {
+    key: "news",
+    href: "/novedades",
+    label: "Novedades",
+    icon: Sparkles,
+    permission: "news.view",
+  },
+  {
+    key: "changelog",
+    href: "/changelog",
+    label: "Historial de cambios",
+    icon: History,
+    permission: "changelog.view",
   },
   {
     key: "tracker",

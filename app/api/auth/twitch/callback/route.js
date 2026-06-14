@@ -10,11 +10,30 @@ import {
   exchangeTwitchCode,
   fetchTwitchChannelMembership,
   fetchTwitchUserProfile,
+  TWITCH_OAUTH_RETURN_COOKIE,
   TWITCH_OAUTH_STATE_COOKIE,
 } from "@/lib/twitchOAuth";
 
+function getSafeReturnPath(value) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/api/")) {
+    return null;
+  }
+
+  const pathname = value.split("?")[0].split("#")[0];
+  if (["/login", "/registro"].includes(pathname)) {
+    return null;
+  }
+
+  return value;
+}
+
 function redirectLogin(request, message) {
-  return NextResponse.redirect(buildTwitchAppUrl(request, `/login?error=${encodeURIComponent(message)}`));
+  const returnTo = getSafeReturnPath(request.cookies.get(TWITCH_OAUTH_RETURN_COOKIE)?.value);
+  const loginPath = returnTo
+    ? `/login?error=${encodeURIComponent(message)}&returnTo=${encodeURIComponent(returnTo)}`
+    : `/login?error=${encodeURIComponent(message)}`;
+
+  return NextResponse.redirect(buildTwitchAppUrl(request, loginPath));
 }
 
 export async function GET(request) {
@@ -22,6 +41,7 @@ export async function GET(request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const expectedState = request.cookies.get(TWITCH_OAUTH_STATE_COOKIE)?.value;
+  const returnTo = getSafeReturnPath(request.cookies.get(TWITCH_OAUTH_RETURN_COOKIE)?.value) || "/";
 
   if (!code || !state || !expectedState || state !== expectedState) {
     return redirectLogin(request, "No se pudo validar la respuesta de Twitch.");
@@ -41,7 +61,7 @@ export async function GET(request) {
     }
 
     const session = await createPlatformSession(user.id);
-    const response = NextResponse.redirect(buildTwitchAppUrl(request, "/"));
+    const response = NextResponse.redirect(buildTwitchAppUrl(request, returnTo));
 
     response.cookies.set(SESSION_COOKIE, session.token, {
       httpOnly: true,
@@ -51,6 +71,11 @@ export async function GET(request) {
       expires: session.expiresAt,
     });
     response.cookies.set(TWITCH_OAUTH_STATE_COOKIE, "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+    });
+    response.cookies.set(TWITCH_OAUTH_RETURN_COOKIE, "", {
       httpOnly: true,
       path: "/",
       maxAge: 0,

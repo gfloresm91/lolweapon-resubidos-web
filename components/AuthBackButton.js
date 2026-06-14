@@ -27,16 +27,35 @@ function canReturnToPreviousPage() {
   }
 }
 
-export default function AuthBackButton({ fallbackHref = "/inicio", label = "Volver a la web" }) {
+function getSafeLocalPath(path) {
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/api/")) {
+    return null;
+  }
+
+  if (["/login", "/registro"].includes(path.split("?")[0].split("#")[0])) {
+    return null;
+  }
+
+  return path;
+}
+
+export default function AuthBackButton({ fallbackHref = "/inicio", label = "Volver a la web", returnHref = null }) {
   const router = useRouter();
 
   function handleBack() {
+    const safeReturnHref = getSafeLocalPath(returnHref);
+
+    if (safeReturnHref) {
+      router.push(safeReturnHref);
+      return;
+    }
+
     if (canReturnToPreviousPage()) {
       router.back();
       return;
     }
 
-    router.push(fallbackHref);
+    router.push(getSafeLocalPath(fallbackHref) || "/inicio");
   }
 
   return (

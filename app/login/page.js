@@ -17,11 +17,25 @@ const loginSchema = z.object({
   password: z.string().min(1, "La contraseña es obligatoria."),
 });
 
+function getSafeReturnPath(value) {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.startsWith("/api/")) {
+    return null;
+  }
+
+  const pathname = value.split("?")[0].split("#")[0];
+  if (["/login", "/registro"].includes(pathname)) {
+    return null;
+  }
+
+  return value;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [nextPath, setNextPath] = useState("/inicio");
+  const twitchLoginHref = `/api/auth/twitch/start?returnTo=${encodeURIComponent(nextPath)}`;
   const {
     formState: { errors },
     handleSubmit,
@@ -42,9 +56,12 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const error = params.get("error");
     const next = params.get("next");
+    const returnTo = params.get("returnTo");
+    const safeReturnTo = getSafeReturnPath(returnTo);
+    const safeNext = getSafeReturnPath(next);
 
-    if (next?.startsWith("/") && !next.startsWith("//")) {
-      setNextPath(next);
+    if (safeReturnTo || safeNext) {
+      setNextPath(safeReturnTo || safeNext);
     }
 
     if (error) {
@@ -99,7 +116,7 @@ export default function LoginPage() {
         </div>
 
         <div className="auth-provider-row" aria-label="Proveedores de inicio de sesion">
-          <a href="/api/auth/twitch/start" className="auth-provider-button twitch-login-button">
+          <a href={twitchLoginHref} className="auth-provider-button twitch-login-button">
             <span>Twitch</span>
             <strong>Entrar</strong>
           </a>
@@ -161,10 +178,10 @@ export default function LoginPage() {
         </form>
 
         <p className="auth-footer-copy">
-          ¿No tienes cuenta? <Link href="/registro">Registrarme</Link>
+          ¿No tienes cuenta? <Link href={`/registro?returnTo=${encodeURIComponent(nextPath)}`}>Registrarme</Link>
         </p>
 
-        <AuthBackButton fallbackHref={nextPath} />
+        <AuthBackButton fallbackHref="/inicio" returnHref={nextPath} />
 
       </section>
     </main>
