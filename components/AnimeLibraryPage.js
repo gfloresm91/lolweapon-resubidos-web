@@ -1951,7 +1951,6 @@ export default function AnimeLibraryPage({
 
   function setDensity(nextDensity) {
     onCardDensityChange?.(nextDensity);
-    try { window.localStorage.setItem("kala_card_density", nextDensity); } catch {}
   }
 
   return (
@@ -2068,16 +2067,29 @@ export default function AnimeLibraryPage({
                 >
                   Compacto
                 </button>
+                <button
+                  type="button"
+                  className={`density-table-option ${cardDensity === "table" ? "is-active" : ""}`}
+                  onClick={() => setDensity("table")}
+                >
+                  Tabla
+                </button>
               </div>
             </div>
-            <div className={cardDensity === "compact" ? "anime-compact-shell" : ""}>
-              {cardDensity === "compact" ? (
+            <div className={cardDensity === "table" ? "anime-compact-shell" : ""}>
+              {cardDensity === "table" ? (
                 <div className="lives-compact-scroll-hint" aria-hidden="true">
                   Desliza horizontalmente para ver más columnas
                 </div>
               ) : null}
-              <div className={`anime-grid anime-library-grid anime-library-grid-${cardDensity}`}>
-                {cardDensity === "compact" ? (
+              <div className={`anime-grid anime-library-grid ${
+                cardDensity === "table"
+                  ? "anime-library-grid-compact anime-library-grid-table"
+                  : cardDensity === "compact"
+                    ? "anime-library-grid-card-compact"
+                    : "anime-library-grid-comfortable"
+              }`}>
+                {cardDensity === "table" ? (
                   <div className="anime-library-table-header" role="row" aria-hidden="true">
                     <span>Poster</span>
                     <span>Anime</span>
@@ -2108,6 +2120,143 @@ export default function AnimeLibraryPage({
                   anime.episodes ? `${anime.episodes} eps` : null,
                   anime.format,
                 ].filter(Boolean).join(" · ");
+
+                if (cardDensity === "compact") {
+                  const compactStatusLabel = mode === "completed"
+                    ? getStatusLabel(anime.watchStatus)
+                    : fullSeason
+                      ? "Entera"
+                      : purchaseLabel;
+
+                  return (
+                    <article
+                      key={anime.key}
+                      className={`anime-card anime-library-card anime-library-card-compact ${canUpdate ? "is-admin" : ""}`}
+                    >
+                      <div className="poster-container anime-library-poster anime-library-compact-poster">
+                        <AnimePosterImage
+                          src={anime.image}
+                          title={anime.titleEs || anime.title}
+                          className="poster-img"
+                          decorative
+                        />
+                        <div className="poster-overlay" />
+                        {streamerScore != null ? (
+                          <Tooltip label="Nota destacada por Kala">
+                            <span
+                              className="anime-compact-featured-score"
+                              style={{ "--score-color": getChulopuntoColor(streamerScore) }}
+                            >
+                              {formatChulopunto(streamerScore)}
+                            </span>
+                          </Tooltip>
+                        ) : null}
+                        {episodeProgress.total ? (
+                          <div
+                            className={`anime-library-watch-progress ${mode === "completed" ? "archive-progress" : ""}`}
+                            aria-label={`Progreso visto ${episodeProgress.current} de ${episodeProgress.total} episodios`}
+                            title={`${episodeProgress.current}/${episodeProgress.total} episodios vistos`}
+                          >
+                            <span style={{ width: `${episodeProgress.percent}%` }} />
+                          </div>
+                        ) : null}
+                        <div className="title-overlay">
+                          <h2 className="anime-title">{anime.titleEs || anime.title}</h2>
+                        </div>
+                      </div>
+                      <div className="anime-card-body anime-library-compact-body">
+                        <div className="anime-library-compact-summary">
+                          <span>{compactStatusLabel}</span>
+                          {episodeProgress.total ? (
+                            <strong>{episodeProgress.current}/{episodeProgress.total}</strong>
+                          ) : archiveMeta.length ? (
+                            <strong>{archiveMeta.join(" · ")}</strong>
+                          ) : null}
+                        </div>
+                        <div className="anime-card-actions anime-library-compact-actions">
+                          <Tooltip label={!isAuthenticated ? "Inicia sesión para guardar favoritos" : personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}>
+                            <button
+                              type="button"
+                              className={`anime-rating-btn anime-compact-icon-action ${personalActivity.isFavorite ? "is-rated" : ""}`}
+                              aria-label={personalActivity.isFavorite ? "Quitar de favoritos" : "Marcar como favorito"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                updateAnimeActivity(anime.key, { isFavorite: !personalActivity.isFavorite });
+                              }}
+                            >
+                              <Star size={14} />
+                            </button>
+                          </Tooltip>
+                          <Tooltip
+                            label={
+                              !isAuthenticated
+                                ? "Inicia sesión para puntuar"
+                                : !canRate
+                                  ? "Tu rol no permite puntuar"
+                                  : userScore != null
+                                    ? `Tu puntuación personal: ${formatChulopunto(userScore)}/8`
+                                    : "Calificar anime"
+                            }
+                          >
+                            <button
+                              type="button"
+                              className={`anime-rating-btn anime-compact-rating ${userScore != null ? "is-rated" : ""} ${isAuthenticated && !canRate ? "is-disabled" : ""}`}
+                              style={userScoreColor ? { color: userScoreColor, borderColor: `${userScoreColor}66` } : undefined}
+                              aria-label={userScore != null ? `Tu puntuación: ${formatChulopunto(userScore)}/8` : "Calificar anime"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (!isAuthenticated) {
+                                  toast("Inicia sesión para calificar.", {
+                                    action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
+                                  });
+                                  return;
+                                }
+                                if (!canRate) {
+                                  toast.error("Tu rol no tiene permiso para calificar anime.");
+                                  return;
+                                }
+                                openRatingModal(anime.key);
+                              }}
+                            >
+                              {userScore != null ? (
+                                <>
+                                  <span className="anime-rating-score">{formatChulopunto(userScore)}</span>
+                                  <span className="anime-rating-label">Nota</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="anime-rating-label">Nota</span>
+                                </>
+                              )}
+                            </button>
+                          </Tooltip>
+                          <Tooltip label={hasTrackerUrl ? "Abrir resubidos" : "Sin enlace de resubidos"}>
+                            {hasTrackerUrl ? (
+                              <a
+                                href={anime.trackerUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="anime-tracker-button"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                Ver
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                className="anime-tracker-button is-disabled"
+                                aria-disabled="true"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                Ver
+                              </button>
+                            )}
+                          </Tooltip>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                }
 
                 return (
                   <article
