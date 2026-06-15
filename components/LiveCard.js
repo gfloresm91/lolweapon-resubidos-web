@@ -10,6 +10,7 @@ import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 function statusClass(status) {
   const normalized = String(status || "").toLowerCase();
 
+  if (normalized.includes("directo")) return "status-badge status-badge--directo";
   if (normalized.includes("completo")) return "status-badge status-badge--completo";
   if (normalized.includes("lost")) return "status-badge status-badge--lost";
   if (normalized.includes("subiendo")) return "status-badge status-badge--subiendo";
@@ -19,6 +20,7 @@ function statusClass(status) {
 function statusDotClass(status) {
   const normalized = String(status || "").toLowerCase();
 
+  if (normalized.includes("directo")) return "status-dot status-dot-directo";
   if (normalized.includes("completo")) return "status-dot status-dot-completo";
   if (normalized.includes("lost")) return "status-dot status-dot-lost";
   if (normalized.includes("subiendo")) return "status-dot status-dot-subiendo";
@@ -84,6 +86,21 @@ function formatDisplayDate(value) {
   }).format(date);
 }
 
+function truncateCompactTitle(value, maxLength = 46) {
+  const title = String(value || "Sin titulo").replace(/\s+/g, " ").trim();
+
+  if (title.length <= maxLength) {
+    return title;
+  }
+
+  const slice = title.slice(0, maxLength + 1);
+  const wordBoundary = slice.lastIndexOf(" ");
+  const cutIndex = wordBoundary >= Math.floor(maxLength * 0.65) ? wordBoundary : maxLength;
+  const truncated = title.slice(0, cutIndex).replace(/[\s.,;:!?\-]+$/g, "");
+
+  return `${truncated}...`;
+}
+
 function LiveCard({
   live,
   cardDensity = "comfortable",
@@ -117,6 +134,7 @@ function LiveCard({
   const isWatched = Boolean(activity?.isWatched);
   const compactTags = allTags.slice(0, 2);
   const compactHiddenCount = Math.max(allTags.length - compactTags.length, 0);
+  const compactTitle = truncateCompactTitle(live.title);
 
   function openDetail() {
     onOpenDetail?.(live.id);
@@ -150,7 +168,9 @@ function LiveCard({
           </button>
         </div>
 
-        <h2 className="live-title live-compact-title">{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
+        <h2 className="live-title live-compact-title" title={live.title || "Sin titulo"}>
+          {compactTitle}
+        </h2>
 
         <div className="live-compact-tags">
           {compactTags.map((tag) => (
