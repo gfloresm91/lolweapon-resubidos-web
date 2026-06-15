@@ -10,6 +10,7 @@ import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 function statusClass(status) {
   const normalized = String(status || "").toLowerCase();
 
+  if (normalized.includes("directo")) return "status-badge status-badge--directo";
   if (normalized.includes("completo")) return "status-badge status-badge--completo";
   if (normalized.includes("lost")) return "status-badge status-badge--lost";
   if (normalized.includes("subiendo")) return "status-badge status-badge--subiendo";
@@ -19,6 +20,7 @@ function statusClass(status) {
 function statusDotClass(status) {
   const normalized = String(status || "").toLowerCase();
 
+  if (normalized.includes("directo")) return "status-dot status-dot-directo";
   if (normalized.includes("completo")) return "status-dot status-dot-completo";
   if (normalized.includes("lost")) return "status-dot status-dot-lost";
   if (normalized.includes("subiendo")) return "status-dot status-dot-subiendo";
@@ -84,8 +86,24 @@ function formatDisplayDate(value) {
   }).format(date);
 }
 
+function truncateCompactTitle(value, maxLength = 46) {
+  const title = String(value || "Sin titulo").replace(/\s+/g, " ").trim();
+
+  if (title.length <= maxLength) {
+    return title;
+  }
+
+  const slice = title.slice(0, maxLength + 1);
+  const wordBoundary = slice.lastIndexOf(" ");
+  const cutIndex = wordBoundary >= Math.floor(maxLength * 0.65) ? wordBoundary : maxLength;
+  const truncated = title.slice(0, cutIndex).replace(/[\s.,;:!?\-]+$/g, "");
+
+  return `${truncated}...`;
+}
+
 function LiveCard({
   live,
+  cardDensity = "comfortable",
   isAdmin,
   activity = null,
   isAuthenticated = false,
@@ -114,10 +132,120 @@ function LiveCard({
   const showThumbnail = false;
   const isSaved = Boolean(activity?.isSaved);
   const isWatched = Boolean(activity?.isWatched);
+  const compactTags = allTags.slice(0, 2);
+  const compactHiddenCount = Math.max(allTags.length - compactTags.length, 0);
+  const compactTitle = truncateCompactTitle(live.title);
 
   function openDetail() {
     onOpenDetail?.(live.id);
     router.push(detailPath);
+  }
+
+  if (cardDensity === "compact") {
+    return (
+      <article className="live-card live-card-compact visible" data-live-id={live.id}>
+        <div className="live-compact-header">
+          <button
+            type="button"
+            className="live-date-pill"
+            onClick={(event) => {
+              event.stopPropagation();
+              onFilterYear?.(live.year);
+            }}
+          >
+            {formatDisplayDate(live.date)}
+          </button>
+          <button
+            type="button"
+            className={statusClass(live.status)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onFilterStatus?.(live.status);
+            }}
+          >
+            <span className={statusDotClass(live.status)} aria-hidden="true" />
+            {live.status || PENDING_LIVE_STATUS_LABEL}
+          </button>
+        </div>
+
+        <h2 className="live-title live-compact-title" title={live.title || "Sin titulo"}>
+          {compactTitle}
+        </h2>
+
+        <div className="live-compact-tags">
+          {compactTags.map((tag) => (
+            <button
+              type="button"
+              key={tag}
+              className="tag-pill"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFilterTag(tag);
+              }}
+            >
+              {highlightText(tag, searchTerm)}
+            </button>
+          ))}
+          {compactHiddenCount ? <span className="tag-pill tag-pill-muted">+{compactHiddenCount}</span> : null}
+        </div>
+
+        <div className="availability-row live-compact-availability" aria-label="Disponibilidad del resubido">
+          {okruCount > 0 ? <span className="availability-chip availability-chip-okru">OK.RU · {okruCount}</span> : null}
+          {telegramCount > 0 ? <span className="availability-chip availability-chip-telegram">Telegram · {telegramCount}</span> : null}
+          {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
+        </div>
+
+        <div className="links-container live-compact-actions">
+          <Tooltip label={isSaved ? "Quitar de guardados" : "Guardar para después"}>
+            <button
+              type="button"
+              className={`platform-btn platform-personal ${isSaved ? "is-active" : ""}`}
+              aria-label={isSaved ? `Quitar ${live.title || "directo"} de guardados` : `Guardar ${live.title || "directo"} para después`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!isAuthenticated) {
+                  onLoginRequired?.("Inicia sesión para guardar directos y verlos después.");
+                  return;
+                }
+
+                onToggleSaved?.(live.id, !isSaved);
+              }}
+            >
+              <Bookmark size={15} />
+            </button>
+          </Tooltip>
+          <Tooltip label={isWatched ? "Marcar como no visto" : "Marcar como visto"}>
+            <button
+              type="button"
+              className={`platform-btn platform-personal ${isWatched ? "is-active" : ""}`}
+              aria-label={isWatched ? `Marcar ${live.title || "directo"} como no visto` : `Marcar ${live.title || "directo"} como visto`}
+              onClick={(event) => {
+                event.stopPropagation();
+                if (!isAuthenticated) {
+                  onLoginRequired?.("Inicia sesión para marcar directos como vistos.");
+                  return;
+                }
+
+                onToggleWatched?.(live.id, !isWatched);
+              }}
+            >
+              <CheckCircle2 size={15} />
+            </button>
+          </Tooltip>
+          <button
+            type="button"
+            className="platform-btn platform-detail"
+            onClick={(event) => {
+              event.stopPropagation();
+              openDetail();
+            }}
+          >
+            <span>{detailCtaLabel}</span>
+            <CirclePlay size={15} aria-hidden="true" />
+          </button>
+        </div>
+      </article>
+    );
   }
 
   return (
