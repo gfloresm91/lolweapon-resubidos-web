@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
+import { getLiveStatuses, readLives } from "@/lib/repositories/liveRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { upsertTwitchLive } from "@/lib/twitchArchive";
 
@@ -37,7 +38,12 @@ export async function POST(request) {
       request,
     });
 
-    return NextResponse.json({ success: true, live });
+    const [lives, statuses] = await Promise.all([
+      readLives(),
+      getLiveStatuses(),
+    ]);
+
+    return NextResponse.json({ success: true, live, lives, statuses });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error.message },

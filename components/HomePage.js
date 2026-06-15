@@ -1224,7 +1224,13 @@ export default function HomePage({
         throw new Error(data.error || "No se pudo crear el card desde Twitch");
       }
 
-      await refreshLivesFromServer();
+      if (Array.isArray(data.lives)) {
+        setLives(data.lives);
+        setLiveStatuses(data.statuses || liveStatuses);
+      } else {
+        await refreshLivesFromServer();
+      }
+
       toast.success("Card de Twitch creado o actualizado.");
     } catch (error) {
       toast.error(error.message || "No se pudo crear el card desde Twitch.");
