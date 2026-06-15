@@ -17,6 +17,30 @@ Usar cuando se va a liberar a producción. No usar para cada feature/fix en `dev
 5. Documentación actualizada.
 6. `npm run build` OK.
 
+## Documentar Novedades E Historial
+
+Antes del bump de versión y antes de crear el tag, registrar el release en la UI pública:
+
+- `lib/newsGuideContent.js`
+  - `newsGuideUpdates`: tarjetas visibles en `/novedades`.
+  - `newsGuideChangelog`: entrada visible en `/changelog`.
+
+Reglas:
+
+- Usar la versión que se va a liberar, por ejemplo `vX.Y.Z`.
+- Usar la fecha del día del release con el formato actual del archivo, por ejemplo `15 jun 2026`.
+- Registrar cambios orientados a usuarios: features, mejoras visibles, ajustes de UX, cambios de navegación y módulos afectados.
+- Mantener `/novedades` como resumen corto y accionable.
+- Mantener `/changelog` como detalle completo del release.
+- Hacer este commit antes del bump para que el tag incluya la comunicación pública del release.
+
+Ejemplo:
+
+```bash
+git add lib/newsGuideContent.js
+git commit -m "docs: document vX.Y.Z changes"
+```
+
 ## Elegir Versión
 
 Usar semver:
@@ -43,6 +67,8 @@ git pull origin dev
 git status --short
 npm run build
 ```
+
+Si falta documentar novedades/changelog, hacerlo antes de continuar con el bump.
 
 Si se cambió versión:
 
@@ -81,6 +107,31 @@ git checkout dev
 ```
 
 El push a `main` dispara GitHub Actions de producción.
+
+## Limpieza Opcional De Ramas
+
+Después de confirmar que el release quedó desplegado y que las ramas feature ya están integradas en `dev`/`main`, plantear la limpieza opcional de ramas locales/remotas creadas para ese release.
+
+No borrar ramas sin confirmación explícita.
+
+Revisión sugerida:
+
+```bash
+git branch --merged dev
+git branch -r --merged origin/dev
+```
+
+Si el usuario confirma, borrar ramas locales ya integradas:
+
+```bash
+git branch -d <rama-feature>
+```
+
+Si existe rama remota feature y el usuario confirma:
+
+```bash
+git push origin --delete <rama-feature>
+```
 
 ## Monitoreo
 

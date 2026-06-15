@@ -517,9 +517,14 @@ export default function PlatformTrackerMaintainerPage({
         throw new Error(data.error || "No se pudo crear el card desde Twitch.");
       }
 
-      const refreshResponse = await fetch("/api/lives", { cache: "no-store" });
-      const refreshData = await refreshResponse.json();
-      updateLives(refreshData.lives || [], refreshData.statuses || LIVE_STATUS_OPTIONS);
+      if (Array.isArray(data.lives)) {
+        updateLives(data.lives, data.statuses || LIVE_STATUS_OPTIONS);
+      } else {
+        const refreshResponse = await fetch("/api/lives", { cache: "no-store" });
+        const refreshData = await refreshResponse.json();
+        updateLives(refreshData.lives || [], refreshData.statuses || LIVE_STATUS_OPTIONS);
+      }
+
       setIsArchiveConfirmOpen(false);
       toast.success("Card de Twitch creado o actualizado.");
     } catch (error) {
