@@ -3,7 +3,7 @@ import { Archive, Bookmark, BookOpenText, CheckCircle2, ChevronDown, CircleDot, 
 
 import SocialLinks from "@/components/SocialLinks";
 
-const SIDEBAR_ITEMS = [
+const TOP_LEVEL_ITEMS = [
   {
     key: "home",
     href: "/inicio",
@@ -25,6 +25,9 @@ const SIDEBAR_ITEMS = [
     icon: History,
     permission: "changelog.view",
   },
+];
+
+const ARCHIVE_ITEMS = [
   {
     key: "tracker",
     href: "/rastreador",
@@ -87,7 +90,7 @@ const READING_ITEMS = [
   },
 ];
 
-const ADMIN_ITEMS = [
+const ADMIN_TREE_ITEMS = [
   {
     key: "platformUsers",
     href: "/administracion/usuarios",
@@ -117,10 +120,33 @@ const ADMIN_ITEMS = [
     permission: "admin.tags.view",
   },
   {
+    key: "adminAnimeLibrary",
+    label: "Biblioteca de anime",
+    icon: Library,
+    children: [
+      {
+        key: "platformAnimeTracking",
+        href: "/administracion/biblioteca-anime/viendo",
+        label: "Viendo",
+        icon: CircleDot,
+        permission: "admin.anime.tracking.view",
+        manageFlag: "animeTracking",
+      },
+      {
+        key: "platformAnimeCompleted",
+        href: "/administracion/biblioteca-anime/terminados",
+        label: "Terminados",
+        icon: Library,
+        permission: "admin.anime.completed.view",
+        manageFlag: "animeCompleted",
+      },
+    ],
+  },
+  {
     key: "platformSpaceDrum",
     label: "SpaceDrum",
     icon: BookOpenText,
-    permission: "admin.spacedrum.chapters.view",
+    manageFlag: "spaceDrum",
     children: [
       {
         key: "platformSpaceDrumChapters",
@@ -151,20 +177,6 @@ const ADMIN_ITEMS = [
         permission: "admin.spacedrum.import.view",
       },
     ],
-  },
-  {
-    key: "platformAnimeTracking",
-    href: "/administracion/biblioteca-anime/viendo",
-    label: "Viendo",
-    icon: CircleDot,
-    permission: "admin.anime.tracking.view",
-  },
-  {
-    key: "platformAnimeCompleted",
-    href: "/administracion/biblioteca-anime/terminados",
-    label: "Terminados",
-    icon: Library,
-    permission: "admin.anime.completed.view",
   },
 ];
 
@@ -200,36 +212,74 @@ function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
   );
 }
 
-function isNavItemActive(item, activeView) {
-  return item.key === activeView || item.children?.some((child) => child.key === activeView);
+function isTreeItemActive(item, activeView) {
+  return item.key === activeView || item.children?.some((child) => isTreeItemActive(child, activeView));
 }
 
-function SidebarNavGroup({ item, activeView, onSelect }) {
+function SidebarTreeGroup({ item, activeView, onSelect, level = 1 }) {
   const Icon = item.icon;
-  const isActive = isNavItemActive(item, activeView);
+  const isActive = isTreeItemActive(item, activeView);
 
   return (
-    <div className={`sidebar-nav-group ${isActive ? "is-active" : ""}`}>
-      <div className={`sidebar-link sidebar-section-link sidebar-parent-link ${isActive ? "is-active" : ""}`}>
+    <details className={`sidebar-nav-group sidebar-tree-level-${level} ${isActive ? "is-active" : ""}`} open={isActive || undefined}>
+      <summary
+        className={`sidebar-link sidebar-section-link sidebar-parent-link ${isActive ? "is-active" : ""}`}
+      >
         <span className="sidebar-icon" aria-hidden="true">
           <Icon />
         </span>
         <span>{item.label}</span>
         <ChevronDown className="sidebar-parent-chevron" size={14} aria-hidden="true" />
-      </div>
+      </summary>
       <div className="sidebar-submenu" aria-label={`${item.label} submenu`}>
         {item.children.map((child) => (
-          <SidebarNavItem
-            key={child.key}
-            item={child}
-            activeView={activeView}
-            isSectionLink
-            onSelect={onSelect}
-          />
+          child.children?.length ? (
+            <SidebarTreeGroup
+              key={child.key}
+              item={child}
+              activeView={activeView}
+              onSelect={onSelect}
+              level={level + 1}
+            />
+          ) : (
+            <SidebarNavItem
+              key={child.key}
+              item={child}
+              activeView={activeView}
+              isSectionLink
+              onSelect={onSelect}
+            />
+          )
         ))}
       </div>
-    </div>
+    </details>
   );
+}
+
+function canShowManagedItem(item, manageAccess) {
+  if (item.manageFlag === "animeTracking") return manageAccess.animeTracking;
+  if (item.manageFlag === "animeCompleted") return manageAccess.animeCompleted;
+  if (item.manageFlag === "spaceDrum") return manageAccess.spaceDrum;
+  if (item.key === "platformTracker") return manageAccess.tracker;
+  if (item.key === "platformTags") return manageAccess.tags;
+  if (item.key === "platformUsers") return manageAccess.users;
+  if (item.key === "platformRoles") return manageAccess.roles;
+  return true;
+}
+
+function filterTreeItems(items, canAccess, manageAccess = {}) {
+  return items.reduce((result, item) => {
+    if (!canShowManagedItem(item, manageAccess)) return result;
+
+    if (item.children?.length) {
+      const children = filterTreeItems(item.children, canAccess, manageAccess);
+      if (children.length) result.push({ ...item, children });
+      return result;
+    }
+
+    if (!item.permission || canAccess(item.permission)) result.push(item);
+    return result;
+  }, []);
 }
 
 export default function AppSidebar({
@@ -249,25 +299,46 @@ export default function AppSidebar({
   // isAdmin is intentionally omitted — permissions are controlled individually above
 }) {
   const sidebarClassName = ["sidebar", className].filter(Boolean).join(" ");
-  const sidebarItems = SIDEBAR_ITEMS.filter((item) => canAccess(item.permission));
+  const topLevelItems = TOP_LEVEL_ITEMS.filter((item) => canAccess(item.permission));
   const authItems = isAuthenticated ? AUTH_ITEMS.filter((item) => canAccess(item.permission)) : [];
+  const archiveItems = filterTreeItems([...ARCHIVE_ITEMS, ...authItems], canAccess);
   const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission) && (!item.authOnly || isAuthenticated));
   const readingItems = READING_ITEMS.filter((item) => !item.isFuture && canAccess(item.permission));
-  const adminItems = ADMIN_ITEMS.filter((item) => {
-    if (item.children?.length) {
-      if (item.key === "platformSpaceDrum") {
-        return canManageSpaceDrum && item.children.some((child) => canAccess(child.permission));
-      }
-      return item.children.some((child) => canAccess(child.permission));
-    }
-    if (item.key === "platformAnimeTracking") return canManageAnimeTracking && canAccess(item.permission);
-    if (item.key === "platformAnimeCompleted") return canManageAnimeCompleted && canAccess(item.permission);
-    if (item.key === "platformTracker") return canManageTracker && canAccess(item.permission);
-    if (item.key === "platformTags") return canManageTags && canAccess(item.permission);
-    if (item.key === "platformUsers") return canManageUsers && canAccess(item.permission);
-    if (item.key === "platformRoles") return canManageRoles && canAccess(item.permission);
-    return false;
+  const adminItems = filterTreeItems(ADMIN_TREE_ITEMS, canAccess, {
+    animeCompleted: canManageAnimeCompleted,
+    animeTracking: canManageAnimeTracking,
+    roles: canManageRoles,
+    spaceDrum: canManageSpaceDrum,
+    tags: canManageTags,
+    tracker: canManageTracker,
+    users: canManageUsers,
   });
+  const treeGroups = [
+    {
+      key: "archive",
+      label: "Archivo VOD",
+      icon: Archive,
+      children: archiveItems,
+    },
+    {
+      key: "animeLibrary",
+      label: "Biblioteca de anime",
+      icon: Library,
+      children: animeItems,
+    },
+    {
+      key: "readings",
+      label: "Lecturas",
+      icon: BookOpenText,
+      children: readingItems,
+    },
+    {
+      key: "administration",
+      label: "Administración",
+      icon: ShieldCheck,
+      children: adminItems,
+    },
+  ].filter((item) => item.children.length);
 
   return (
     <aside id={id} className={sidebarClassName} aria-label="Menu principal">
@@ -293,74 +364,20 @@ export default function AppSidebar({
       )}
 
       <nav className="sidebar-nav">
-        {sidebarItems.map((item) => (
+        {topLevelItems.map((item) => (
           <SidebarNavItem key={item.key} item={item} activeView={activeView} onSelect={onSelect} />
         ))}
 
-        {authItems.map((item) => (
-          <SidebarNavItem key={item.key} item={item} activeView={activeView} onSelect={onSelect} />
-        ))}
-
-        {animeItems.length ? <div className="sidebar-section">
-          <span className="sidebar-section-label">Biblioteca de anime</span>
-          <div className="sidebar-section-links" aria-label="Biblioteca de anime">
-            {animeItems.map((item) => (
-              <SidebarNavItem
-                key={item.key}
-                item={item}
-                activeView={activeView}
-                isSectionLink
-                onSelect={onSelect}
-              />
-            ))}
-          </div>
-        </div> : null}
-
-        {readingItems.length ? (
-          <div className="sidebar-section">
-            <span className="sidebar-section-label">Lecturas</span>
-            <div className="sidebar-section-links" aria-label="Lecturas">
-              {readingItems.map((item) => (
-                <SidebarNavItem
-                  key={item.key}
-                  item={item}
-                  activeView={activeView}
-                  isSectionLink
-                  onSelect={onSelect}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {adminItems.length ? (
-          <div className="sidebar-section">
-            <span className="sidebar-section-label">Administración</span>
-            <div className="sidebar-section-links" aria-label="Administración">
-              {adminItems.map((item) => (
-                item.children?.length ? (
-                  <SidebarNavGroup
-                    key={item.key}
-                    item={{
-                      ...item,
-                      children: item.children.filter((child) => canAccess(child.permission)),
-                    }}
-                    activeView={activeView}
-                    onSelect={onSelect}
-                  />
-                ) : (
-                  <SidebarNavItem
-                    key={item.key}
-                    item={item}
-                    activeView={activeView}
-                    isSectionLink
-                    onSelect={onSelect}
-                  />
-                )
-              ))}
-            </div>
-          </div>
-        ) : null}
+        <div className="sidebar-tree" aria-label="Secciones del menu">
+          {treeGroups.map((item) => (
+            <SidebarTreeGroup
+              key={item.key}
+              item={item}
+              activeView={activeView}
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
 
       </nav>
 
