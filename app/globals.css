@@ -9139,9 +9139,9 @@ html:has(.watch-player-stage.is-theater) .persistent-footer {
 }
 
 .watch-link-action-danger {
-  border-color: rgba(251, 146, 60, 0.34);
-  background: linear-gradient(135deg, rgba(180, 83, 9, 0.92), rgba(127, 29, 29, 0.86));
-  box-shadow: 0 12px 24px rgba(251, 146, 60, 0.12);
+  border-color: rgba(248, 113, 113, 0.38);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(185, 28, 28, 0.92));
+  box-shadow: 0 14px 28px rgba(239, 68, 68, 0.2);
 }
 
 .watch-link-action-okru {

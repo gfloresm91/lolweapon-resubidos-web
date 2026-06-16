@@ -286,7 +286,7 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
                 className="watch-link-action watch-link-action-danger"
                 onClick={() => setIsDownloadModalOpen(true)}
               >
-                Si falla OK.RU
+                Opciones para descargar
               </button>
             </div>
           ) : null}
