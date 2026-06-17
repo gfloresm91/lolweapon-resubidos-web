@@ -2,6 +2,59 @@
 
 Checklist para agregar una feature que involucra datos, UI, permisos, rutas o documentación.
 
+## 0. Análisis Previo
+
+Usar cuando el usuario pida plan antes de código o cuando la feature tenga decisiones de arquitectura, permisos, datos o UI responsiva.
+
+1. Confirmar el objetivo funcional en una frase.
+2. Ubicar dónde vive la feature:
+   - ruta directa;
+   - navegación interna en `HomePage`;
+   - menú o grupo del sidebar;
+   - permiso requerido.
+3. Revisar los datos existentes antes de proponer schema nuevo.
+4. Definir si requiere:
+   - schema Prisma o migración;
+   - soporte JSON/Postgres;
+   - repositorio nuevo o extensión de uno existente;
+   - API route;
+   - permiso nuevo;
+   - auditoría `AuditLog`;
+   - documentación;
+   - pruebas visuales.
+5. Para features con acceso restringido:
+   - nombrar el permiso;
+   - definir roles con asignación por defecto;
+   - decidir si `Dios` entra por regla general o si será una exclusión explícita.
+6. Para UI nueva:
+   - proponer comportamiento desktop/mobile antes de editar;
+   - definir vistas principales y estados vacíos;
+   - definir interacciones a validar con Playwright.
+7. Cerrar el plan con archivos probables, comandos de verificación y pendientes de decisión.
+8. Definir la rama de trabajo antes de implementar:
+   - proponer nombre descriptivo, por ejemplo `feature/tracker-calendar`;
+   - confirmar rama base esperada, normalmente `dev`;
+   - entregar el comando `git checkout -b <rama>` para que el usuario lo ejecute, salvo que pida explícitamente que el agente cree la rama.
+
+### Resoluciones Para Pruebas Visuales
+
+Para cambios visuales relevantes, validar con screenshots reales en estas resoluciones:
+
+| Tipo | Resolución | Uso |
+|---|---:|---|
+| Mobile mínimo | `320 x 1080` | Ancho crítico, textos y controles apilados |
+| Mobile angosto | `360 x 740` | Alto reducido y scroll |
+| Mobile base | `390 x 844` | Teléfono moderno estándar |
+| Mobile grande | `430 x 932` | iPhone grande |
+| Tablet vertical | `768 x 1080` | Layout intermedio alto |
+| Tablet estándar | `768 x 1024` | Tablet vertical común |
+| Breakpoint sidebar | `900 x 900` | Cambio de comportamiento del menú lateral |
+| Laptop | `1024 x 1080` | Sidebar visible en ancho contenido |
+| Desktop estándar | `1280 x 900` | Layout desktop base |
+| Desktop amplio | `1440 x 1080` | Layout amplio |
+
+Con Playwright, probar acceso directo por URL, navegación interna desde otra vista, estados interactivos relevantes y screenshots antes de entregar. Si Playwright no puede cubrir un estado por permisos o datos locales, documentar el bloqueo y validar lo demás.
+
 ## 1. Contexto
 
 1. Leer `AGENTS.md`.

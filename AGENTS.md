@@ -39,6 +39,7 @@ Memoria externa de Claude, útil para contexto histórico no versionado:
 ## Flujo De Trabajo
 
 - Leer el contexto local antes de editar. Usar `rg`/`rg --files` para búsquedas.
+- Si el usuario pide plan antes de código o la feature tiene decisiones de arquitectura, permisos, datos o UI responsiva, usar el análisis previo de `docs/workflows/new-feature.md` antes de editar.
 - Implementar cambios solicitados de forma completa: código, estilos, rutas, permisos, migraciones, docs y verificación cuando aplique.
 - Preferir patrones existentes del repo sobre nuevas abstracciones.
 - Usar `apply_patch` para ediciones manuales.
