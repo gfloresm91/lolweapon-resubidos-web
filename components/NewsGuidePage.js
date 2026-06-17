@@ -9,6 +9,7 @@ import {
   BookOpenCheck,
   Check,
   Compass,
+  Download,
   History,
   Lock,
   LogIn,
@@ -60,6 +61,7 @@ const ICONS = {
   BookOpenCheck,
   Check,
   Compass,
+  Download,
   History,
   LogIn,
   ShieldCheck,
@@ -527,7 +529,7 @@ export default function NewsGuidePage({ currentUser = null, permissions = [] }) 
 
     return true;
   });
-  const visibleUpdates = newsGuideUpdates.filter((update) => !update.adminOnly || canSeeAdminPreview);
+  const visibleUpdates = newsGuideUpdates.filter((update) => !update.adminOnly || canSeeAdminPreview).slice(0, 9);
   const visibleTutorials = newsGuideTutorials.filter((tutorial) => !tutorial.adminOnly || canSeeAdminPreview);
   const latestReleaseLabel = getLatestReleaseLabel(changelogEntries);
 
