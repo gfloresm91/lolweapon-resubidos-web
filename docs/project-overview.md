@@ -193,7 +193,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
 | Anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
 | Anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
-| Rastreador | `tracker.view/create/update/delete`, `tracker.form.full/compact` |
+| Rastreador | `tracker.view`, `tracker.calendar.view`, `tracker.create/update/delete`, `tracker.form.full/compact` |
 | Lecturas | `spacedrum.view` |
 
 ---
@@ -208,6 +208,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
+| `/rastreador/calendario` | Calendario histórico de directos por año, mes y día. Controlado por permiso `tracker.calendar.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación y administración. |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
 | `/biblioteca-anime/terminados` | Anime terminado, pausado, pendiente o dropeado |

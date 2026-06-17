@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bookmark, BookOpenText, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Archive, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -34,6 +34,13 @@ const ARCHIVE_ITEMS = [
     label: "Rastreador de directos",
     icon: Archive,
     permission: "tracker.view",
+  },
+  {
+    key: "trackerCalendar",
+    href: "/rastreador/calendario",
+    label: "Calendario de directos",
+    icon: CalendarDays,
+    permission: "tracker.calendar.view",
   },
 ];
 
