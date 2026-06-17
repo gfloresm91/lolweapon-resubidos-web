@@ -4587,6 +4587,394 @@ body::before {
   display: none;
 }
 
+.tracker-calendar-page {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.tracker-calendar-header {
+  padding-bottom: 1.25rem;
+}
+
+.tracker-calendar-toolbar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.tracker-calendar-toolbar .filter-select {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.tracker-calendar-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--border);
+}
+
+.tracker-calendar-stats div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 1rem;
+  background: rgba(12, 13, 20, 0.82);
+}
+
+.tracker-calendar-stats span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tracker-calendar-stats strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--purple-light);
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1.45rem;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.tracker-calendar-main,
+.tracker-calendar-day-panel {
+  min-width: 0;
+}
+
+.tracker-calendar-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.tracker-calendar-month,
+.tracker-calendar-day-panel {
+  border: 1px solid rgba(167, 139, 250, 0.14);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(167, 139, 250, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(12, 13, 20, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.tracker-calendar-month {
+  padding: 1rem;
+}
+
+.tracker-calendar-month.is-compact {
+  padding: 0.75rem;
+}
+
+.tracker-calendar-month-heading {
+  margin-bottom: 0.75rem;
+}
+
+.tracker-calendar-month-heading button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-main);
+  cursor: pointer;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1rem;
+  font-weight: 850;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.tracker-calendar-month-heading button:hover,
+.tracker-calendar-month-heading button:focus-visible {
+  background: rgba(167, 139, 250, 0.13);
+  color: var(--purple-light);
+  outline: none;
+}
+
+.tracker-calendar-weekdays,
+.tracker-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.32rem;
+}
+
+.tracker-calendar-weekdays {
+  margin-bottom: 0.38rem;
+}
+
+.tracker-calendar-weekdays span {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.tracker-calendar-day {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+
+.tracker-calendar-day.is-empty {
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+.tracker-calendar-day:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.tracker-calendar-day.has-low,
+.tracker-calendar-day.has-medium,
+.tracker-calendar-day.has-high {
+  color: #fff;
+  opacity: 1;
+}
+
+.tracker-calendar-day.has-low {
+  border-color: rgba(45, 212, 191, 0.24);
+  background: rgba(45, 212, 191, 0.16);
+}
+
+.tracker-calendar-day.has-medium {
+  border-color: rgba(167, 139, 250, 0.32);
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.tracker-calendar-day.has-high {
+  border-color: rgba(245, 158, 11, 0.36);
+  background: rgba(245, 158, 11, 0.24);
+}
+
+.tracker-calendar-day:not(:disabled):hover,
+.tracker-calendar-day:not(:disabled):focus-visible,
+.tracker-calendar-day.is-selected {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  outline: none;
+}
+
+.tracker-calendar-day strong {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  min-width: 15px;
+  border-radius: 999px;
+  background: rgba(5, 6, 12, 0.72);
+  color: #fff;
+  font-size: 0.55rem;
+  line-height: 15px;
+  text-align: center;
+}
+
+.tracker-calendar-day-panel {
+  position: sticky;
+  top: calc(var(--topbar-height) + 1rem);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.tracker-calendar-day-panel.is-empty {
+  min-height: 140px;
+  align-content: center;
+}
+
+.tracker-calendar-live-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tracker-calendar-live-row {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  padding: 0.72rem;
+  text-decoration: none;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+
+.tracker-calendar-live-row:hover,
+.tracker-calendar-live-row:focus-visible {
+  border-color: rgba(167, 139, 250, 0.32);
+  background: rgba(167, 139, 250, 0.095);
+  outline: none;
+}
+
+.tracker-calendar-live-main,
+.tracker-calendar-live-meta {
+  display: grid;
+  min-width: 0;
+}
+
+.tracker-calendar-live-main strong,
+.tracker-calendar-live-main small,
+.tracker-calendar-live-meta em,
+.tracker-calendar-live-meta small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-calendar-live-main strong {
+  color: var(--text-main);
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.tracker-calendar-live-main small,
+.tracker-calendar-live-meta small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.tracker-calendar-live-meta {
+  justify-items: end;
+  text-align: right;
+}
+
+.tracker-calendar-live-meta em {
+  color: var(--green);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tracker-calendar-empty {
+  margin-top: 2rem;
+}
+
+@media (max-width: 1180px) {
+  .tracker-calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tracker-calendar-day-panel {
+    position: static;
+  }
+
+  .tracker-calendar-year-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .tracker-calendar-header {
+    padding-top: 2.3rem;
+  }
+
+  .tracker-calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-year-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-month {
+    padding: 0.82rem;
+  }
+
+  .tracker-calendar-weekdays,
+  .tracker-calendar-grid {
+    gap: 0.26rem;
+  }
+
+  .tracker-calendar-live-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-live-meta {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 360px) {
+  .tracker-calendar-page {
+    gap: 0.95rem;
+  }
+
+  .tracker-calendar-month,
+  .tracker-calendar-day-panel {
+    border-radius: 10px;
+  }
+
+  .tracker-calendar-month {
+    padding: 0.64rem;
+  }
+
+  .tracker-calendar-day {
+    border-radius: 5px;
+    font-size: 0.68rem;
+  }
+
+  .tracker-calendar-day strong {
+    right: 1px;
+    bottom: 1px;
+    min-width: 13px;
+    font-size: 0.5rem;
+    line-height: 13px;
+  }
+
+  .tracker-calendar-stats strong {
+    font-size: 1.2rem;
+  }
+}
+
 @media (min-width: 768px) {
   .density-table-option {
     display: inline-flex;

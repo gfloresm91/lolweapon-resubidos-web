@@ -28,6 +28,7 @@ import PlatformRolesPage from "@/components/PlatformRolesPage";
 import StatsBar from "@/components/StatsBar";
 import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
+import TrackerCalendarPage from "@/components/TrackerCalendarPage";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
 import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 
@@ -103,6 +104,7 @@ const VIEW_LABELS = {
   news: "Novedades",
   changelog: "Historial de cambios",
   tracker: "Rastreador de directos",
+  trackerCalendar: "Calendario de directos",
   myList: "Mi lista",
   myAnimeList: "Mi lista anime",
   animeLibraryTracking: "Viendo",
@@ -125,6 +127,7 @@ const VIEW_PATHS = {
   news: "/novedades",
   changelog: "/changelog",
   tracker: "/rastreador",
+  trackerCalendar: "/rastreador/calendario",
   myList: "/mi-lista",
   myAnimeList: "/mi-lista/anime",
   animeLibraryTracking: "/biblioteca-anime/viendo",
@@ -356,6 +359,7 @@ export default function HomePage({
       tracker: queryState
         ? { ...DEFAULT_TRACKER_STATE, filters: queryState.filters, selectedTag: queryState.selectedTag }
         : DEFAULT_TRACKER_STATE,
+      trackerCalendar: DEFAULT_TRACKER_STATE,
       myList: DEFAULT_TRACKER_STATE,
     };
   });
@@ -805,7 +809,7 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    if (!["home", "tracker", "myList"].includes(currentView) || lives.length) {
+    if (!["home", "tracker", "trackerCalendar", "myList"].includes(currentView) || lives.length) {
       return undefined;
     }
 
@@ -835,7 +839,7 @@ export default function HomePage({
   }, [currentView, lives.length]);
 
   useEffect(() => {
-    if (!["tracker", "myList"].includes(currentView) || !isAuthenticated) {
+    if (!["tracker", "trackerCalendar", "myList"].includes(currentView) || !isAuthenticated) {
       return;
     }
 
@@ -1274,6 +1278,7 @@ export default function HomePage({
       news: "news.view",
       changelog: "changelog.view",
       tracker: "tracker.view",
+      trackerCalendar: "tracker.calendar.view",
       myList: "tracker.view",
       myAnimeList: "anime.tracking.view",
       animeLibraryTracking: "anime.tracking.view",
@@ -1696,6 +1701,13 @@ export default function HomePage({
         </main>
 
               </>
+            ) : null}
+
+            {currentView === "trackerCalendar" && hasPermission("tracker.calendar.view") ? (
+              <TrackerCalendarPage
+                lives={lives}
+                onOpenDetail={handleOpenLiveDetail}
+              />
             ) : null}
 
             {currentView === "animeLibraryTracking" ? (

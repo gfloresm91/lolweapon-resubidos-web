@@ -180,6 +180,7 @@ npm run db:migrate:deploy
   - No se le cambia rol.
 - `Dios` tiene acceso total por defecto, salvo exclusiones explícitas definidas por negocio.
 - `anime.rating.streamer` es excepcional: solo un rol debería tenerlo y no debe asignarse automáticamente a `Dios`.
+- `tracker.calendar.view` desbloquea el calendario histórico de directos y se asigna por defecto a tiers Twitch, miembros YouTube, moderación y administración.
 - Si se agrega una pantalla o acción nueva, agregar el permiso correspondiente y verificar que aparezca en el mantenedor de roles.
 
 ## Autenticación
