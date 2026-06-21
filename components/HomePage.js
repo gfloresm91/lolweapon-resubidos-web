@@ -944,6 +944,10 @@ export default function HomePage({
   }, []);
 
   useEffect(() => {
+    if (!["tracker", "myList"].includes(currentView)) {
+      return undefined;
+    }
+
     if (!hasMoreLives || !loadMoreRef.current) {
       return undefined;
     }
@@ -966,7 +970,7 @@ export default function HomePage({
     observer.observe(loadMoreRef.current);
 
     return () => observer.disconnect();
-  }, [filteredLives.length, hasMoreLives]);
+  }, [currentView, filteredLives.length, hasMoreLives]);
 
   async function uploadImage(file) {
     if (!canCreateTracker && !canUpdateTracker && !canCreateTrackingAnime && !canUpdateTrackingAnime && !canCreateCompletedAnime && !canUpdateCompletedAnime) {

@@ -199,7 +199,7 @@ function LiveCard({
           <Tooltip label={isWatched ? "Marcar como no visto" : "Marcar como visto"}>
             <button
               type="button"
-              className={`platform-btn platform-personal ${isWatched ? "is-active" : ""}`}
+              className={`platform-btn platform-personal platform-personal-watched ${isWatched ? "is-active" : ""}`}
               aria-label={isWatched ? `Marcar ${live.title || "directo"} como no visto` : `Marcar ${live.title || "directo"} como visto`}
               onClick={(event) => {
                 event.stopPropagation();
@@ -267,13 +267,6 @@ function LiveCard({
         </div>
 
         <h2 className="live-title">{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
-
-        {(isSaved || isWatched) ? (
-          <div className="live-personal-badges" aria-label="Estado personal">
-            {isSaved ? <span className="live-personal-badge">Guardado</span> : null}
-            {isWatched ? <span className="live-personal-badge is-watched">Visto</span> : null}
-          </div>
-        ) : null}
 
         {live.additional_info ? (
           <>
@@ -370,7 +363,7 @@ function LiveCard({
           <Tooltip label={isWatched ? "Marcar como no visto" : "Marcar como visto"}>
             <button
               type="button"
-              className={`platform-btn platform-personal ${isWatched ? "is-active" : ""}`}
+              className={`platform-btn platform-personal platform-personal-watched ${isWatched ? "is-active" : ""}`}
               aria-label={isWatched ? `Marcar ${live.title || "directo"} como no visto` : `Marcar ${live.title || "directo"} como visto`}
               onClick={(event) => {
                 event.stopPropagation();

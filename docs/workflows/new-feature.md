@@ -159,6 +159,11 @@ Reglas especiales:
   - pruebas Playwright autenticadas en desktop y mobile.
 - Para pruebas Playwright autenticadas, usar un usuario admin local de prueba y pasar credenciales por variables locales como `PLAYWRIGHT_ADMIN_LOGIN` y `PLAYWRIGHT_ADMIN_PASSWORD`; no versionar usuario/clave concretos.
 - Para botones que requieren sesión: toast/modal con acción para login, no redirección brusca.
+- Si la pantalla usa scroll infinito con `IntersectionObserver`:
+  - incluir la vista activa, ruta o clave de listado en las dependencias del efecto;
+  - no crear observer cuando el sentinel no está montado o la vista no está activa;
+  - recrear el observer al entrar por navegación interna desde otra pantalla;
+  - probar acceso directo por URL y navegación interna desde al menos una vista previa con datos ya cargados.
 
 ## 8. Auditoría
 
