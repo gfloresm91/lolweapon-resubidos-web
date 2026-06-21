@@ -53,10 +53,14 @@ const FALLBACK_ROLES = [
 
 const TABLE_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
-  { key: "alias", label: "Usuario", sortable: true },
+  { key: "alias", label: "Alias", sortable: true },
+  { key: "login", label: "Usuario", sortable: true },
+  { key: "email", label: "Email", sortable: true },
   { key: "role", label: "Rol", sortable: true },
   { key: "lastLoginAt", label: "Último login", sortable: true },
+  { key: "origin", label: "Origen", sortable: true },
   { key: "twitch", label: "Twitch" },
+  { key: "twitchRoleSyncedAt", label: "Sync", sortable: true },
   { key: "isActive", label: "Estado", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
@@ -181,6 +185,22 @@ function getSortValue(user, sortKey) {
 
   if (sortKey === "lastLoginAt") {
     return user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
+  }
+
+  if (sortKey === "twitchRoleSyncedAt") {
+    return user.twitchRoleSyncedAt ? new Date(user.twitchRoleSyncedAt).getTime() : 0;
+  }
+
+  if (sortKey === "origin") {
+    return getUserOrigin(user);
+  }
+
+  if (sortKey === "login") {
+    return String(user.login || "").toLowerCase();
+  }
+
+  if (sortKey === "email") {
+    return String(user.email || "").toLowerCase();
   }
 
   return String(user.alias || user.login || "").toLowerCase();
@@ -627,9 +647,16 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
           user.id,
           user.alias,
           user.login,
+          user.login ? `@${user.login}` : "",
           user.email,
           user.roleLabel,
           user.role,
+          formatDate(user.lastLoginAt),
+          getUserOrigin(user),
+          getUserOrigin(user) === "twitch" ? "Twitch" : "Manual",
+          ...getTwitchBadges(user).map((badge) => badge.label),
+          user.twitchRoleSyncedAt ? formatDate(user.twitchRoleSyncedAt) : "",
+          user.isActive ? "Activo" : "Inactivo",
         ].some((value) => String(value || "").toLowerCase().includes(normalizedSearch));
       })
       .filter((user) => roleFilter === "all" || user.role === roleFilter)
@@ -921,7 +948,7 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
       <MaintainerToolbar
         searchId="admin-users-search"
         searchValue={searchQuery}
-        searchPlaceholder="Buscar ID, alias, usuario, email o rol"
+        searchPlaceholder="Buscar ID, alias, usuario, email, rol, origen, Twitch o estado"
         onSearchChange={setSearchQuery}
       >
         <FilterSelect
@@ -981,7 +1008,10 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
           onNext: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
         }}
       >
-          {paginatedUsers.map((user) => (
+          {paginatedUsers.map((user) => {
+            const twitchBadges = getTwitchBadges(user);
+
+            return (
             <div className="maintainer-table-row admin-users-row" role="row" key={user.id}>
               <span className="admin-user-cell admin-record-id">#{user.id || "-"}</span>
               <div className="admin-user-cell admin-user-profile">
@@ -990,29 +1020,29 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
                 ) : (
                   <span className="admin-user-avatar">{(user.alias || user.login).slice(0, 2).toUpperCase()}</span>
                 )}
-                <div>
-                  <strong>{user.alias}</strong>
-                  <span>@{user.login}</span>
-                  {user.email ? <em>{user.email}</em> : null}
-                </div>
+                <strong>{user.alias}</strong>
               </div>
+              <span className="admin-user-cell admin-user-login">@{user.login}</span>
+              <span className="admin-user-cell admin-user-email">{user.email || "-"}</span>
               <span className="admin-user-cell">
                 {user.roleLabel || rolesByCode.get(user.role)?.label || user.role}
               </span>
               <span className="admin-user-cell">{formatDate(user.lastLoginAt)}</span>
-              <span className="admin-user-cell admin-user-twitch">
+              <span className="admin-user-cell">
                 {getUserOrigin(user) === "twitch" ? (
-                  <>
-                    <span className="admin-user-origin is-twitch">Twitch</span>
-                    {getTwitchBadges(user).map((badge) => (
-                      <span key={badge.key} className={`admin-user-twitch-badge is-${badge.tone}`}>{badge.label}</span>
-                    ))}
-                    {user.twitchRoleSyncedAt ? <em>{formatDate(user.twitchRoleSyncedAt)}</em> : null}
-                  </>
+                  <span className="admin-user-origin is-twitch">Twitch</span>
                 ) : (
                   <span className="admin-user-origin">Manual</span>
                 )}
               </span>
+              <span className="admin-user-cell admin-user-twitch">
+                {twitchBadges.length ? (
+                  twitchBadges.map((badge) => (
+                    <span key={badge.key} className={`admin-user-twitch-badge is-${badge.tone}`}>{badge.label}</span>
+                  ))
+                ) : "-"}
+              </span>
+              <span className="admin-user-cell admin-user-sync">{user.twitchRoleSyncedAt ? formatDate(user.twitchRoleSyncedAt) : "-"}</span>
               <span className={`admin-user-status ${user.isActive ? "is-active" : "is-inactive"}`}>
                 {user.isActive ? "Activo" : "Inactivo"}
               </span>
@@ -1060,7 +1090,8 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
                 ) : null}
               </div>
             </div>
-          ))}
+            );
+          })}
       </MaintainerTable>
 
       {editingUser ? (

@@ -181,20 +181,21 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 
 | Grupo | Códigos |
 |---|---|
-| Inicio | `home.view` |
-| Novedades | `news.view` |
-| Historial de cambios | `changelog.view` |
-| Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
-| Roles | `roles.read`, `roles.create`, `roles.update` |
-| Admin: Rastreador | `admin.tracker.view` |
-| Admin: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
-| Admin: Viendo | `admin.anime.tracking.view` |
-| Admin: Terminados | `admin.anime.completed.view` |
-| Anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
-| Anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
-| Anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
-| Rastreador | `tracker.view`, `tracker.calendar.view`, `tracker.create/update/delete`, `tracker.form.full/compact` |
-| Lecturas | `spacedrum.view` |
+| Plataforma: Inicio | `home.view` |
+| Plataforma: Novedades | `news.view` |
+| Plataforma: Historial de cambios | `changelog.view` |
+| Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.form.full/compact` |
+| Archivo VOD: Calendario | `tracker.calendar.view` |
+| Biblioteca de anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
+| Biblioteca de anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
+| Biblioteca de anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
+| Lecturas: SpaceDrum | `spacedrum.view` |
+| Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
+| Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
+| Administración: Rastreador | `admin.tracker.view` |
+| Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
+| Administración: Anime Viendo | `admin.anime.tracking.view` |
+| Administración: Anime Terminados | `admin.anime.completed.view` |
 
 ---
 
