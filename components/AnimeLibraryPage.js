@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Eye, ListPlus, Star, Edit3, X } from "lucide-react";
+import { CheckCircle2, CirclePlay, Eye, ListPlus, Star, Edit3, X } from "lucide-react";
 import { toast } from "sonner";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
@@ -2239,7 +2239,8 @@ export default function AnimeLibraryPage({
                                 className="anime-tracker-button"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                Ver
+                                <span>Ver</span>
+                                <CirclePlay size={15} aria-hidden="true" />
                               </a>
                             ) : (
                               <button
@@ -2248,7 +2249,8 @@ export default function AnimeLibraryPage({
                                 aria-disabled="true"
                                 onClick={(event) => event.stopPropagation()}
                               >
-                                Ver
+                                <span>Ver</span>
+                                <CirclePlay size={15} aria-hidden="true" />
                               </button>
                             )}
                           </Tooltip>
@@ -2455,7 +2457,8 @@ export default function AnimeLibraryPage({
                               className="anime-tracker-button"
                               onClick={(event) => event.stopPropagation()}
                             >
-                              Ver resubidos
+                              <span>Ver resubidos</span>
+                              <CirclePlay size={15} aria-hidden="true" />
                             </a>
                           ) : (
                             <button
@@ -2464,7 +2467,8 @@ export default function AnimeLibraryPage({
                               aria-disabled="true"
                               onClick={(event) => event.stopPropagation()}
                             >
-                              Ver resubidos
+                              <span>Ver resubidos</span>
+                              <CirclePlay size={15} aria-hidden="true" />
                             </button>
                           )}
                         </Tooltip>

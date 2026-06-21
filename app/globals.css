@@ -2007,7 +2007,9 @@ body::before {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   min-height: 40px;
+  padding: 0 0.82rem;
   border: 1px solid rgba(167, 139, 250, 0.28);
   border-radius: var(--radius-sm);
   background: rgba(167, 139, 250, 0.12);
@@ -2017,6 +2019,17 @@ body::before {
   font-weight: 800;
   text-decoration: none;
   transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+
+.anime-tracker-button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anime-tracker-button svg {
+  flex: 0 0 auto;
 }
 
 .anime-tracker-button:hover,
@@ -2458,6 +2471,17 @@ body::before {
 
 .anime-primary-actions .anime-tracker-button {
   flex: 1;
+  position: relative;
+  padding: 0 2.1rem 0 1rem;
+}
+
+.anime-primary-actions .anime-tracker-button span {
+  max-width: 100%;
+}
+
+.anime-primary-actions .anime-tracker-button svg {
+  position: absolute;
+  right: 0.78rem;
 }
 
 .anime-edit-action {
@@ -2645,7 +2669,7 @@ body::before {
 
 .anime-library-compact-actions {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 44px;
+  grid-template-columns: 34px minmax(0, 1fr) minmax(58px, 64px);
   gap: 0.38rem;
 }
 
@@ -2677,10 +2701,8 @@ body::before {
 
 .anime-library-compact-actions .anime-tracker-button {
   min-width: 0;
-  padding: 0 0.55rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  gap: 0.3rem;
+  padding: 0 0.48rem;
 }
 
 @media (min-width: 1024px) {
@@ -5992,33 +6014,6 @@ body::before {
   line-height: 1.35;
 }
 
-.live-personal-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: -0.25rem 0 0.55rem;
-}
-
-.live-personal-badge {
-  border: 1px solid rgba(167, 139, 250, 0.22);
-  border-radius: 999px;
-  background: rgba(167, 139, 250, 0.11);
-  color: var(--purple-light);
-  display: inline-flex;
-  align-items: center;
-  min-height: 23px;
-  padding: 0.18rem 0.52rem;
-  font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 0.68rem;
-  font-weight: 850;
-}
-
-.live-personal-badge.is-watched {
-  border-color: rgba(52, 211, 153, 0.24);
-  background: rgba(52, 211, 153, 0.1);
-  color: var(--green);
-}
-
 .search-highlight {
   border-radius: 4px;
   background: rgba(251, 191, 36, 0.22);
@@ -6484,19 +6479,6 @@ body::before {
   line-height: 1.12;
 }
 
-.lives-grid-compact .live-personal-badges {
-  grid-column: 2;
-  grid-row: 2;
-  align-self: start;
-  margin: 0.35rem 0 0;
-}
-
-.lives-grid-compact .live-personal-badge {
-  min-height: 19px;
-  padding: 0.12rem 0.42rem;
-  font-size: 0.62rem;
-}
-
 .lives-grid-compact .info-preview,
 .lives-grid-compact .info-inline-toggle {
   display: none;
@@ -6658,6 +6640,18 @@ body::before {
 
 .platform-personal.is-active {
   color: #fff;
+}
+
+.platform-personal-watched:hover,
+.platform-personal-watched:focus-visible,
+.platform-personal-watched.is-active {
+  background: rgba(52, 211, 153, 0.14);
+  border-color: rgba(52, 211, 153, 0.36);
+  color: var(--green);
+}
+
+.platform-personal-watched.is-active {
+  color: #ecfdf5;
 }
 
 .platform-personal-label {

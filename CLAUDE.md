@@ -108,6 +108,8 @@ docs/
 
 **Server / Client:** Server Component fetches data y pasa props a un Client Component hijo. No mezclar fetch en `useEffect` donde se puede evitar.
 
+**Vistas internas e infinite scroll:** Si una vista dentro de `HomePage` usa `IntersectionObserver` para cargar más resultados, el efecto debe depender de la vista activa (`currentView`) o de una clave equivalente. El observer debe salir temprano fuera de su vista y volver a crearse al entrar. Bug corregido: al navegar desde otra pantalla al `Rastreador`, los directos ya estaban cargados, el efecto no se reejecutaba porque dependía solo de `filteredLives.length`/`hasMoreLives`, y el sentinel `Cargando más resultados...` quedaba sin observer activo.
+
 **Errores en route handlers:** `try/catch` con respuesta JSON estructurada y status HTTP correspondiente:
 ```js
 try {

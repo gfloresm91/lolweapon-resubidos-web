@@ -115,6 +115,10 @@ npm run db:migrate:deploy
   - La navegación interna SPA debe cargar datos desde `HomePage` al cambiar `currentView` si los props iniciales vienen vacíos.
   - No depender de recargar la página para poblar datos.
   - Al crear una pantalla nueva, probar navegación desde `/inicio`, desde otra vista existente y acceso directo por URL.
+- Scroll infinito en vistas condicionales:
+  - Si un listado usa `IntersectionObserver` y el sentinel se monta solo dentro de una vista (`currentView === "tracker"`, `myList`, etc.), el efecto debe depender también de la vista activa o de una clave equivalente de montaje.
+  - El observer debe salir temprano cuando no corresponde a la vista actual y volver a crearse al entrar en la vista.
+  - Error conocido corregido en `Rastreador`: al navegar desde otra pantalla, los directos ya estaban cargados y el efecto del observer no se reejecutaba porque dependía solo de `filteredLives.length`/`hasMoreLives`; el sentinel aparecía con `Cargando más resultados...`, pero no tenía observer activo. Solución: incluir `currentView` en dependencias y observar solo en `tracker`/`myList`.
 - Validar en boundaries: formularios, route handlers y APIs externas.
 - Route handlers deben responder JSON estructurado con status HTTP claro.
 - Usar comentarios solo cuando expliquen un “por qué” no obvio.

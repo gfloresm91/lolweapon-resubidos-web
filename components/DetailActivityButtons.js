@@ -74,7 +74,7 @@ export default function DetailActivityButtons({ liveId, liveTitle = "", initialA
       <Tooltip label={isWatched ? "Marcar como no visto" : "Marcar como visto"}>
         <button
           type="button"
-          className={`platform-btn platform-personal ${isWatched ? "is-active" : ""} ${pendingKey === "watched" ? "is-loading" : ""}`}
+          className={`platform-btn platform-personal platform-personal-watched ${isWatched ? "is-active" : ""} ${pendingKey === "watched" ? "is-loading" : ""}`}
           aria-label={isWatched ? `Marcar ${liveTitle} como no visto` : `Marcar ${liveTitle} como visto`}
           aria-busy={pendingKey === "watched"}
           disabled={pendingKey !== null}
