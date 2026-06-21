@@ -33,6 +33,7 @@ function getTodayParts() {
   return {
     year: String(today.getFullYear()),
     month: String(today.getMonth() + 1).padStart(2, "0"),
+    monthKey: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`,
   };
 }
 
@@ -82,16 +83,46 @@ function getYearOptions(livesByDate) {
     .map((year) => ({ value: year, label: year }));
 }
 
-function mergeYearOptions(options, extraYears = []) {
+function getBoundedYearOptions(options, selectedYear, bounds) {
   return Array.from(new Set([
-    ...options.map((option) => option.value),
-    ...extraYears.filter(Boolean).map(String),
-  ]))
+    ...options
+      .map((option) => option.value)
+      .filter((year) => Number(year) >= bounds.minYear && Number(year) <= bounds.maxYear),
+    selectedYear,
+  ].filter(Boolean)))
+    .filter((year) => Number(year) >= bounds.minYear && Number(year) <= bounds.maxYear)
     .sort((left, right) => Number(right) - Number(left))
     .map((year) => {
       const option = options.find((item) => item.value === year);
       return option || { value: year, label: `${year} · sin directos` };
     });
+}
+
+function getCalendarBounds(livesByDate, todayParts) {
+  const dateItems = Object.values(livesByDate);
+  const monthKeys = dateItems.map((item) => `${item.date.year}-${item.date.month}`).sort();
+  const minYear = dateItems.reduce((min, item) => Math.min(min, Number(item.date.year)), Infinity);
+
+  return {
+    minYear: Number.isFinite(minYear) ? minYear : Number(todayParts.year),
+    minMonthKey: monthKeys[0] || todayParts.monthKey,
+    maxYear: Number(todayParts.year),
+    maxMonthKey: todayParts.monthKey,
+  };
+}
+
+function compareMonthKey(leftYear, leftMonth, rightMonthKey) {
+  return `${leftYear}-${leftMonth}`.localeCompare(rightMonthKey);
+}
+
+function isMonthInBounds(year, month, bounds) {
+  const monthKey = `${year}-${month}`;
+  return monthKey.localeCompare(bounds.minMonthKey) >= 0 && monthKey.localeCompare(bounds.maxMonthKey) <= 0;
+}
+
+function splitMonthKey(monthKey) {
+  const [year, month] = String(monthKey || "").split("-");
+  return { year, month };
 }
 
 function getInitialYear(yearOptions) {
@@ -287,40 +318,73 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
 
   const dataYearOptions = useMemo(() => getYearOptions(livesByDate), [livesByDate]);
   const todayParts = useMemo(() => getTodayParts(), []);
-  const [selectedYear, setSelectedYear] = useState(() => getInitialYear(dataYearOptions));
-  const [selectedMonth, setSelectedMonth] = useState(() => getInitialMonth(livesByDate, getInitialYear(dataYearOptions)));
+  const calendarBounds = useMemo(() => getCalendarBounds(livesByDate, todayParts), [livesByDate, todayParts]);
+  const initialYearOptions = useMemo(() => getBoundedYearOptions(dataYearOptions, todayParts.year, calendarBounds), [calendarBounds, dataYearOptions, todayParts.year]);
+  const [selectedYear, setSelectedYear] = useState(() => getInitialYear(initialYearOptions));
+  const [selectedMonth, setSelectedMonth] = useState(() => getInitialMonth(livesByDate, getInitialYear(initialYearOptions)));
   const [calendarView, setCalendarView] = useState("month");
   const [selectedDate, setSelectedDate] = useState("");
   const dayPanelRef = useRef(null);
   const shouldScrollToDayPanelRef = useRef(false);
-  const yearOptions = useMemo(
-    () => mergeYearOptions(dataYearOptions, [selectedYear, todayParts.year]),
-    [dataYearOptions, selectedYear, todayParts.year],
-  );
+  const yearOptions = useMemo(() => getBoundedYearOptions(dataYearOptions, selectedYear, calendarBounds), [calendarBounds, dataYearOptions, selectedYear]);
   const calendarTitle = formatCalendarTitle(calendarView, selectedYear, selectedMonth);
+  const isAtFirstYear = Number(selectedYear) <= calendarBounds.minYear;
+  const isAtCurrentYear = Number(selectedYear) >= calendarBounds.maxYear;
+  const isAtFirstMonth = compareMonthKey(selectedYear, selectedMonth, calendarBounds.minMonthKey) <= 0;
+  const isAtCurrentMonth = compareMonthKey(selectedYear, selectedMonth, calendarBounds.maxMonthKey) >= 0;
+  const canGoPrevious = calendarView === "year" ? !isAtFirstYear : !isAtFirstMonth;
+  const canGoNext = calendarView === "year" ? !isAtCurrentYear : !isAtCurrentMonth;
+  const canGoToday = compareMonthKey(todayParts.year, todayParts.month, calendarBounds.minMonthKey) >= 0;
 
   useEffect(() => {
     if (!dataYearOptions.length) {
       return;
     }
 
-    setSelectedYear((current) => (
-      current || getInitialYear(dataYearOptions)
-    ));
-  }, [dataYearOptions]);
+    setSelectedYear((current) => {
+      const currentNumber = Number(current);
+      if (!current || currentNumber < calendarBounds.minYear) {
+        return String(calendarBounds.minYear);
+      }
+      if (currentNumber > calendarBounds.maxYear) {
+        return String(calendarBounds.maxYear);
+      }
+      return current;
+    });
+  }, [calendarBounds.maxYear, calendarBounds.minYear, dataYearOptions]);
+
+  useEffect(() => {
+    const monthComparisonToStart = compareMonthKey(selectedYear, selectedMonth, calendarBounds.minMonthKey);
+    const monthComparisonToToday = compareMonthKey(selectedYear, selectedMonth, calendarBounds.maxMonthKey);
+
+    if (monthComparisonToStart < 0) {
+      const { year, month } = splitMonthKey(calendarBounds.minMonthKey);
+      setSelectedYear(year);
+      setSelectedMonth(month);
+      return;
+    }
+
+    if (monthComparisonToToday > 0) {
+      const { year, month } = splitMonthKey(calendarBounds.maxMonthKey);
+      setSelectedYear(year);
+      setSelectedMonth(month);
+    }
+  }, [calendarBounds.maxMonthKey, calendarBounds.minMonthKey, selectedMonth, selectedYear]);
 
   useEffect(() => {
     setSelectedDate("");
   }, [selectedMonth, selectedYear, calendarView]);
 
-  const monthOptions = useMemo(() => MONTHS.map((month) => ({
-    ...month,
-    label: `${month.label}${
-      Object.values(livesByDate).some((item) => item.date.year === selectedYear && item.date.month === month.value)
-        ? ""
-        : " · sin directos"
-    }`,
-  })), [livesByDate, selectedYear]);
+  const monthOptions = useMemo(() => MONTHS
+    .filter((month) => isMonthInBounds(selectedYear, month.value, calendarBounds))
+    .map((month) => ({
+      ...month,
+      label: `${month.label}${
+        Object.values(livesByDate).some((item) => item.date.year === selectedYear && item.date.month === month.value)
+          ? ""
+          : " · sin directos"
+      }`,
+    })), [calendarBounds, livesByDate, selectedYear]);
 
   const selectedDayLives = selectedDate ? livesByDate[selectedDate]?.lives || [] : [];
 
@@ -375,12 +439,20 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
   }
 
   function goToToday() {
+    if (!canGoToday) {
+      return;
+    }
+
     setSelectedYear(todayParts.year);
     setSelectedMonth(todayParts.month);
     setSelectedDate("");
   }
 
   function goToPreviousPeriod() {
+    if (!canGoPrevious) {
+      return;
+    }
+
     setSelectedDate("");
 
     if (calendarView === "year") {
@@ -399,6 +471,10 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
   }
 
   function goToNextPeriod() {
+    if (!canGoNext) {
+      return;
+    }
+
     setSelectedDate("");
 
     if (calendarView === "year") {
@@ -479,17 +555,29 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
 
       <section className="tracker-calendar-navigation" aria-label="Navegación del calendario">
         <div className="tracker-calendar-period">
-          <button type="button" className="tracker-calendar-nav-button" onClick={goToPreviousPeriod} aria-label={calendarView === "year" ? "Año anterior" : "Mes anterior"}>
+          <button
+            type="button"
+            className="tracker-calendar-nav-button"
+            onClick={goToPreviousPeriod}
+            aria-label={calendarView === "year" ? "Año anterior" : "Mes anterior"}
+            disabled={!canGoPrevious}
+          >
             <ChevronLeft size={18} aria-hidden="true" />
           </button>
           <strong>{calendarTitle}</strong>
-          <button type="button" className="tracker-calendar-nav-button" onClick={goToNextPeriod} aria-label={calendarView === "year" ? "Año siguiente" : "Mes siguiente"}>
+          <button
+            type="button"
+            className="tracker-calendar-nav-button"
+            onClick={goToNextPeriod}
+            aria-label={calendarView === "year" ? "Año siguiente" : "Mes siguiente"}
+            disabled={!canGoNext}
+          >
             <ChevronRight size={18} aria-hidden="true" />
           </button>
         </div>
 
         <div className="tracker-calendar-navigation-actions">
-          <button type="button" className="tracker-calendar-today-button" onClick={goToToday}>
+          <button type="button" className="tracker-calendar-today-button" onClick={goToToday} disabled={!canGoToday}>
             Hoy
           </button>
           <div className="tracker-calendar-view-toggle" role="group" aria-label="Cambiar vista del calendario">
