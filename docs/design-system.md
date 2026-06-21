@@ -29,18 +29,80 @@ Usar primero estos componentes antes de crear algo nuevo:
 
 - Primera columna: `ID`, mostrando `#id`.
 - Últimas columnas: `Estado` antes de `Acciones`.
+  - Si la entidad no tiene un estado real, no inventar una columna `Estado`; dejar antes de `Acciones` el dato operativo más relevante.
 - Acciones en este orden:
   - editar
   - cambiar contraseña, si aplica
   - cambiar estado
   - eliminar
 - La búsqueda debe incluir ID cuando el registro tenga ID.
+- Las columnas deben representar datos atómicos. Evitar celdas con subtexto repetido cuando ese dato pueda ser una columna propia.
+  - El header debe coincidir con el nombre funcional del campo cuando exista formulario equivalente.
+  - Ejemplo recomendado en usuarios: `Alias`, `Usuario`, `Email`, `Rol`.
+  - Ejemplo recomendado en roles: `Rol`, `Código`, `Permisos`, `Áreas`.
+  - Evitar: `Rol` con código debajo o `Permisos` con áreas debajo si eso se repite en todas las filas.
+- El texto de datos en columnas administrativas debe mantener una jerarquía tranquila.
+  - Usar un color secundario consistente para las celdas de datos.
+  - Reservar mayor contraste solo para headers, estados, acciones primarias o casos realmente destacables.
+  - Evitar intercalado de filas si genera ruido visual; preferir un fondo uniforme con separadores sutiles.
+- Si una métrica tiene columna propia, el header debe explicar la unidad y la celda debe ser breve.
+  - Correcto: columna `Permisos` con `9 permisos`.
+  - Correcto: columna `Áreas` con `8 áreas`.
+  - Evitar duplicar la misma información como línea secundaria.
+- Los filtros y la búsqueda deben contemplar todas las columnas visibles relevantes.
+  - Si se agregan columnas como `Usuario`, `Código`, `Permisos`, `Áreas` o `Estado`, la búsqueda debe encontrar esos valores.
+  - Normalizar acentos cuando aplique: buscar `area` debe poder encontrar `área`.
 - Los badges de estado:
   - activo/visible: verde
   - inactivo/oculto: rojo
   - advertencia/pendiente: amarillo/naranja
+- Estados del rastreador:
+  - `En directo`: verde esmeralda brillante.
+  - `Completo`: verde.
+  - `Completo/Partes sin audio`: lima/amarillo verdoso.
+  - `Subiendo`: azul.
+  - `Pendiente`: amarillo.
+  - `Incompleto`: naranja.
+  - `Incompleto/Partes sin audio`: rojo rosado.
+  - `Lost Media`: fucsia/rojo crítico.
+  - Usar `getLiveStatusMeta(status)` como fuente única para clases, tonos y futuras leyendas; no duplicar reglas con `includes()` en componentes.
 - Filtros y paginación deben seguir el mismo diseño entre mantenedores.
+- Ordenamiento:
+  - Las columnas ordenables deben mostrar un icono neutro cuando no están activas.
+  - La columna activa debe marcar dirección con flecha arriba o abajo.
+  - El estado debe exponerse con `aria-sort` y un `aria-label` que indique la dirección actual y la acción siguiente.
+- Paginación:
+  - No usar `<select>` nativo visible.
+  - El selector de cantidad de filas debe usar `FilterSelect` o una variante visualmente equivalente.
+  - El menú del selector de filas debe abrir hacia arriba cuando esté en el borde inferior de la pantalla.
+  - Debe incluir una opción final `Todos` para ver todos los registros filtrados.
+  - Al seleccionar `Todos`, el paginador debe usar el total filtrado actual y actualizar el rango visible.
 - Si una tabla crece mucho, preferir paginación y filtros claros antes de agregar más densidad visual.
+- Responsive:
+  - En desktop no debe haber overflow horizontal global.
+  - Las tablas administrativas anchas deben usar scroll horizontal propio, también en desktop cuando el ancho disponible no alcance.
+  - `MaintainerTable` debe separar el wrapper externo del área scrolleable:
+    - `.maintainer-table-shell`: contenedor general, paginación y espaciado.
+    - `.maintainer-table-scroll`: único contenedor con `overflow-x: auto`.
+    - `.maintainer-table`: tabla con `min-width: var(--maintainer-table-min-width, 980px)`.
+  - Cuando una tabla tenga scroll horizontal real visible, debe mostrarse arriba de la tabla la pista `Desliza horizontalmente para ver más columnas`.
+    - La pista debe vivir dentro de `.maintainer-table-scroll` antes de `.maintainer-table`, para desplazarse junto al área de tabla cuando corresponda.
+    - No debe mostrarse si la tabla cabe completa en el ancho disponible, aunque use el componente estándar.
+    - En pantallas extremadamente angostas puede ocultarse si compite con el espacio útil, pero desktop/tablet/mobile estándar deben mostrarla.
+  - El paginador debe quedar fuera de `.maintainer-table-scroll`, para que el scrollbar aparezca inmediatamente bajo la tabla y no después de la paginación.
+  - Cada mantenedor ancho debe declarar su `--maintainer-table-min-width` a nivel global, no solo dentro de media queries.
+    - El mínimo debe cubrir columnas, gaps, padding y acciones completas.
+    - Si las celdas se cortan dentro de la tabla, subir el mínimo antes de comprimir texto o bajar contraste.
+  - En mobile, mantener el mismo patrón: scroll horizontal dentro de `.maintainer-table-scroll`, sin mover toda la página.
+  - Validar que el scroll horizontal no genere overflow global ni oculte acciones al extremo derecho.
+- Verificación mínima para cambios en mantenedores:
+  - `npm run build`
+  - `git diff --check`
+  - Playwright autenticado en desktop y mobile cuando cambie estructura, contraste, filtros, acciones visibles o permisos.
+  - Para Playwright, usar un usuario admin local de prueba. No documentar ni commitear credenciales reales; pasarlas por variables locales como `PLAYWRIGHT_ADMIN_LOGIN` y `PLAYWRIGHT_ADMIN_PASSWORD`.
+  - Probar búsquedas por cada columna nueva o modificada.
+  - Probar indicadores de orden y cambio de cantidad de filas, incluyendo `Todos`.
+  - Cuando una tabla requiera scroll horizontal, medir con Playwright que `.maintainer-table-scroll.scrollWidth > .clientWidth`, que `overflow-x` sea `auto` o `scroll`, que `document.documentElement` no tenga overflow global y que las acciones sean visibles al desplazar al extremo derecho.
 
 ## Modales
 

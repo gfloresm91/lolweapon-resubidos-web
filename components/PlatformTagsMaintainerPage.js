@@ -17,9 +17,13 @@ import { normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
 const TAG_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
   { key: "name", label: "Tag", sortable: true },
+  { key: "slug", label: "Slug", sortable: true },
   { key: "category", label: "Categoría", sortable: true },
-  { key: "usage", label: "Uso", sortable: true },
+  { key: "categoryCode", label: "Código", sortable: true },
+  { key: "liveCount", label: "Directos", sortable: true },
+  { key: "animeCount", label: "Animes", sortable: true },
   { key: "source", label: "Asignación", sortable: true },
+  { key: "rule", label: "Regla", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
 const DEFAULT_CATEGORY_ICON = "TG";
@@ -64,6 +68,49 @@ function compareValues(left, right, direction) {
   if (leftValue < rightValue) return -1 * modifier;
   if (leftValue > rightValue) return 1 * modifier;
   return 0;
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getRuleDescription(tag) {
+  if (tag.isManual) {
+    return `Manual; por regla sería ${tag.automaticCategoryLabel || "calculada"}`;
+  }
+
+  if (tag.ruleType === "exact") {
+    return `Regla exacta: ${tag.ruleValue}`;
+  }
+
+  if (tag.ruleType === "keyword") {
+    return `Keyword: ${tag.ruleValue}`;
+  }
+
+  return "Sin coincidencia; cae en Otros";
+}
+
+function getTagSortValue(tag, key) {
+  if (key === "category") {
+    return tag.categoryLabel;
+  }
+
+  if (key === "categoryCode") {
+    return tag.categoryCode;
+  }
+
+  if (key === "source") {
+    return tag.isManual ? "Manual" : "Por regla";
+  }
+
+  if (key === "rule") {
+    return getRuleDescription(tag);
+  }
+
+  return tag[key];
 }
 
 export default function PlatformTagsMaintainerPage({
@@ -116,7 +163,7 @@ export default function PlatformTagsMaintainerPage({
     { value: "without", label: "Sin uso" },
   ], []);
   const filteredTags = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = normalizeSearchText(searchQuery.trim());
 
     return tagItems
       .filter((tag) => !query || [
@@ -124,7 +171,14 @@ export default function PlatformTagsMaintainerPage({
         tag.name,
         tag.slug,
         tag.categoryLabel,
-      ].some((value) => String(value || "").toLowerCase().includes(query)))
+        tag.categoryCode,
+        tag.liveCount,
+        `${tag.liveCount || 0} directos`,
+        tag.animeCount,
+        `${tag.animeCount || 0} animes`,
+        tag.isManual ? "Manual" : "Por regla",
+        getRuleDescription(tag),
+      ].some((value) => normalizeSearchText(value).includes(query)))
       .filter((tag) => categoryFilter === "all" || tag.categoryCode === categoryFilter)
       .filter((tag) => {
         if (sourceFilter === "manual") return tag.isManual;
@@ -139,20 +193,8 @@ export default function PlatformTagsMaintainerPage({
       })
       .sort((left, right) => {
         const key = sortConfig.key;
-        const leftValue = key === "usage"
-          ? (left.liveCount || 0) + (left.animeCount || 0)
-          : key === "category"
-            ? left.categoryLabel
-            : key === "source"
-              ? (left.isManual ? "Manual" : "Por regla")
-              : left[key];
-        const rightValue = key === "usage"
-          ? (right.liveCount || 0) + (right.animeCount || 0)
-          : key === "category"
-            ? right.categoryLabel
-            : key === "source"
-              ? (right.isManual ? "Manual" : "Por regla")
-              : right[key];
+        const leftValue = getTagSortValue(left, key);
+        const rightValue = getTagSortValue(right, key);
         return compareValues(leftValue, rightValue, sortConfig.direction);
       });
   }, [categoryFilter, searchQuery, sortConfig, sourceFilter, tagItems, usageFilter]);
@@ -204,7 +246,7 @@ export default function PlatformTagsMaintainerPage({
         return { key, direction: current.direction === "asc" ? "desc" : "asc" };
       }
 
-      return { key, direction: key === "id" || key === "usage" ? "desc" : "asc" };
+      return { key, direction: ["id", "liveCount", "animeCount"].includes(key) ? "desc" : "asc" };
     });
   }
 
@@ -409,22 +451,6 @@ export default function PlatformTagsMaintainerPage({
     }
   }
 
-  function getRuleDescription(tag) {
-    if (tag.isManual) {
-      return `Manual; por regla sería ${tag.automaticCategoryLabel || "calculada"}`;
-    }
-
-    if (tag.ruleType === "exact") {
-      return `Regla exacta: ${tag.ruleValue}`;
-    }
-
-    if (tag.ruleType === "keyword") {
-      return `Keyword: ${tag.ruleValue}`;
-    }
-
-    return "Sin coincidencia; cae en Otros";
-  }
-
   return (
     <>
       <header className="watching-header admin-users-header">
@@ -497,7 +523,7 @@ export default function PlatformTagsMaintainerPage({
       <MaintainerToolbar
         searchId="admin-tags-search"
         searchValue={searchQuery}
-        searchPlaceholder="Buscar por ID, tag o categoría"
+        searchPlaceholder="Buscar por ID, tag, slug, categoría, código, uso, asignación o regla"
         onSearchChange={setSearchQuery}
       >
         <FilterSelect
@@ -549,24 +575,19 @@ export default function PlatformTagsMaintainerPage({
         {paginatedTags.map((tag) => (
           <div className="maintainer-table-row admin-tags-row" role="row" key={tag.slug || tag.name}>
             <span className="admin-user-cell admin-record-id">#{tag.id}</span>
-            <div className="admin-user-cell admin-tracker-title">
-              <strong>{tag.name}</strong>
-              <span>{tag.slug}</span>
-            </div>
+            <span className="admin-user-cell admin-tags-name-cell">{tag.name}</span>
+            <span className="admin-user-cell admin-tags-slug-cell">{tag.slug}</span>
             <div className="admin-user-cell admin-tags-category-cell">
-              <strong>{tag.categoryIcon ? <span>{tag.categoryIcon}</span> : null}{tag.categoryLabel}</strong>
-              <small>{tag.categoryCode}</small>
+              {tag.categoryIcon ? <span>{tag.categoryIcon}</span> : null}
+              <strong>{tag.categoryLabel}</strong>
             </div>
-            <div className="admin-user-cell admin-anime-summary">
-              <strong>{tag.liveCount || 0} directos</strong>
-              <small>{tag.animeCount || 0} animes</small>
-            </div>
-            <div className="admin-user-cell admin-tags-assignment-cell">
-              <span className={`admin-user-status ${tag.isManual ? "is-warning" : "is-active"}`}>
-                {tag.isManual ? "Manual" : "Por regla"}
-              </span>
-              <small>{getRuleDescription(tag)}</small>
-            </div>
+            <span className="admin-user-cell admin-tags-code-cell">{tag.categoryCode}</span>
+            <span className="admin-user-cell admin-tags-count-cell">{tag.liveCount || 0} directos</span>
+            <span className="admin-user-cell admin-tags-count-cell">{tag.animeCount || 0} animes</span>
+            <span className={`admin-user-status ${tag.isManual ? "is-warning" : "is-active"}`}>
+              {tag.isManual ? "Manual" : "Por regla"}
+            </span>
+            <span className="admin-user-cell admin-tags-rule-cell" title={getRuleDescription(tag)}>{getRuleDescription(tag)}</span>
             <div className="admin-user-actions">
               {canUpdate ? (
                 <button type="button" className="icon-tool-button" aria-label="Editar tag" onClick={() => openEditTag(tag)}>

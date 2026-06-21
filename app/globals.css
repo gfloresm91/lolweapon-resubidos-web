@@ -4587,6 +4587,795 @@ body::before {
   display: none;
 }
 
+.tracker-calendar-page {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.tracker-calendar-header {
+  padding-bottom: 1.25rem;
+}
+
+.tracker-calendar-navigation {
+  border: 1px solid rgba(167, 139, 250, 0.16);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  background:
+    linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(45, 212, 191, 0.025)),
+    rgba(10, 12, 19, 0.8);
+  padding: 0.78rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.tracker-calendar-period {
+  min-width: 0;
+  display: inline-grid;
+  grid-template-columns: 42px minmax(0, auto) 42px;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.tracker-calendar-period strong {
+  min-width: 0;
+  color: var(--text-main);
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: clamp(1.05rem, 2vw, 1.45rem);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tracker-calendar-navigation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.tracker-calendar-nav-button,
+.tracker-calendar-today-button,
+.tracker-calendar-view-toggle button {
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-weight: 850;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.tracker-calendar-nav-button {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0;
+}
+
+.tracker-calendar-today-button {
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.82rem;
+  padding: 0 1rem;
+}
+
+.tracker-calendar-view-toggle {
+  border: 1px solid rgba(167, 139, 250, 0.16);
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  gap: 0.18rem;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.22rem;
+}
+
+.tracker-calendar-view-toggle button {
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 0.78rem;
+  padding: 0 0.78rem;
+}
+
+.tracker-calendar-nav-button:hover,
+.tracker-calendar-nav-button:focus-visible,
+.tracker-calendar-today-button:hover,
+.tracker-calendar-today-button:focus-visible,
+.tracker-calendar-view-toggle button:hover,
+.tracker-calendar-view-toggle button:focus-visible,
+.tracker-calendar-view-toggle button.is-active {
+  border-color: rgba(196, 181, 253, 0.36);
+  background: rgba(167, 139, 250, 0.17);
+  color: var(--purple-light);
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+}
+
+.tracker-calendar-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.tracker-calendar-toolbar .filter-select {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.tracker-calendar-legend {
+  border: 1px solid rgba(167, 139, 250, 0.12);
+  border-radius: var(--radius-md);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  background: rgba(10, 12, 19, 0.58);
+  padding: 0.78rem 0.88rem;
+}
+
+.tracker-calendar-legend-title {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tracker-calendar-legend-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.tracker-calendar-legend-chip {
+  --legend-chip-bg: rgba(255, 255, 255, 0.035);
+  --legend-chip-border: rgba(255, 255, 255, 0.08);
+  --legend-chip-color: var(--text-secondary);
+  max-width: 100%;
+  border: 1px solid var(--legend-chip-border);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--legend-chip-bg);
+  color: var(--legend-chip-color);
+  font-size: 0.72rem;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  padding: 0.36rem 0.56rem;
+}
+
+.tracker-calendar-legend-chip i {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.tracker-calendar-legend-chip.is-live {
+  --legend-chip-border: rgba(94, 234, 212, 0.38);
+  --legend-chip-bg: rgba(20, 184, 166, 0.13);
+  --legend-chip-color: #5eead4;
+}
+
+.tracker-calendar-legend-chip.is-complete {
+  --legend-chip-border: rgba(34, 197, 94, 0.38);
+  --legend-chip-bg: rgba(22, 163, 74, 0.13);
+  --legend-chip-color: var(--green);
+}
+
+.tracker-calendar-legend-chip.is-complete-audio {
+  --legend-chip-border: rgba(190, 242, 100, 0.4);
+  --legend-chip-bg: rgba(132, 204, 22, 0.13);
+  --legend-chip-color: #bef264;
+}
+
+.tracker-calendar-legend-chip.is-uploading {
+  --legend-chip-border: rgba(96, 165, 250, 0.4);
+  --legend-chip-bg: rgba(37, 99, 235, 0.13);
+  --legend-chip-color: var(--blue);
+}
+
+.tracker-calendar-legend-chip.is-pending {
+  --legend-chip-border: rgba(245, 158, 11, 0.42);
+  --legend-chip-bg: rgba(217, 119, 6, 0.13);
+  --legend-chip-color: var(--yellow);
+}
+
+.tracker-calendar-legend-chip.is-incomplete {
+  --legend-chip-border: rgba(251, 146, 60, 0.42);
+  --legend-chip-bg: rgba(234, 88, 12, 0.13);
+  --legend-chip-color: var(--orange);
+}
+
+.tracker-calendar-legend-chip.is-incomplete-audio {
+  --legend-chip-border: rgba(251, 113, 133, 0.42);
+  --legend-chip-bg: rgba(225, 29, 72, 0.13);
+  --legend-chip-color: #fb7185;
+}
+
+.tracker-calendar-legend-chip.is-lost {
+  --legend-chip-border: rgba(244, 114, 182, 0.42);
+  --legend-chip-bg: rgba(219, 39, 119, 0.13);
+  --legend-chip-color: #f472b6;
+}
+
+.tracker-calendar-legend-chip.is-mixed {
+  --legend-chip-border: rgba(167, 139, 250, 0.44);
+  --legend-chip-bg: linear-gradient(135deg, rgba(45, 212, 191, 0.14), rgba(167, 139, 250, 0.14), rgba(251, 113, 133, 0.12));
+  --legend-chip-color: #c4b5fd;
+}
+
+.tracker-calendar-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--border);
+}
+
+.tracker-calendar-stats div {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 1rem;
+  background: rgba(12, 13, 20, 0.82);
+}
+
+.tracker-calendar-stats span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tracker-calendar-stats strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--purple-light);
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1.45rem;
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.tracker-calendar-main,
+.tracker-calendar-day-panel {
+  min-width: 0;
+}
+
+.tracker-calendar-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.tracker-calendar-month,
+.tracker-calendar-day-panel {
+  border: 1px solid rgba(167, 139, 250, 0.14);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgba(167, 139, 250, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(12, 13, 20, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.tracker-calendar-month {
+  padding: 1rem;
+}
+
+.tracker-calendar-month.is-compact {
+  padding: 0.75rem;
+}
+
+.tracker-calendar-month-heading {
+  margin-bottom: 0.75rem;
+}
+
+.tracker-calendar-month-heading button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text-main);
+  cursor: pointer;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1rem;
+  font-weight: 850;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+}
+
+.tracker-calendar-month-heading button:hover,
+.tracker-calendar-month-heading button:focus-visible {
+  background: rgba(167, 139, 250, 0.13);
+  color: var(--purple-light);
+  outline: none;
+}
+
+.tracker-calendar-weekdays,
+.tracker-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.32rem;
+}
+
+.tracker-calendar-weekdays {
+  margin-bottom: 0.38rem;
+}
+
+.tracker-calendar-weekdays span {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.tracker-calendar-day {
+  position: relative;
+  --calendar-day-bg: rgba(255, 255, 255, 0.025);
+  --calendar-day-border: rgba(255, 255, 255, 0.07);
+  --calendar-day-color: var(--text-muted);
+  --calendar-day-active-bg: rgba(255, 255, 255, 0.16);
+  --calendar-day-active-border: rgba(255, 255, 255, 0.34);
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid var(--calendar-day-border);
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--calendar-day-bg);
+  color: var(--calendar-day-color);
+  cursor: pointer;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0;
+  transition: border-color var(--t-fast), background var(--t-fast), color var(--t-fast);
+}
+
+.tracker-calendar-day.is-empty {
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
+.tracker-calendar-day:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.tracker-calendar-day.has-low,
+.tracker-calendar-day.has-medium,
+.tracker-calendar-day.has-high {
+  --calendar-day-color: #fff;
+  opacity: 1;
+}
+
+.tracker-calendar-day.has-low {
+  --calendar-day-border: rgba(45, 212, 191, 0.24);
+  --calendar-day-bg: rgba(45, 212, 191, 0.16);
+}
+
+.tracker-calendar-day.has-medium {
+  --calendar-day-border: rgba(167, 139, 250, 0.32);
+  --calendar-day-bg: rgba(167, 139, 250, 0.2);
+}
+
+.tracker-calendar-day.has-high {
+  --calendar-day-border: rgba(245, 158, 11, 0.36);
+  --calendar-day-bg: rgba(245, 158, 11, 0.24);
+}
+
+.tracker-calendar-day.is-live {
+  --calendar-day-border: rgba(94, 234, 212, 0.38);
+  --calendar-day-bg: rgba(20, 184, 166, 0.2);
+  --calendar-day-active-border: rgba(94, 234, 212, 0.62);
+  --calendar-day-active-bg: rgba(20, 184, 166, 0.28);
+}
+
+.tracker-calendar-day.is-complete {
+  --calendar-day-border: rgba(34, 197, 94, 0.38);
+  --calendar-day-bg: rgba(22, 163, 74, 0.2);
+  --calendar-day-active-border: rgba(74, 222, 128, 0.62);
+  --calendar-day-active-bg: rgba(22, 163, 74, 0.28);
+}
+
+.tracker-calendar-day.is-complete-audio {
+  --calendar-day-border: rgba(190, 242, 100, 0.4);
+  --calendar-day-bg: rgba(132, 204, 22, 0.2);
+  --calendar-day-active-border: rgba(217, 249, 157, 0.64);
+  --calendar-day-active-bg: rgba(132, 204, 22, 0.28);
+}
+
+.tracker-calendar-day.is-uploading {
+  --calendar-day-border: rgba(96, 165, 250, 0.4);
+  --calendar-day-bg: rgba(37, 99, 235, 0.2);
+  --calendar-day-active-border: rgba(147, 197, 253, 0.64);
+  --calendar-day-active-bg: rgba(37, 99, 235, 0.28);
+}
+
+.tracker-calendar-day.is-pending {
+  --calendar-day-border: rgba(245, 158, 11, 0.42);
+  --calendar-day-bg: rgba(217, 119, 6, 0.2);
+  --calendar-day-active-border: rgba(251, 191, 36, 0.66);
+  --calendar-day-active-bg: rgba(217, 119, 6, 0.28);
+}
+
+.tracker-calendar-day.is-incomplete {
+  --calendar-day-border: rgba(251, 146, 60, 0.42);
+  --calendar-day-bg: rgba(234, 88, 12, 0.2);
+  --calendar-day-active-border: rgba(253, 186, 116, 0.66);
+  --calendar-day-active-bg: rgba(234, 88, 12, 0.28);
+}
+
+.tracker-calendar-day.is-incomplete-audio {
+  --calendar-day-border: rgba(251, 113, 133, 0.42);
+  --calendar-day-bg: rgba(225, 29, 72, 0.2);
+  --calendar-day-active-border: rgba(253, 164, 175, 0.66);
+  --calendar-day-active-bg: rgba(225, 29, 72, 0.28);
+}
+
+.tracker-calendar-day.is-lost {
+  --calendar-day-border: rgba(244, 114, 182, 0.42);
+  --calendar-day-bg: rgba(219, 39, 119, 0.2);
+  --calendar-day-active-border: rgba(249, 168, 212, 0.66);
+  --calendar-day-active-bg: rgba(219, 39, 119, 0.28);
+}
+
+.tracker-calendar-day.is-mixed {
+  --calendar-day-border: rgba(167, 139, 250, 0.44);
+  --calendar-day-bg: linear-gradient(135deg, rgba(45, 212, 191, 0.18), rgba(167, 139, 250, 0.18), rgba(251, 113, 133, 0.16));
+  --calendar-day-active-border: rgba(196, 181, 253, 0.68);
+  --calendar-day-active-bg: linear-gradient(135deg, rgba(45, 212, 191, 0.24), rgba(167, 139, 250, 0.24), rgba(251, 113, 133, 0.22));
+}
+
+.tracker-calendar-day:not(:disabled):hover,
+.tracker-calendar-day:not(:disabled):focus-visible,
+.tracker-calendar-day.is-selected {
+  border-color: var(--calendar-day-active-border);
+  background: var(--calendar-day-active-bg);
+  color: #fff;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.tracker-calendar-day strong {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  min-width: 15px;
+  border-radius: 999px;
+  background: rgba(5, 6, 12, 0.72);
+  color: #fff;
+  font-size: 0.55rem;
+  line-height: 15px;
+  text-align: center;
+}
+
+.tracker-calendar-day-panel {
+  position: sticky;
+  top: calc(var(--topbar-height) + 1rem);
+  scroll-margin-top: calc(var(--topbar-height) + 1rem);
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.tracker-calendar-day-panel.is-empty {
+  min-height: 140px;
+  align-content: center;
+}
+
+.tracker-calendar-live-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tracker-calendar-live-row {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  padding: 0.72rem;
+  text-decoration: none;
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+
+.tracker-calendar-live-row:hover,
+.tracker-calendar-live-row:focus-visible {
+  border-color: rgba(167, 139, 250, 0.32);
+  background: rgba(167, 139, 250, 0.095);
+  outline: none;
+}
+
+.tracker-calendar-live-main,
+.tracker-calendar-live-meta {
+  display: grid;
+  min-width: 0;
+}
+
+.tracker-calendar-live-main strong,
+.tracker-calendar-live-main small,
+.tracker-calendar-live-meta em,
+.tracker-calendar-live-meta small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracker-calendar-live-main strong {
+  color: var(--text-main);
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.tracker-calendar-live-main small,
+.tracker-calendar-live-meta small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.tracker-calendar-live-meta {
+  justify-items: end;
+  text-align: right;
+}
+
+.tracker-calendar-live-meta em {
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tracker-calendar-live-status.is-live {
+  color: #5eead4;
+}
+
+.tracker-calendar-live-status.is-complete {
+  color: var(--green);
+}
+
+.tracker-calendar-live-status.is-complete-audio {
+  color: #bef264;
+}
+
+.tracker-calendar-live-status.is-uploading {
+  color: var(--blue);
+}
+
+.tracker-calendar-live-status.is-pending {
+  color: var(--yellow);
+}
+
+.tracker-calendar-live-status.is-incomplete {
+  color: var(--orange);
+}
+
+.tracker-calendar-live-status.is-incomplete-audio {
+  color: #fb7185;
+}
+
+.tracker-calendar-live-status.is-lost {
+  color: #f472b6;
+}
+
+.tracker-calendar-empty {
+  margin-top: 2rem;
+}
+
+@media (max-width: 1180px) {
+  .tracker-calendar-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tracker-calendar-day-panel {
+    position: static;
+  }
+
+  .tracker-calendar-year-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .tracker-calendar-header {
+    padding-top: 2.3rem;
+  }
+
+  .tracker-calendar-navigation {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+    padding: 0.7rem;
+  }
+
+  .tracker-calendar-period {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    width: 100%;
+  }
+
+  .tracker-calendar-period strong {
+    font-size: 1.12rem;
+  }
+
+  .tracker-calendar-navigation-actions {
+    display: grid;
+    grid-template-columns: minmax(70px, 0.42fr) minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .tracker-calendar-today-button,
+  .tracker-calendar-view-toggle {
+    width: 100%;
+  }
+
+  .tracker-calendar-view-toggle button {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .tracker-calendar-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracker-calendar-legend {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    padding: 0.72rem;
+  }
+
+  .tracker-calendar-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-year-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-month {
+    padding: 0.82rem;
+  }
+
+  .tracker-calendar-weekdays,
+  .tracker-calendar-grid {
+    gap: 0.26rem;
+  }
+
+  .tracker-calendar-live-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-live-meta {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 360px) {
+  .tracker-calendar-page {
+    gap: 0.95rem;
+  }
+
+  .tracker-calendar-navigation {
+    border-radius: 10px;
+    padding: 0.58rem;
+  }
+
+  .tracker-calendar-period {
+    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    gap: 0.4rem;
+  }
+
+  .tracker-calendar-nav-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .tracker-calendar-period strong {
+    font-size: 1rem;
+  }
+
+  .tracker-calendar-navigation-actions {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+
+  .tracker-calendar-today-button {
+    min-height: 38px;
+  }
+
+  .tracker-calendar-view-toggle button {
+    min-height: 34px;
+    padding-inline: 0.45rem;
+  }
+
+  .tracker-calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-calendar-legend {
+    border-radius: 10px;
+    padding: 0.62rem;
+  }
+
+  .tracker-calendar-legend-list {
+    gap: 0.36rem;
+  }
+
+  .tracker-calendar-legend-chip {
+    flex: 0 1 auto;
+    justify-content: center;
+    font-size: 0.68rem;
+  }
+
+  .tracker-calendar-month,
+  .tracker-calendar-day-panel {
+    border-radius: 10px;
+  }
+
+  .tracker-calendar-month {
+    padding: 0.64rem;
+  }
+
+  .tracker-calendar-day {
+    border-radius: 5px;
+    font-size: 0.68rem;
+  }
+
+  .tracker-calendar-day strong {
+    right: 1px;
+    bottom: 1px;
+    min-width: 13px;
+    font-size: 0.5rem;
+    line-height: 13px;
+  }
+
+  .tracker-calendar-stats strong {
+    font-size: 1.2rem;
+  }
+}
+
 @media (min-width: 768px) {
   .density-table-option {
     display: inline-flex;
@@ -5116,28 +5905,70 @@ body::before {
   background: currentColor;
 }
 
+.status-badge--live {
+  background: rgba(16, 185, 129, 0.16);
+  color: #5eead4;
+  border: 1px solid rgba(16, 185, 129, 0.34);
+}
+
+.status-badge--complete {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--green);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.status-badge--complete-audio {
+  background: rgba(190, 242, 100, 0.12);
+  color: #bef264;
+  border: 1px solid rgba(190, 242, 100, 0.26);
+}
+
+.status-badge--uploading {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--blue);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+.status-badge--pending {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--yellow);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.status-badge--incomplete {
+  background: rgba(251, 146, 60, 0.12);
+  color: var(--orange);
+  border: 1px solid rgba(251, 146, 60, 0.28);
+}
+
+.status-badge--incomplete-audio {
+  background: rgba(251, 113, 133, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(251, 113, 133, 0.28);
+}
+
+.status-badge--lost {
+  background: rgba(244, 114, 182, 0.12);
+  color: #f472b6;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+}
+
+.status-badge--directo {
+  background: rgba(16, 185, 129, 0.16);
+  color: #5eead4;
+  border: 1px solid rgba(16, 185, 129, 0.34);
+}
+
 .status-badge--completo {
   background: rgba(52, 211, 153, 0.12);
   color: var(--green);
   border: 1px solid rgba(52, 211, 153, 0.25);
 }
 
-.status-badge--directo {
-  background: rgba(52, 211, 153, 0.14);
-  color: var(--green);
-  border: 1px solid rgba(52, 211, 153, 0.28);
-}
-
 .status-badge--pendiente {
   background: rgba(251, 191, 36, 0.1);
   color: var(--yellow);
   border: 1px solid rgba(251, 191, 36, 0.2);
-}
-
-.status-badge--lost {
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--red);
-  border: 1px solid rgba(248, 113, 113, 0.25);
 }
 
 .status-badge--subiendo {
@@ -5385,7 +6216,8 @@ body::before {
 }
 
 .live-compact-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.45rem;
@@ -5400,9 +6232,23 @@ body::before {
 }
 
 .live-card-compact .status-badge {
-  max-width: 46%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  justify-self: end;
+  max-width: min(100%, 9.4rem);
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.12;
+}
+
+.live-card-compact .status-badge--complete-audio,
+.live-card-compact .status-badge--incomplete-audio {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: stretch;
+  max-width: 100%;
+  min-height: 26px;
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
 }
 
 .live-compact-title {
@@ -5497,13 +6343,13 @@ body::before {
 
   .live-compact-header {
     align-items: center;
-    justify-content: space-between;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.35rem;
     margin-bottom: 0.5rem;
   }
 
   .live-card-compact .status-badge {
-    max-width: min(62%, 8.5rem);
+    max-width: min(100%, 8.8rem);
   }
 
   .live-card-compact .live-date-pill,
@@ -5550,7 +6396,7 @@ body::before {
 
 .lives-grid-compact .lives-table-header {
   display: grid;
-  grid-template-columns: minmax(112px, 0.75fr) minmax(260px, 2fr) minmax(132px, 0.9fr) minmax(160px, 1.15fr) minmax(190px, 1.18fr) minmax(250px, 1.45fr);
+  grid-template-columns: minmax(112px, 0.65fr) minmax(260px, 1.85fr) minmax(230px, 1.25fr) minmax(180px, 1.08fr) minmax(190px, 1.12fr) minmax(250px, 1.35fr);
   gap: 0.75rem;
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -5566,7 +6412,7 @@ body::before {
 
 .lives-grid-compact .live-card {
   display: grid;
-  grid-template-columns: minmax(112px, 0.75fr) minmax(260px, 2fr) minmax(132px, 0.9fr) minmax(160px, 1.15fr) minmax(190px, 1.18fr) minmax(250px, 1.45fr);
+  grid-template-columns: minmax(112px, 0.65fr) minmax(260px, 1.85fr) minmax(230px, 1.25fr) minmax(180px, 1.08fr) minmax(190px, 1.12fr) minmax(250px, 1.35fr);
   gap: 0.75rem;
   align-items: start;
   border: 0;
@@ -5626,6 +6472,10 @@ body::before {
   grid-row: 1;
   align-self: start;
   justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.12;
 }
 
 .lives-grid-compact .live-personal-badges {
@@ -6012,6 +6862,9 @@ body::before {
 
 .maintainer-table-shell {
   margin-top: 1.4rem;
+}
+
+.maintainer-table-scroll {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.55rem;
@@ -6019,15 +6872,15 @@ body::before {
   scrollbar-width: thin;
 }
 
-.maintainer-table-shell::-webkit-scrollbar {
+.maintainer-table-scroll::-webkit-scrollbar {
   height: 6px;
 }
 
-.maintainer-table-shell::-webkit-scrollbar-track {
+.maintainer-table-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.maintainer-table-shell::-webkit-scrollbar-thumb {
+.maintainer-table-scroll::-webkit-scrollbar-thumb {
   background: rgba(167, 139, 250, 0.38);
   border-radius: 999px;
 }
@@ -6036,9 +6889,13 @@ body::before {
   display: none;
 }
 
-.admin-tracker-table .maintainer-scroll-hint,
+.admin-users-table .maintainer-scroll-hint,
+.admin-roles-table .maintainer-scroll-hint,
 .admin-anime-table .maintainer-scroll-hint,
-.admin-spacedrum-table .maintainer-scroll-hint {
+.admin-tracker-table .maintainer-scroll-hint,
+.admin-tags-table .maintainer-scroll-hint,
+.admin-spacedrum-table .maintainer-scroll-hint,
+.admin-spacedrum-pages-table .maintainer-scroll-hint {
   position: sticky;
   left: 0;
   display: inline-flex;
@@ -6106,32 +6963,79 @@ body::before {
   outline: none;
 }
 
+.maintainer-table-sort.is-active {
+  color: var(--text-secondary);
+}
+
 .admin-users-row,
 .admin-users-table .maintainer-table-head {
-  grid-template-columns: minmax(70px, 0.28fr) minmax(240px, 1.45fr) minmax(110px, 0.65fr) minmax(105px, 0.55fr) minmax(150px, 0.8fr) minmax(170px, 0.9fr) minmax(105px, 0.5fr);
+  grid-template-columns: minmax(70px, 0.22fr) minmax(210px, 0.82fr) minmax(150px, 0.58fr) minmax(230px, 0.9fr) minmax(120px, 0.48fr) minmax(150px, 0.58fr) minmax(120px, 0.46fr) minmax(160px, 0.62fr) minmax(150px, 0.58fr) minmax(110px, 0.42fr) minmax(190px, 0.7fr);
 }
 
 .admin-roles-row {
-  grid-template-columns: minmax(70px, 0.28fr) minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
+  grid-template-columns: minmax(70px, 0.26fr) minmax(170px, 1fr) minmax(150px, 0.72fr) minmax(135px, 0.62fr) minmax(105px, 0.5fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
 }
 
 .admin-roles-table .maintainer-table-head {
-  grid-template-columns: minmax(70px, 0.28fr) minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
+  grid-template-columns: minmax(70px, 0.26fr) minmax(170px, 1fr) minmax(150px, 0.72fr) minmax(135px, 0.62fr) minmax(105px, 0.5fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
+}
+
+.admin-roles-table .maintainer-table {
+  background: rgba(9, 11, 18, 0.96);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+}
+
+.admin-roles-table .maintainer-table-head {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(24, 28, 39, 0.94);
+  color: #9aa8bd;
+}
+
+.admin-roles-table .maintainer-table-row {
+  border-top-color: rgba(148, 163, 184, 0.13);
+  background: rgba(11, 14, 22, 0.78);
+}
+
+.admin-roles-table .admin-record-id,
+.admin-roles-table .admin-user-cell,
+.admin-roles-table .admin-user-cell strong,
+.admin-roles-table .admin-role-permissions-summary strong,
+.admin-roles-table .admin-role-code-cell,
+.admin-roles-table .admin-role-areas-cell {
+  color: #aeb8ca;
+}
+
+.admin-roles-table .admin-role-code-cell,
+.admin-roles-table .admin-role-areas-cell,
+.admin-roles-table .admin-role-permissions-summary {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-roles-table .admin-user-cell strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-anime-row,
 .admin-anime-table .maintainer-table-head {
-  grid-template-columns: minmax(110px, 0.55fr) minmax(280px, 1.35fr) minmax(135px, 0.62fr) minmax(190px, 0.9fr) minmax(170px, 0.76fr) minmax(105px, 0.5fr) minmax(140px, 0.62fr);
+  grid-template-columns: minmax(110px, 0.42fr) minmax(300px, 1.1fr) minmax(180px, 0.68fr) minmax(145px, 0.55fr) minmax(120px, 0.46fr) minmax(170px, 0.64fr) minmax(105px, 0.4fr) minmax(130px, 0.5fr) minmax(150px, 0.56fr) minmax(110px, 0.42fr) minmax(150px, 0.56fr);
 }
 
 .admin-tracker-row,
 .admin-tracker-table .maintainer-table-head {
-  grid-template-columns: minmax(90px, 0.42fr) minmax(280px, 1.45fr) minmax(140px, 0.68fr) minmax(130px, 0.62fr) minmax(170px, 0.76fr) minmax(180px, 0.84fr) minmax(150px, 0.62fr);
+  grid-template-columns: minmax(90px, 0.34fr) minmax(280px, 1.08fr) minmax(190px, 0.76fr) minmax(100px, 0.38fr) minmax(150px, 0.58fr) minmax(170px, 0.66fr) minmax(180px, 0.7fr) minmax(120px, 0.46fr) minmax(190px, 0.74fr) minmax(150px, 0.58fr);
 }
 
 .admin-tags-row,
 .admin-tags-table .maintainer-table-head {
-  grid-template-columns: minmax(88px, 0.42fr) minmax(260px, 1.45fr) minmax(190px, 0.95fr) minmax(150px, 0.72fr) minmax(155px, 0.7fr) minmax(130px, 0.52fr);
+  grid-template-columns: minmax(88px, 0.36fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) minmax(170px, 0.72fr) minmax(150px, 0.62fr) minmax(130px, 0.52fr) minmax(130px, 0.52fr) minmax(135px, 0.56fr) minmax(260px, 1.08fr) minmax(130px, 0.52fr);
 }
 
 .admin-spacedrum-row,
@@ -6144,9 +7048,13 @@ body::before {
   grid-template-columns: minmax(86px, 0.38fr) minmax(90px, 0.45fr) minmax(280px, 1.35fr) minmax(110px, 0.52fr) minmax(110px, 0.52fr) minmax(150px, 0.58fr);
 }
 
-.admin-tracker-table { --maintainer-table-min-width: 1280px; }
-.admin-anime-table { --maintainer-table-min-width: 1280px; }
+.admin-users-table { --maintainer-table-min-width: 1880px; }
+.admin-roles-table { --maintainer-table-min-width: 1040px; }
+.admin-tracker-table { --maintainer-table-min-width: 1840px; }
+.admin-tags-table { --maintainer-table-min-width: 1900px; }
+.admin-anime-table { --maintainer-table-min-width: 1880px; }
 .admin-spacedrum-table { --maintainer-table-min-width: 1220px; }
+.admin-spacedrum-pages-table { --maintainer-table-min-width: 980px; }
 
 .admin-record-id {
   color: var(--text-muted);
@@ -6600,8 +7508,6 @@ body::before {
   min-height: 1.85rem;
 }
 
-.admin-anime-profile div,
-.admin-tracker-title,
 .admin-tracker-tags,
 .admin-anime-summary {
   display: flex;
@@ -6610,8 +7516,17 @@ body::before {
   gap: 0.18rem;
 }
 
-.admin-anime-profile strong,
-.admin-tracker-title strong,
+.admin-anime-profile strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #aeb8ca;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .admin-anime-summary strong {
   color: var(--text-main);
   font-size: 0.9rem;
@@ -6620,8 +7535,6 @@ body::before {
   white-space: nowrap;
 }
 
-.admin-anime-profile span,
-.admin-tracker-title span,
 .admin-anime-summary small {
   color: var(--text-muted);
   font-size: 0.76rem;
@@ -6631,6 +7544,36 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-anime-code-cell,
+.admin-anime-progress-cell,
+.admin-anime-year-cell,
+.admin-anime-format-cell,
+.admin-anime-publication-cell {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #aeb8ca;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-tracker-live-id {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-tracker-title-cell {
+  display: block;
+  min-width: 0;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .admin-tracker-tags {
@@ -6674,23 +7617,24 @@ body::before {
 }
 
 .admin-tags-category-cell {
-  display: flex;
+  display: inline-flex;
   min-width: 0;
-  flex-direction: column;
-  gap: 0.18rem;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .admin-tags-category-cell strong {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--text-main);
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #aeb8ca;
   font-size: 0.9rem;
   font-weight: 850;
-  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.admin-tags-category-cell strong span {
+.admin-tags-category-cell > span {
   width: 24px;
   height: 24px;
   border-radius: 9px;
@@ -6704,28 +7648,21 @@ body::before {
   flex: 0 0 auto;
 }
 
-.admin-tags-category-cell small {
-  color: var(--text-muted);
-  font-size: 0.76rem;
-  font-weight: 750;
-}
-
-.admin-tags-assignment-cell {
-  display: flex;
+.admin-tags-name-cell,
+.admin-tags-slug-cell,
+.admin-tags-code-cell,
+.admin-tags-count-cell,
+.admin-tags-rule-cell {
+  display: block;
   min-width: 0;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.22rem;
-}
-
-.admin-tags-assignment-cell small {
-  max-width: 100%;
   overflow: hidden;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 750;
+  color: #aeb8ca;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-tags-name-cell {
+  font-weight: 850;
 }
 
 .tag-category-manager {
@@ -6968,7 +7905,7 @@ body::before {
   font-weight: 750;
 }
 
-.maintainer-pagination div {
+.maintainer-pagination-actions {
   display: flex;
   gap: 0.5rem;
 }
@@ -6976,19 +7913,48 @@ body::before {
 .maintainer-page-size {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
   margin-left: auto;
 }
 
-.maintainer-page-size select {
+.maintainer-page-size .filter-select {
+  min-width: 112px;
+  width: 112px;
+}
+
+.maintainer-page-size .filter-select-button {
+  min-height: 40px;
+  border-color: rgba(167, 139, 250, 0.22);
+  border-radius: var(--radius-md);
+  background: rgba(30, 25, 46, 0.76);
+  padding: 0.44rem 0.72rem;
+}
+
+.maintainer-page-size .filter-select-label {
+  font-size: 0.6rem;
+}
+
+.maintainer-page-size .filter-select-button strong {
+  font-size: 0.86rem;
+}
+
+.maintainer-page-size .filter-select-menu {
+  top: auto;
+  bottom: calc(100% + 0.45rem);
+  min-width: 112px;
+  border-color: rgba(167, 139, 250, 0.2);
+  background: rgb(16, 17, 26);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.52);
+  padding: 0.42rem;
+}
+
+.maintainer-page-size .filter-select-option {
   min-height: 36px;
-  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  font: inherit;
-  font-weight: 850;
-  padding: 0 0.6rem;
+  padding: 0.45rem 0.62rem;
+}
+
+.maintainer-page-size .filter-select-option + .filter-select-option {
+  margin-top: 0.12rem;
 }
 
 .maintainer-pagination button {
@@ -7039,26 +8005,19 @@ body::before {
   font-size: 0.78rem;
 }
 
-.admin-user-profile div {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
 .admin-user-profile strong {
-  color: var(--text-main);
+  color: var(--text-secondary);
   font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.admin-user-profile span,
-.admin-user-profile em {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  font-style: normal;
+.admin-user-login,
+.admin-user-email,
+.admin-user-sync {
+  display: block;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -7076,6 +8035,54 @@ body::before {
   background: rgba(34, 197, 94, 0.12);
   color: #86efac;
   border: 1px solid rgba(34, 197, 94, 0.22);
+}
+
+.admin-user-status.is-live {
+  background: rgba(16, 185, 129, 0.16);
+  color: #5eead4;
+  border: 1px solid rgba(16, 185, 129, 0.34);
+}
+
+.admin-user-status.is-complete {
+  background: rgba(52, 211, 153, 0.12);
+  color: var(--green);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+}
+
+.admin-user-status.is-complete-audio {
+  background: rgba(190, 242, 100, 0.12);
+  color: #bef264;
+  border: 1px solid rgba(190, 242, 100, 0.26);
+}
+
+.admin-user-status.is-uploading {
+  background: rgba(96, 165, 250, 0.1);
+  color: var(--blue);
+  border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+.admin-user-status.is-pending {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.26);
+}
+
+.admin-user-status.is-incomplete {
+  background: rgba(251, 146, 60, 0.12);
+  color: var(--orange);
+  border: 1px solid rgba(251, 146, 60, 0.28);
+}
+
+.admin-user-status.is-incomplete-audio {
+  background: rgba(251, 113, 133, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(251, 113, 133, 0.28);
+}
+
+.admin-user-status.is-lost {
+  background: rgba(244, 114, 182, 0.12);
+  color: #f472b6;
+  border: 1px solid rgba(244, 114, 182, 0.3);
 }
 
 .admin-user-status.is-inactive {
@@ -11917,7 +12924,7 @@ a.empty-state-action {
     grid-column: 1 / -1;
   }
 
-  .maintainer-table-shell {
+  .maintainer-table-scroll {
     margin-inline: -0.15rem;
     overflow-x: auto;
     overflow-y: hidden;
@@ -11945,16 +12952,16 @@ a.empty-state-action {
     backdrop-filter: blur(12px);
   }
 
-  .maintainer-table-shell::-webkit-scrollbar {
+  .maintainer-table-scroll::-webkit-scrollbar {
     height: 6px;
   }
 
-  .maintainer-table-shell::-webkit-scrollbar-track {
+  .maintainer-table-scroll::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.035);
     border-radius: 999px;
   }
 
-  .maintainer-table-shell::-webkit-scrollbar-thumb {
+  .maintainer-table-scroll::-webkit-scrollbar-thumb {
     background: rgba(167, 139, 250, 0.38);
     border-radius: 999px;
   }
@@ -11964,7 +12971,7 @@ a.empty-state-action {
   }
 
   .admin-users-table {
-    --maintainer-table-min-width: 1080px;
+    --maintainer-table-min-width: 1880px;
   }
 
   .admin-roles-table {
@@ -11972,15 +12979,15 @@ a.empty-state-action {
   }
 
   .admin-anime-table {
-    --maintainer-table-min-width: 1280px;
+    --maintainer-table-min-width: 1880px;
   }
 
   .admin-tracker-table {
-    --maintainer-table-min-width: 1280px;
+    --maintainer-table-min-width: 1840px;
   }
 
   .admin-tags-table {
-    --maintainer-table-min-width: 1100px;
+    --maintainer-table-min-width: 1900px;
   }
 
   .admin-spacedrum-table {
@@ -12442,7 +13449,7 @@ a.empty-state-action {
     grid-column: 1 / -1;
   }
 
-  .maintainer-table-shell {
+  .maintainer-table-scroll {
     margin-inline: -0.15rem;
     overflow-x: auto;
     overflow-y: hidden;
@@ -12470,16 +13477,16 @@ a.empty-state-action {
     backdrop-filter: blur(12px);
   }
 
-  .maintainer-table-shell::-webkit-scrollbar {
+  .maintainer-table-scroll::-webkit-scrollbar {
     height: 6px;
   }
 
-  .maintainer-table-shell::-webkit-scrollbar-track {
+  .maintainer-table-scroll::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.035);
     border-radius: 999px;
   }
 
-  .maintainer-table-shell::-webkit-scrollbar-thumb {
+  .maintainer-table-scroll::-webkit-scrollbar-thumb {
     background: rgba(167, 139, 250, 0.38);
     border-radius: 999px;
   }
@@ -12572,7 +13579,7 @@ a.empty-state-action {
   }
 
   .admin-users-table {
-    --maintainer-table-min-width: 1080px;
+    --maintainer-table-min-width: 1880px;
   }
 
   .admin-roles-table {
@@ -12580,15 +13587,15 @@ a.empty-state-action {
   }
 
   .admin-anime-table {
-    --maintainer-table-min-width: 1280px;
+    --maintainer-table-min-width: 1880px;
   }
 
   .admin-tracker-table {
-    --maintainer-table-min-width: 1280px;
+    --maintainer-table-min-width: 1840px;
   }
 
   .admin-tags-table {
-    --maintainer-table-min-width: 1100px;
+    --maintainer-table-min-width: 1900px;
   }
 
   .admin-spacedrum-table {
@@ -13361,6 +14368,11 @@ a.empty-state-action {
     padding-bottom: 0;
   }
 
+  .maintainer-table-scroll {
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
   .maintainer-scroll-hint {
     display: none;
   }
@@ -13410,13 +14422,16 @@ a.empty-state-action {
   .admin-users-table {
     width: 100%;
     max-width: 100%;
+  }
+
+  .admin-users-table .maintainer-table-scroll {
     overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 0.55rem;
   }
 
   .admin-users-table .maintainer-table {
-    min-width: 1080px;
+    min-width: 1880px;
     display: block;
     gap: 0;
     border: 1px solid var(--border);
@@ -13431,7 +14446,7 @@ a.empty-state-action {
   }
 
   .admin-users-table .maintainer-table-row {
-    grid-template-columns: minmax(70px, 0.28fr) minmax(240px, 1.45fr) minmax(110px, 0.65fr) minmax(105px, 0.55fr) minmax(150px, 0.8fr) minmax(170px, 0.9fr) minmax(105px, 0.5fr);
+    grid-template-columns: minmax(70px, 0.22fr) minmax(210px, 0.82fr) minmax(150px, 0.58fr) minmax(230px, 0.9fr) minmax(120px, 0.48fr) minmax(150px, 0.58fr) minmax(120px, 0.46fr) minmax(160px, 0.62fr) minmax(150px, 0.58fr) minmax(110px, 0.42fr) minmax(190px, 0.7fr);
     gap: 1rem;
     align-items: center;
     padding: 1rem 1.1rem;
@@ -13473,12 +14488,12 @@ a.empty-state-action {
     padding: 0.9rem 0.2rem 0;
   }
 
-  .admin-users-table .maintainer-pagination div,
+  .admin-users-table .maintainer-pagination-actions,
   .admin-users-table .maintainer-pagination button {
     width: auto;
   }
 
-  .admin-users-table .maintainer-pagination div {
+  .admin-users-table .maintainer-pagination-actions {
     justify-content: flex-start;
   }
 
@@ -13490,24 +14505,32 @@ a.empty-state-action {
   .admin-spacedrum-pages-table {
     width: 100%;
     max-width: 100%;
+  }
+
+  .admin-roles-table .maintainer-table-scroll,
+  .admin-anime-table .maintainer-table-scroll,
+  .admin-tracker-table .maintainer-table-scroll,
+  .admin-tags-table .maintainer-table-scroll,
+  .admin-spacedrum-table .maintainer-table-scroll,
+  .admin-spacedrum-pages-table .maintainer-table-scroll {
     overflow-x: auto;
     overflow-y: hidden;
     padding-bottom: 0.55rem;
   }
 
   .admin-roles-table .maintainer-table {
-    min-width: 850px;
+    min-width: 1040px;
     display: block;
     gap: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
-    background: rgba(14, 16, 24, 0.88);
-    box-shadow: var(--shadow-card);
+    background: rgba(9, 11, 18, 0.96);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
   }
 
   .admin-anime-table .maintainer-table {
-    min-width: 1280px;
+    min-width: 1880px;
     display: block;
     gap: 0;
     border: 1px solid var(--border);
@@ -13518,7 +14541,7 @@ a.empty-state-action {
   }
 
   .admin-tracker-table .maintainer-table {
-    min-width: 1280px;
+    min-width: 1840px;
     display: block;
     gap: 0;
     border: 1px solid var(--border);
@@ -13529,7 +14552,7 @@ a.empty-state-action {
   }
 
   .admin-tags-table .maintainer-table {
-    min-width: 1100px;
+    min-width: 1900px;
     display: block;
     gap: 0;
     border: 1px solid var(--border);
@@ -13572,20 +14595,20 @@ a.empty-state-action {
 
   .admin-roles-table .maintainer-table-row,
   .admin-roles-row {
-    grid-template-columns: minmax(70px, 0.28fr) minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
+    grid-template-columns: minmax(70px, 0.26fr) minmax(170px, 1fr) minmax(150px, 0.72fr) minmax(135px, 0.62fr) minmax(105px, 0.5fr) minmax(110px, 0.5fr) minmax(105px, 0.4fr);
     gap: 1rem;
     align-items: center;
     padding: 1rem 1.1rem;
     border: none;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid rgba(148, 163, 184, 0.13);
     border-radius: 0;
-    background: transparent;
+    background: rgba(11, 14, 22, 0.78);
     box-shadow: none;
   }
 
   .admin-anime-table .maintainer-table-row,
   .admin-anime-row {
-    grid-template-columns: minmax(110px, 0.55fr) minmax(280px, 1.35fr) minmax(135px, 0.62fr) minmax(190px, 0.9fr) minmax(170px, 0.76fr) minmax(105px, 0.5fr) minmax(140px, 0.62fr);
+    grid-template-columns: minmax(110px, 0.42fr) minmax(300px, 1.1fr) minmax(180px, 0.68fr) minmax(145px, 0.55fr) minmax(120px, 0.46fr) minmax(170px, 0.64fr) minmax(105px, 0.4fr) minmax(130px, 0.5fr) minmax(150px, 0.56fr) minmax(110px, 0.42fr) minmax(150px, 0.56fr);
     gap: 1rem;
     align-items: center;
     padding: 1rem 1.1rem;
@@ -13598,7 +14621,7 @@ a.empty-state-action {
 
   .admin-tracker-table .maintainer-table-row,
   .admin-tracker-row {
-    grid-template-columns: minmax(90px, 0.42fr) minmax(280px, 1.45fr) minmax(140px, 0.68fr) minmax(130px, 0.62fr) minmax(170px, 0.76fr) minmax(180px, 0.84fr) minmax(150px, 0.62fr);
+    grid-template-columns: minmax(90px, 0.34fr) minmax(280px, 1.08fr) minmax(190px, 0.76fr) minmax(100px, 0.38fr) minmax(150px, 0.58fr) minmax(170px, 0.66fr) minmax(180px, 0.7fr) minmax(120px, 0.46fr) minmax(190px, 0.74fr) minmax(150px, 0.58fr);
     gap: 1rem;
     align-items: center;
     padding: 1rem 1.1rem;
@@ -13611,7 +14634,7 @@ a.empty-state-action {
 
   .admin-tags-table .maintainer-table-row,
   .admin-tags-row {
-    grid-template-columns: minmax(88px, 0.42fr) minmax(260px, 1.45fr) minmax(190px, 0.95fr) minmax(150px, 0.72fr) minmax(155px, 0.7fr) minmax(130px, 0.52fr);
+    grid-template-columns: minmax(88px, 0.36fr) minmax(210px, 0.9fr) minmax(210px, 0.9fr) minmax(170px, 0.72fr) minmax(150px, 0.62fr) minmax(130px, 0.52fr) minmax(130px, 0.52fr) minmax(135px, 0.56fr) minmax(260px, 1.08fr) minmax(130px, 0.52fr);
     gap: 1rem;
     align-items: center;
     padding: 1rem 1.1rem;
@@ -13685,27 +14708,27 @@ a.empty-state-action {
     padding: 0.9rem 0.2rem 0;
   }
 
-  .admin-roles-table .maintainer-pagination div,
+  .admin-roles-table .maintainer-pagination-actions,
   .admin-roles-table .maintainer-pagination button,
-  .admin-anime-table .maintainer-pagination div,
+  .admin-anime-table .maintainer-pagination-actions,
   .admin-anime-table .maintainer-pagination button,
-  .admin-tracker-table .maintainer-pagination div,
+  .admin-tracker-table .maintainer-pagination-actions,
   .admin-tracker-table .maintainer-pagination button,
-  .admin-tags-table .maintainer-pagination div,
+  .admin-tags-table .maintainer-pagination-actions,
   .admin-tags-table .maintainer-pagination button,
-  .admin-spacedrum-table .maintainer-pagination div,
+  .admin-spacedrum-table .maintainer-pagination-actions,
   .admin-spacedrum-table .maintainer-pagination button,
-  .admin-spacedrum-pages-table .maintainer-pagination div,
+  .admin-spacedrum-pages-table .maintainer-pagination-actions,
   .admin-spacedrum-pages-table .maintainer-pagination button {
     width: auto;
   }
 
-  .admin-roles-table .maintainer-pagination div,
-  .admin-anime-table .maintainer-pagination div,
-  .admin-tracker-table .maintainer-pagination div,
-  .admin-tags-table .maintainer-pagination div,
-  .admin-spacedrum-table .maintainer-pagination div,
-  .admin-spacedrum-pages-table .maintainer-pagination div {
+  .admin-roles-table .maintainer-pagination-actions,
+  .admin-anime-table .maintainer-pagination-actions,
+  .admin-tracker-table .maintainer-pagination-actions,
+  .admin-tags-table .maintainer-pagination-actions,
+  .admin-spacedrum-table .maintainer-pagination-actions,
+  .admin-spacedrum-pages-table .maintainer-pagination-actions {
     justify-content: flex-start;
   }
 
@@ -13734,12 +14757,12 @@ a.empty-state-action {
     padding-inline: 0;
   }
 
-  .maintainer-pagination div,
+  .maintainer-pagination-actions,
   .maintainer-pagination button {
     width: 100%;
   }
 
-  .maintainer-pagination div {
+  .maintainer-pagination-actions {
     justify-content: stretch;
   }
 

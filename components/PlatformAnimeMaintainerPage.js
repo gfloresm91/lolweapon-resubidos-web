@@ -58,9 +58,13 @@ const MODE_CONFIG = {
 const ANIME_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
   { key: "anime", label: "Anime", sortable: true },
+  { key: "code", label: "Código", sortable: true },
   { key: "condition", label: "Seguimiento", sortable: true },
-  { key: "progress", label: "Progreso", sortable: true },
-  { key: "metadata", label: "Metadata", sortable: true },
+  { key: "watched", label: "Vistos", sortable: true },
+  { key: "purchased", label: "Comprado", sortable: true },
+  { key: "year", label: "Año", sortable: true },
+  { key: "format", label: "Formato", sortable: true },
+  { key: "publication", label: "Publicación", sortable: true },
   { key: "status", label: "Estado", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
@@ -82,16 +86,39 @@ function isModeAnime(anime, mode) {
   return MODE_CONFIG[mode].acceptsStatus(anime.watchStatus);
 }
 
-function getProgressDetails(anime) {
+function getAnimeCode(anime) {
+  return anime?.tag || anime?.key || "-";
+}
+
+function getWatchedLabel(anime) {
   const current = parseInt(anime.currentEpisode, 10) || 0;
   const total = parseInt(anime.episodes, 10) || 0;
+
+  return `${current}/${total || "?"}`;
+}
+
+function getPurchasedLabel(anime) {
   const purchased = String(anime.purchased || "").trim();
   const isFullSeason = anime.watchStatus === "purchased" || purchased.toUpperCase() === "ENTERA";
 
-  return {
-    watched: `Visto: ${current || 0}/${total || "?"}`,
-    purchased: isFullSeason ? "Comprado: temporada entera" : `Comprado: ${purchased || 0}`,
-  };
+  return isFullSeason ? "Temporada entera" : String(purchased || 0);
+}
+
+function getPurchasedSortValue(anime) {
+  const purchased = String(anime.purchased || "").trim();
+
+  if (anime.watchStatus === "purchased" || purchased.toUpperCase() === "ENTERA") {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return parseInt(purchased, 10) || 0;
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function getSortableValue(anime, key) {
@@ -99,12 +126,28 @@ function getSortableValue(anime, key) {
     return getAnimeId(anime);
   }
 
-  if (key === "progress") {
+  if (key === "code") {
+    return getAnimeCode(anime);
+  }
+
+  if (key === "watched") {
     return parseInt(anime.currentEpisode, 10) || 0;
   }
 
-  if (key === "metadata") {
+  if (key === "purchased") {
+    return getPurchasedSortValue(anime);
+  }
+
+  if (key === "year") {
     return parseInt(anime.year, 10) || 0;
+  }
+
+  if (key === "format") {
+    return anime.format || "";
+  }
+
+  if (key === "publication") {
+    return anime.status || "";
   }
 
   if (key === "condition") {
@@ -197,7 +240,7 @@ export default function PlatformAnimeMaintainerPage({
     ];
   }, [allVisibleAndHiddenAnimes]);
   const filteredAnimes = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = normalizeSearchText(searchQuery.trim());
 
     const sourceAnimes = visibilityFilter === "hidden"
       ? hiddenAnimes
@@ -215,7 +258,11 @@ export default function PlatformAnimeMaintainerPage({
         anime.year,
         anime.status,
         anime.format,
-      ].some((value) => String(value || "").toLowerCase().includes(query)))
+        getStatusLabel(anime.watchStatus),
+        getWatchedLabel(anime),
+        getPurchasedLabel(anime),
+        anime.libraryEnabled === false ? "Oculto" : "Visible",
+      ].some((value) => normalizeSearchText(value).includes(query)))
       .filter((anime) => {
         if (visibilityFilter === "visible") return anime.libraryEnabled !== false;
         if (visibilityFilter === "hidden") return anime.libraryEnabled === false;
@@ -498,7 +545,7 @@ export default function PlatformAnimeMaintainerPage({
       <MaintainerToolbar
         searchId={`admin-anime-${mode}-search`}
         searchValue={searchQuery}
-        searchPlaceholder="Buscar por ID, título, tag, año o estado"
+        searchPlaceholder="Buscar por ID, anime, código, seguimiento, progreso, año, formato, publicación o estado"
         onSearchChange={setSearchQuery}
       >
         <FilterSelect
@@ -567,22 +614,17 @@ export default function PlatformAnimeMaintainerPage({
               ) : (
                 <AnimePosterPlaceholder title={getAnimeTitle(anime)} className="admin-anime-placeholder" />
               )}
-              <div>
-                <strong>{getAnimeTitle(anime)}</strong>
-                <span>{anime.tag || anime.key ? `Código: ${anime.tag || anime.key}` : "Sin código"}</span>
-              </div>
+              <strong title={getAnimeTitle(anime)}>{getAnimeTitle(anime)}</strong>
             </div>
+            <span className="admin-user-cell admin-anime-code-cell">{getAnimeCode(anime)}</span>
             <span className={`anime-library-status status-${anime.watchStatus || "pending"}`}>
               {getStatusLabel(anime.watchStatus)}
             </span>
-            <div className="admin-user-cell admin-anime-summary">
-              <strong>{getProgressDetails(anime).watched}</strong>
-              <small>{getProgressDetails(anime).purchased}</small>
-            </div>
-            <div className="admin-user-cell admin-anime-summary">
-              <strong>{anime.year || "Sin año"}</strong>
-              <small>{[anime.format, anime.status].filter(Boolean).join(" · ") || "Sin metadata"}</small>
-            </div>
+            <span className="admin-user-cell admin-anime-progress-cell">{getWatchedLabel(anime)}</span>
+            <span className="admin-user-cell admin-anime-progress-cell">{getPurchasedLabel(anime)}</span>
+            <span className="admin-user-cell admin-anime-year-cell">{anime.year || "Sin año"}</span>
+            <span className="admin-user-cell admin-anime-format-cell">{anime.format || "-"}</span>
+            <span className="admin-user-cell admin-anime-publication-cell">{anime.status || "-"}</span>
             <span className={`admin-user-status ${anime.libraryEnabled === false ? "is-inactive" : "is-active"}`}>
               {anime.libraryEnabled === false ? "Oculto" : "Visible"}
             </span>
