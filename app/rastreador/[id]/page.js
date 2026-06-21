@@ -11,6 +11,7 @@ import DetailTopbarActions from "@/components/DetailTopbarActions";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
 import { getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
@@ -53,14 +54,9 @@ function ExternalLinkList({ links, platform }) {
 }
 
 function StatusBadge({ status }) {
-  const normalized = String(status || "").toLowerCase();
-  let className = "status-badge status-badge--pendiente";
+  const statusMeta = getLiveStatusMeta(status);
 
-  if (normalized.includes("completo")) className = "status-badge status-badge--completo";
-  if (normalized.includes("lost")) className = "status-badge status-badge--lost";
-  if (normalized.includes("subiendo")) className = "status-badge status-badge--subiendo";
-
-  return <span className={className}>{status || PENDING_LIVE_STATUS_LABEL}</span>;
+  return <span className={statusMeta.badgeFullClassName}>{status || PENDING_LIVE_STATUS_LABEL}</span>;
 }
 
 export default async function LiveDetailPage({ params }) {

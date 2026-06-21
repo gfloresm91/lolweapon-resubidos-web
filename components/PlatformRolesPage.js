@@ -26,7 +26,9 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const ROLE_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
   { key: "role", label: "Rol", sortable: true },
+  { key: "code", label: "Código", sortable: true },
   { key: "permissions", label: "Permisos", sortable: true },
+  { key: "areas", label: "Áreas", sortable: true },
   { key: "status", label: "Estado", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
@@ -37,18 +39,22 @@ const GOD_EXCLUDED_PERMISSION_CODES = new Set([STREAMER_RATING_PERMISSION_CODE])
 const ROLE_CODE_MAX_LENGTH = 40;
 const ROLE_LABEL_MAX_LENGTH = 60;
 const PERMISSION_GROUP_ORDER = [
-  "Inicio",
-  "Rastreador",
-  "Anime: Viendo",
-  "Anime: Terminados",
-  "Anime: Puntuación",
-  "Lecturas",
-  "Usuarios",
-  "Roles",
+  "Plataforma: Inicio",
+  "Plataforma: Novedades",
+  "Plataforma: Historial de cambios",
+  "Archivo VOD: Rastreador",
+  "Archivo VOD: Calendario",
+  "Biblioteca de anime: Viendo",
+  "Biblioteca de anime: Terminados",
+  "Biblioteca de anime: Puntuación",
+  "Lecturas: SpaceDrum",
+  "Administración: Usuarios",
+  "Administración: Roles",
   "Administración: Rastreador",
   "Administración: Tags",
-  "Administración: Viendo",
-  "Administración: Terminados",
+  "Administración: Anime Viendo",
+  "Administración: Anime Terminados",
+  "Administración: SpaceDrum",
 ];
 const PERMISSION_GROUP_ORDER_MAP = new Map(PERMISSION_GROUP_ORDER.map((group, index) => [group, index]));
 const ROLE_CODE_RULES = z
@@ -116,17 +122,32 @@ function getRolePermissionGroups(role, permissions) {
     }, []);
 }
 
-function formatRolePermissionSummary(role, permissions) {
+function getRolePermissionGroupCount(role, permissions) {
+  return getRolePermissionGroups(role, permissions).length;
+}
+
+function normalizeSearchValue(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function getRoleSearchValues(role, permissions) {
   const permissionCount = getRolePermissionCount(role, permissions);
-  const groupCount = getRolePermissionGroups(role, permissions).length;
+  const areaCount = getRolePermissionGroupCount(role, permissions);
+  const statusLabel = role.isActive ? "activo" : "inactivo";
 
-  if (!permissionCount) {
-    return "Sin permisos";
-  }
-
-  const permissionLabel = permissionCount === 1 ? "1 permiso" : `${permissionCount} permisos`;
-  const groupLabel = groupCount === 1 ? "1 área" : `${groupCount} áreas`;
-  return `${permissionLabel} en ${groupLabel}`;
+  return [
+    role.id,
+    role.label,
+    role.code,
+    permissionCount,
+    `${permissionCount} ${permissionCount === 1 ? "permiso" : "permisos"}`,
+    areaCount,
+    `${areaCount} ${areaCount === 1 ? "area" : "areas"}`,
+    statusLabel,
+  ];
 }
 
 function getRoleSortValue(role, key, permissions) {
@@ -138,8 +159,16 @@ function getRoleSortValue(role, key, permissions) {
     return getRolePermissionCount(role, permissions);
   }
 
+  if (key === "areas") {
+    return getRolePermissionGroupCount(role, permissions);
+  }
+
   if (key === "status") {
     return role.isActive ? 1 : 0;
+  }
+
+  if (key === "code") {
+    return String(role.code || "").toLowerCase();
   }
 
   return String(role.label || role.code || "").toLowerCase();
@@ -561,9 +590,9 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialRoles.length);
   const filteredRoles = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = normalizeSearchValue(searchQuery.trim());
     return roles
-      .filter((role) => !query || [role.id, role.code, role.label].some((value) => String(value || "").toLowerCase().includes(query)))
+      .filter((role) => !query || getRoleSearchValues(role, permissions).some((value) => normalizeSearchValue(value).includes(query)))
       .filter((role) => {
         if (statusFilter === "active") return role.isActive;
         if (statusFilter === "inactive") return !role.isActive;
@@ -761,7 +790,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
       <MaintainerToolbar
         searchId="admin-roles-search"
         searchValue={searchQuery}
-        searchPlaceholder="Buscar por ID, nombre o código"
+        searchPlaceholder="Buscar por ID, rol, código, permisos, áreas o estado"
         onSearchChange={setSearchQuery}
       >
         <FilterSelect
@@ -805,18 +834,19 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
       >
         {paginatedRoles.map((role) => {
           const permissionCount = getRolePermissionCount(role, permissions);
+          const areaCount = getRolePermissionGroupCount(role, permissions);
 
           return (
             <div className="maintainer-table-row admin-roles-row" role="row" key={role.id || role.code}>
               <span className="admin-user-cell admin-record-id">#{role.id || "-"}</span>
               <div className="admin-user-cell">
                 <strong>{role.label}</strong>
-                <span className="admin-role-code">{role.code}</span>
               </div>
+              <span className="admin-user-cell admin-role-code-cell">{role.code}</span>
               <div className="admin-user-cell admin-role-permissions-summary">
                 <strong>{permissionCount === 1 ? "1 permiso" : `${permissionCount} permisos`}</strong>
-                <small>{formatRolePermissionSummary(role, permissions)}</small>
               </div>
+              <span className="admin-user-cell admin-role-areas-cell">{areaCount === 1 ? "1 área" : `${areaCount} áreas`}</span>
               <span className={`admin-user-status ${role.isActive ? "is-active" : "is-inactive"}`}>
                 {role.isActive ? "Activo" : "Inactivo"}
               </span>

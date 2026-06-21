@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
+import FormSelect from "@/components/FormSelect";
 import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
@@ -153,6 +154,8 @@ export default function PlatformSpaceDrumPagesPage({
         page.chapterLegacyId,
         page.image,
         page.alt,
+        page.position,
+        `Página ${Number(page.position || 0) + 1}`,
         getLanguageLabel(page.language),
       ].some((value) => normalizeText(value).includes(query));
       const matchesLanguage = languageFilter === "all" || page.language === languageFilter;
@@ -376,17 +379,13 @@ export default function PlatformSpaceDrumPagesPage({
             <h3>Contenido</h3>
             <div className="form-row">
               <div className="form-group-modal">
-                <label htmlFor="spacedrum-page-chapter">Capítulo</label>
-                <select
+                <FormSelect
                   id="spacedrum-page-chapter"
-                  className="modal-input"
+                  label="Capítulo"
                   value={editingPage.chapterId}
-                  onChange={(event) => setEditingPage((current) => ({ ...current, chapterId: event.target.value }))}
-                >
-                  {formChapterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                  options={formChapterOptions}
+                  onChange={(chapterId) => setEditingPage((current) => ({ ...current, chapterId }))}
+                />
               </div>
               <div className="form-group-modal">
                 <label htmlFor="spacedrum-page-position">Orden</label>

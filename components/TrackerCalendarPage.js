@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { FilterSelect } from "@/components/FiltersBar";
+import { LIVE_STATUS_LEGEND_ITEMS, getLiveStatusMeta } from "@/lib/liveStatusStyles";
 
 const MONTHS = [
   { value: "01", label: "Enero" },
@@ -25,6 +26,15 @@ const VIEW_OPTIONS = [
   { value: "month", label: "Mensual" },
   { value: "year", label: "Anual" },
 ];
+
+function getTodayParts() {
+  const today = new Date();
+
+  return {
+    year: String(today.getFullYear()),
+    month: String(today.getMonth() + 1).padStart(2, "0"),
+  };
+}
 
 function parseLiveDate(value) {
   const [day, month, year] = String(value || "").split("/");
@@ -70,6 +80,18 @@ function getYearOptions(livesByDate) {
   return Array.from(new Set(Object.values(livesByDate).map((item) => item.date.year)))
     .sort((left, right) => Number(right) - Number(left))
     .map((year) => ({ value: year, label: year }));
+}
+
+function mergeYearOptions(options, extraYears = []) {
+  return Array.from(new Set([
+    ...options.map((option) => option.value),
+    ...extraYears.filter(Boolean).map(String),
+  ]))
+    .sort((left, right) => Number(right) - Number(left))
+    .map((year) => {
+      const option = options.find((item) => item.value === year);
+      return option || { value: year, label: `${year} · sin directos` };
+    });
 }
 
 function getInitialYear(yearOptions) {
@@ -126,6 +148,33 @@ function formatSelectedDate(dateKey) {
   return `${Number(day)} de ${monthLabel.toLowerCase()}`;
 }
 
+function formatCalendarTitle(view, year, month) {
+  if (view === "year") {
+    return year;
+  }
+
+  const monthLabel = MONTHS.find((item) => item.value === month)?.label || month;
+  return `${monthLabel} ${year}`;
+}
+
+function getCalendarDayStatusMeta(lives = []) {
+  if (!lives.length) {
+    return null;
+  }
+
+  const tones = lives.map((live) => getLiveStatusMeta(live.status));
+  const uniqueTones = new Set(tones.map((meta) => meta.tone));
+
+  if (uniqueTones.size > 1) {
+    return {
+      calendarClassName: "is-mixed",
+      label: "Estados mixtos",
+    };
+  }
+
+  return tones[0];
+}
+
 function CalendarMonth({ year, month, livesByDate, selectedDate, onSelectDate, onOpenMonth, compact = false }) {
   const monthLabel = MONTHS.find((item) => item.value === month)?.label || month;
   const cells = useMemo(() => buildMonthDays(year, month), [month, year]);
@@ -152,13 +201,14 @@ function CalendarMonth({ year, month, livesByDate, selectedDate, onSelectDate, o
           const dayLives = livesByDate[cell.dateKey]?.lives || [];
           const liveCount = dayLives.length;
           const intensity = liveCount >= 3 ? "high" : liveCount === 2 ? "medium" : liveCount === 1 ? "low" : "none";
+          const statusMeta = getCalendarDayStatusMeta(dayLives);
 
           return (
             <button
               key={cell.key}
               type="button"
-              className={`tracker-calendar-day has-${intensity} ${selectedDate === cell.dateKey ? "is-selected" : ""}`}
-              aria-label={`${cell.day} ${monthLabel}, ${liveCount} directos`}
+              className={`tracker-calendar-day has-${intensity} ${statusMeta?.calendarClassName || ""} ${selectedDate === cell.dateKey ? "is-selected" : ""}`}
+              aria-label={`${cell.day} ${monthLabel}, ${liveCount} directos${statusMeta ? `, ${statusMeta.label}` : ""}`}
               aria-pressed={selectedDate === cell.dateKey}
               disabled={!liveCount}
               onClick={() => onSelectDate(cell.dateKey)}
@@ -173,10 +223,10 @@ function CalendarMonth({ year, month, livesByDate, selectedDate, onSelectDate, o
   );
 }
 
-function DayLiveList({ dateKey, lives = [], onOpenDetail }) {
+function DayLiveList({ dateKey, lives = [], onOpenDetail, panelRef }) {
   if (!dateKey || !lives.length) {
     return (
-      <section className="tracker-calendar-day-panel is-empty" aria-label="Directos del día">
+      <section ref={panelRef} className="tracker-calendar-day-panel is-empty" aria-label="Directos del día">
         <span className="tracker-actions-label">Directos del día</span>
         <p className="tracker-actions-copy">Sin día seleccionado.</p>
       </section>
@@ -184,7 +234,7 @@ function DayLiveList({ dateKey, lives = [], onOpenDetail }) {
   }
 
   return (
-    <section className="tracker-calendar-day-panel" aria-label="Directos del día">
+    <section ref={panelRef} className="tracker-calendar-day-panel" aria-label="Directos del día">
       <div className="tracker-calendar-day-panel-heading">
         <div>
           <span className="tracker-actions-label">{formatSelectedDate(dateKey)}</span>
@@ -192,23 +242,27 @@ function DayLiveList({ dateKey, lives = [], onOpenDetail }) {
         </div>
       </div>
       <div className="tracker-calendar-live-list">
-        {lives.map((live) => (
-          <Link
-            key={live.id}
-            href={`/rastreador/${encodeURIComponent(live.id)}`}
-            className="tracker-calendar-live-row"
-            onClick={() => onOpenDetail?.(live.id)}
-          >
-            <span className="tracker-calendar-live-main">
-              <strong>{live.title}</strong>
-              <small>{live.tags?.slice(0, 3).join(" · ") || "Sin tags"}</small>
-            </span>
-            <span className="tracker-calendar-live-meta">
-              <em>{live.status}</em>
-              <small>{getLiveLinksCount(live) ? "Con enlaces" : "Sin enlaces"}</small>
-            </span>
-          </Link>
-        ))}
+        {lives.map((live) => {
+          const statusMeta = getLiveStatusMeta(live.status);
+
+          return (
+            <Link
+              key={live.id}
+              href={`/rastreador/${encodeURIComponent(live.id)}`}
+              className="tracker-calendar-live-row"
+              onClick={() => onOpenDetail?.(live.id)}
+            >
+              <span className="tracker-calendar-live-main">
+                <strong>{live.title}</strong>
+                <small>{live.tags?.slice(0, 3).join(" · ") || "Sin tags"}</small>
+              </span>
+              <span className="tracker-calendar-live-meta">
+                <em className={`tracker-calendar-live-status ${statusMeta.calendarClassName}`}>{live.status || statusMeta.label}</em>
+                <small>{getLiveLinksCount(live) ? "Con enlaces" : "Sin enlaces"}</small>
+              </span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -231,38 +285,33 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
     }, {});
   }, [lives]);
 
-  const yearOptions = useMemo(() => getYearOptions(livesByDate), [livesByDate]);
-  const [selectedYear, setSelectedYear] = useState(() => getInitialYear(yearOptions));
-  const [selectedMonth, setSelectedMonth] = useState(() => getInitialMonth(livesByDate, getInitialYear(yearOptions)));
+  const dataYearOptions = useMemo(() => getYearOptions(livesByDate), [livesByDate]);
+  const todayParts = useMemo(() => getTodayParts(), []);
+  const [selectedYear, setSelectedYear] = useState(() => getInitialYear(dataYearOptions));
+  const [selectedMonth, setSelectedMonth] = useState(() => getInitialMonth(livesByDate, getInitialYear(dataYearOptions)));
   const [calendarView, setCalendarView] = useState("month");
   const [selectedDate, setSelectedDate] = useState("");
+  const dayPanelRef = useRef(null);
+  const shouldScrollToDayPanelRef = useRef(false);
+  const yearOptions = useMemo(
+    () => mergeYearOptions(dataYearOptions, [selectedYear, todayParts.year]),
+    [dataYearOptions, selectedYear, todayParts.year],
+  );
+  const calendarTitle = formatCalendarTitle(calendarView, selectedYear, selectedMonth);
 
   useEffect(() => {
-    if (!yearOptions.length) {
+    if (!dataYearOptions.length) {
       return;
     }
 
     setSelectedYear((current) => (
-      yearOptions.some((option) => option.value === current) ? current : getInitialYear(yearOptions)
+      current || getInitialYear(dataYearOptions)
     ));
-  }, [yearOptions]);
+  }, [dataYearOptions]);
 
   useEffect(() => {
-    setSelectedMonth((current) => {
-      const availableMonths = new Set(
-        Object.values(livesByDate)
-          .filter((item) => item.date.year === selectedYear)
-          .map((item) => item.date.month),
-      );
-
-      if (availableMonths.has(current)) {
-        return current;
-      }
-
-      return getInitialMonth(livesByDate, selectedYear);
-    });
     setSelectedDate("");
-  }, [livesByDate, selectedYear]);
+  }, [selectedMonth, selectedYear, calendarView]);
 
   const monthOptions = useMemo(() => MONTHS.map((month) => ({
     ...month,
@@ -274,6 +323,26 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
   })), [livesByDate, selectedYear]);
 
   const selectedDayLives = selectedDate ? livesByDate[selectedDate]?.lives || [] : [];
+
+  useEffect(() => {
+    if (!selectedDate || !selectedDayLives.length || !shouldScrollToDayPanelRef.current) {
+      return;
+    }
+
+    shouldScrollToDayPanelRef.current = false;
+
+    if (typeof window === "undefined" || !window.matchMedia("(max-width: 1180px)").matches) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      dayPanelRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+  }, [selectedDate, selectedDayLives.length]);
+
   const yearDateItems = useMemo(() => Object.values(livesByDate).filter((item) => item.date.year === selectedYear), [livesByDate, selectedYear]);
   const monthDateItems = useMemo(() => yearDateItems.filter((item) => item.date.month === selectedMonth), [selectedMonth, yearDateItems]);
   const yearLiveCount = yearDateItems.reduce((total, item) => total + item.lives.length, 0);
@@ -295,7 +364,59 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
     setSelectedDate("");
   }
 
-  if (!yearOptions.length) {
+  function selectDate(dateKey) {
+    shouldScrollToDayPanelRef.current = true;
+    setSelectedDate(dateKey);
+  }
+
+  function changeView(view) {
+    setCalendarView(view);
+    setSelectedDate("");
+  }
+
+  function goToToday() {
+    setSelectedYear(todayParts.year);
+    setSelectedMonth(todayParts.month);
+    setSelectedDate("");
+  }
+
+  function goToPreviousPeriod() {
+    setSelectedDate("");
+
+    if (calendarView === "year") {
+      setSelectedYear((year) => String(Number(year) - 1));
+      return;
+    }
+
+    const monthNumber = Number(selectedMonth);
+    if (monthNumber <= 1) {
+      setSelectedYear((year) => String(Number(year) - 1));
+      setSelectedMonth("12");
+      return;
+    }
+
+    setSelectedMonth(String(monthNumber - 1).padStart(2, "0"));
+  }
+
+  function goToNextPeriod() {
+    setSelectedDate("");
+
+    if (calendarView === "year") {
+      setSelectedYear((year) => String(Number(year) + 1));
+      return;
+    }
+
+    const monthNumber = Number(selectedMonth);
+    if (monthNumber >= 12) {
+      setSelectedYear((year) => String(Number(year) + 1));
+      setSelectedMonth("01");
+      return;
+    }
+
+    setSelectedMonth(String(monthNumber + 1).padStart(2, "0"));
+  }
+
+  if (!dataYearOptions.length) {
     return (
       <div className="empty-state tracker-calendar-empty">
         <div className="empty-state-icon">CAL</div>
@@ -316,35 +437,6 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
         <p className="subtitle">Explora el archivo por día, mes y año de transmisión.</p>
       </header>
 
-      <section className="tracker-calendar-toolbar" aria-label="Filtros de calendario">
-        <FilterSelect
-          id="tracker-calendar-view"
-          label="Vista"
-          value={calendarView}
-          options={VIEW_OPTIONS}
-          onChange={setCalendarView}
-        />
-        <FilterSelect
-          id="tracker-calendar-year"
-          label="Año"
-          value={selectedYear}
-          options={yearOptions}
-          onChange={setSelectedYear}
-        />
-        <FilterSelect
-          id="tracker-calendar-month"
-          label="Mes"
-          value={selectedMonth}
-          options={monthOptions}
-          onChange={(month) => {
-            setSelectedMonth(month);
-            setSelectedDate("");
-          }}
-          disabled={calendarView === "year"}
-          disabledHint="Disponible en vista mensual"
-        />
-      </section>
-
       <section className="tracker-calendar-stats" aria-label="Resumen del calendario">
         <div>
           <span>{calendarView === "year" ? "Directos del año" : "Directos del mes"}</span>
@@ -360,6 +452,74 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
         </div>
       </section>
 
+      <section className="tracker-calendar-toolbar" aria-label="Filtros de calendario">
+        <FilterSelect
+          id="tracker-calendar-year"
+          label="Año"
+          value={selectedYear}
+          options={yearOptions}
+          onChange={(year) => {
+            setSelectedYear(year);
+            setSelectedDate("");
+          }}
+        />
+        <FilterSelect
+          id="tracker-calendar-month"
+          label="Mes"
+          value={selectedMonth}
+          options={monthOptions}
+          onChange={(month) => {
+            setSelectedMonth(month);
+            setSelectedDate("");
+          }}
+          disabled={calendarView === "year"}
+          disabledHint="Disponible en vista mensual"
+        />
+      </section>
+
+      <section className="tracker-calendar-navigation" aria-label="Navegación del calendario">
+        <div className="tracker-calendar-period">
+          <button type="button" className="tracker-calendar-nav-button" onClick={goToPreviousPeriod} aria-label={calendarView === "year" ? "Año anterior" : "Mes anterior"}>
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
+          <strong>{calendarTitle}</strong>
+          <button type="button" className="tracker-calendar-nav-button" onClick={goToNextPeriod} aria-label={calendarView === "year" ? "Año siguiente" : "Mes siguiente"}>
+            <ChevronRight size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="tracker-calendar-navigation-actions">
+          <button type="button" className="tracker-calendar-today-button" onClick={goToToday}>
+            Hoy
+          </button>
+          <div className="tracker-calendar-view-toggle" role="group" aria-label="Cambiar vista del calendario">
+            {VIEW_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={calendarView === option.value ? "is-active" : ""}
+                aria-pressed={calendarView === option.value}
+                onClick={() => changeView(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="tracker-calendar-legend" aria-label="Leyenda de estados del calendario">
+        <span className="tracker-calendar-legend-title">Leyenda</span>
+        <div className="tracker-calendar-legend-list">
+          {LIVE_STATUS_LEGEND_ITEMS.map((item) => (
+            <span key={item.calendarClassName} className={`tracker-calendar-legend-chip ${item.calendarClassName}`}>
+              <i aria-hidden="true" />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </section>
+
       <div className={`tracker-calendar-layout ${calendarView === "year" ? "is-year-view" : "is-month-view"}`}>
         <div className="tracker-calendar-main">
           {calendarView === "year" ? (
@@ -371,7 +531,7 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
                   month={month.value}
                   livesByDate={livesByDate}
                   selectedDate={selectedDate}
-                  onSelectDate={setSelectedDate}
+                  onSelectDate={selectDate}
                   onOpenMonth={openMonth}
                   compact
                 />
@@ -383,12 +543,12 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
               month={selectedMonth}
               livesByDate={livesByDate}
               selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
+              onSelectDate={selectDate}
             />
           )}
         </div>
 
-        <DayLiveList dateKey={selectedDate} lives={selectedDayLives} onOpenDetail={onOpenDetail} />
+        <DayLiveList panelRef={dayPanelRef} dateKey={selectedDate} lives={selectedDayLives} onOpenDetail={onOpenDetail} />
       </div>
     </section>
   );

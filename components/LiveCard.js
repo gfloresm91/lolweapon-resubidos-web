@@ -6,26 +6,7 @@ import { Bookmark, CheckCircle2, CirclePlay, Edit3 } from "lucide-react";
 
 import Tooltip from "@/components/Tooltip";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
-
-function statusClass(status) {
-  const normalized = String(status || "").toLowerCase();
-
-  if (normalized.includes("directo")) return "status-badge status-badge--directo";
-  if (normalized.includes("completo")) return "status-badge status-badge--completo";
-  if (normalized.includes("lost")) return "status-badge status-badge--lost";
-  if (normalized.includes("subiendo")) return "status-badge status-badge--subiendo";
-  return "status-badge status-badge--pendiente";
-}
-
-function statusDotClass(status) {
-  const normalized = String(status || "").toLowerCase();
-
-  if (normalized.includes("directo")) return "status-dot status-dot-directo";
-  if (normalized.includes("completo")) return "status-dot status-dot-completo";
-  if (normalized.includes("lost")) return "status-dot status-dot-lost";
-  if (normalized.includes("subiendo")) return "status-dot status-dot-subiendo";
-  return "status-dot status-dot-pendiente";
-}
+import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
 
 function renderInfoText(text) {
   const parts = String(text || "").split(/(https?:\/\/[^\s]+)/g);
@@ -135,6 +116,7 @@ function LiveCard({
   const compactTags = allTags.slice(0, 2);
   const compactHiddenCount = Math.max(allTags.length - compactTags.length, 0);
   const compactTitle = truncateCompactTitle(live.title);
+  const statusMeta = getLiveStatusMeta(live.status);
 
   function openDetail() {
     onOpenDetail?.(live.id);
@@ -157,13 +139,13 @@ function LiveCard({
           </button>
           <button
             type="button"
-            className={statusClass(live.status)}
+            className={statusMeta.badgeFullClassName}
             onClick={(event) => {
               event.stopPropagation();
               onFilterStatus?.(live.status);
             }}
           >
-            <span className={statusDotClass(live.status)} aria-hidden="true" />
+            <span className={statusMeta.dotClassName} aria-hidden="true" />
             {live.status || PENDING_LIVE_STATUS_LABEL}
           </button>
         </div>
@@ -273,13 +255,13 @@ function LiveCard({
           </button>
           <button
             type="button"
-            className={statusClass(live.status)}
+            className={statusMeta.badgeFullClassName}
             onClick={(event) => {
               event.stopPropagation();
               onFilterStatus?.(live.status);
             }}
           >
-            <span className={statusDotClass(live.status)} aria-hidden="true" />
+            <span className={statusMeta.dotClassName} aria-hidden="true" />
             {live.status || PENDING_LIVE_STATUS_LABEL}
           </button>
         </div>

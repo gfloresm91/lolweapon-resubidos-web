@@ -68,6 +68,22 @@ _(vacío)_
 
 ## Ideas / Mejoras futuras
 
+### Trivia otaku
+
+- **Qué es:** módulo de trivia de anime con preguntas por título, género, temporada o dificultad, orientado a juego semanal y ranking social.
+- **Ideas iniciales:** preguntas de opción múltiple, rachas, tabla semanal/mensual, historial de aciertos y badges por hitos.
+- **Integración posible:** usar títulos ya presentes en la biblioteca de anime como base; enlazar preguntas a `AnimeEntry` cuando corresponda.
+- **Permisos sugeridos:** vista pública o para usuarios autenticados; administración de preguntas con permiso nuevo tipo `admin.anime.trivia`.
+- **Riesgos/decisiones pendientes:** evitar spoilers por episodio o permitir marcar preguntas con rango de episodios; definir si las preguntas son manuales, importadas o generadas con revisión.
+
+### Perfil otaku público
+
+- **Qué es:** evolución visual/social del perfil público `/u/[login]`, con una tarjeta otaku compartible que resuma identidad y gustos de anime.
+- **Ideas iniciales:** anime favorito, opening/ending favorito, género más visto, nota promedio, cantidad de completados, racha de capítulos, títulos/badges desbloqueados y listas destacadas.
+- **Relación con backlog existente:** se apoya en la feature pendiente `Perfil público /u/[login]`; primero conviene implementar privacidad, datos base y página pública.
+- **Privacidad:** todo dato exhibido debe ser opt-in y configurable desde perfil.
+- **Riesgos/decisiones pendientes:** decidir si campos como waifu/husbando existen, si se permiten textos libres moderables y si habrá imagen/tarjeta para compartir.
+
 ### Mantenedor de novedades
 
 - La primera versión de `/novedades` y `/changelog` usa contenido estático versionado en el repositorio.

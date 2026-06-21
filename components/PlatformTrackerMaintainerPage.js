@@ -21,6 +21,7 @@ import MaintainerToolbar from "@/components/MaintainerToolbar";
 import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
+import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
 
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -40,11 +41,14 @@ const MONTH_LABELS = {
 };
 const TRACKER_COLUMNS = [
   { key: "id", label: "ID", sortable: true },
-  { key: "live", label: "Directo", sortable: true },
-  { key: "date", label: "Fecha", sortable: true },
+  { key: "title", label: "Título", sortable: true },
+  { key: "liveId", label: "ID interno", sortable: true },
+  { key: "year", label: "Año", sortable: true },
+  { key: "date", label: "Fecha de emisión", sortable: true },
   { key: "status", label: "Estado", sortable: true },
   { key: "tags", label: "Tags", sortable: true },
-  { key: "availability", label: "Disponibilidad", sortable: true },
+  { key: "links", label: "Enlaces", sortable: true },
+  { key: "platforms", label: "Plataformas", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
 
@@ -83,22 +87,16 @@ function getLiveLinksCount(live) {
   return Object.values(live?.links || {}).reduce((total, links) => total + (Array.isArray(links) ? links.length : 0), 0);
 }
 
-function getStatusClassName(status) {
-  const value = String(status || "").toLowerCase();
+function getPlatformLabel(platform) {
+  const value = String(platform || "").toLowerCase();
+  const labels = {
+    okru: "OK.RU",
+    telegram: "Telegram",
+    patreon: "Patreon",
+    piero: "Piero",
+  };
 
-  if (!value) {
-    return "is-warning";
-  }
-
-  if (value.includes("lost") || value.includes("incompleto")) {
-    return "is-danger";
-  }
-
-  if (value.includes("pendiente") || value.includes("subiendo")) {
-    return "is-warning";
-  }
-
-  return "is-active";
+  return labels[value] || platform;
 }
 
 async function uploadImage(file) {
@@ -208,12 +206,16 @@ export default function PlatformTrackerMaintainerPage({
         live.title,
         live.year,
         live.date,
+        parseLiveDate(live.date),
         live.status,
         live.additional_info,
+        getLiveLinksCount(live),
+        `${getLiveLinksCount(live)} enlaces`,
+        getLiveLinksCount(live) ? "Con enlaces" : "Sin enlaces",
         ...(live.tags || []),
         ...Object.entries(live.links || {})
           .filter(([, links]) => Array.isArray(links) && links.length)
-          .map(([platform]) => platform),
+          .flatMap(([platform]) => [platform, getPlatformLabel(platform)]),
       ].some((value) => String(value || "").toLowerCase().includes(query)))
       .filter((live) => yearFilter === "all" || String(live.year) === yearFilter)
       .filter((live) => monthFilter === "all" || getLiveMonth(live) === monthFilter)
@@ -228,11 +230,17 @@ export default function PlatformTrackerMaintainerPage({
   }, [availabilityFilter, lives, monthFilter, searchQuery, statusFilter, tagFilter, yearFilter]);
   const tableColumns = useMemo(() => [
     { id: "id", accessorFn: (live) => getLiveRecordId(live) },
-    { id: "live", accessorFn: (live) => getLiveTitle(live) },
+    { id: "title", accessorFn: (live) => getLiveTitle(live) },
+    { id: "liveId", accessorFn: (live) => live.id || "" },
+    { id: "year", accessorFn: (live) => String(live.year || "") },
     { id: "date", accessorFn: (live) => parseLiveDate(live.date) },
     { id: "status", accessorFn: (live) => live.status || "" },
     { id: "tags", accessorFn: (live) => (live.tags || []).join(" ") },
-    { id: "availability", accessorFn: (live) => getLiveLinksCount(live) },
+    { id: "links", accessorFn: (live) => getLiveLinksCount(live) },
+    { id: "platforms", accessorFn: (live) => Object.entries(live.links || {})
+      .filter(([, links]) => Array.isArray(links) && links.length)
+      .map(([platform]) => getPlatformLabel(platform))
+      .join(" ") },
   ], []);
   const table = useReactTable({
     data: filteredLives,
@@ -619,7 +627,7 @@ export default function PlatformTrackerMaintainerPage({
       <MaintainerToolbar
         searchId="admin-tracker-search"
         searchValue={searchQuery}
-        searchPlaceholder="Buscar por ID, título, tag, año, fecha o estado"
+        searchPlaceholder="Buscar por ID, título, año, fecha, estado, tag o plataforma"
         onSearchChange={setSearchQuery}
       >
         <FilterSelect
@@ -700,15 +708,11 @@ export default function PlatformTrackerMaintainerPage({
         {paginatedLives.map((live) => (
           <div className="maintainer-table-row admin-tracker-row" role="row" key={live.id}>
             <span className="admin-user-cell admin-record-id">{formatLiveRecordId(live)}</span>
-            <div className="admin-user-cell admin-tracker-title">
-              <strong>{getLiveTitle(live)}</strong>
-              <span>{live.id ? `Código: ${live.id}` : "Sin código"}</span>
-            </div>
-            <div className="admin-user-cell admin-anime-summary">
-              <strong>{live.date || "Sin fecha"}</strong>
-              <small>{live.year || "Sin año"}</small>
-            </div>
-            <span className={`admin-user-status ${getStatusClassName(live.status)}`}>{live.status || "Sin estado"}</span>
+            <span className="admin-user-cell admin-tracker-title-cell">{getLiveTitle(live)}</span>
+            <span className="admin-user-cell admin-tracker-live-id">{live.id || "-"}</span>
+            <span className="admin-user-cell">{live.year || "-"}</span>
+            <span className="admin-user-cell">{live.date || "-"}</span>
+            <span className={getLiveStatusMeta(live.status).adminFullClassName}>{live.status || "Sin estado"}</span>
             <div className="admin-user-cell admin-tracker-tags">
               {(live.tags || []).slice(0, 2).map((tag) => (
                 <button type="button" key={tag} className="tag-pill" onClick={() => setTagFilter(tag)}>
@@ -718,14 +722,12 @@ export default function PlatformTrackerMaintainerPage({
               {(live.tags || []).length > 2 ? <small>+{live.tags.length - 2}</small> : null}
               {!live.tags?.length ? <small>Sin tags</small> : null}
             </div>
-            <div className="admin-user-cell admin-anime-summary">
-              <strong>{getLiveLinksCount(live)} enlaces</strong>
-              <div className="admin-tracker-platforms">
-                {Object.entries(live.links || {}).filter(([, links]) => Array.isArray(links) && links.length).map(([platform, links]) => (
-                  <span key={platform}>{platform} {links.length}</span>
-                ))}
-                {!getLiveLinksCount(live) ? <span className="is-empty">Sin enlaces</span> : null}
-              </div>
+            <span className="admin-user-cell">{getLiveLinksCount(live)} enlaces</span>
+            <div className="admin-user-cell admin-tracker-platforms">
+              {Object.entries(live.links || {}).filter(([, links]) => Array.isArray(links) && links.length).map(([platform, links]) => (
+                <span key={platform}>{getPlatformLabel(platform)} {links.length}</span>
+              ))}
+              {!getLiveLinksCount(live) ? <span className="is-empty">Sin enlaces</span> : null}
             </div>
             <div className="admin-user-actions">
               {canUpdate ? (

@@ -139,10 +139,17 @@ npm run db:migrate:deploy
   - `FormSelect`
   - `Tooltip`
 - Tablas de administración:
+  - Seguir el estándar completo de mantenedores en `docs/design-system.md`.
   - Primera columna `ID` con formato `#id`.
   - `Estado` antes de `Acciones`.
+  - Si la entidad no tiene estado real, no inventar una columna `Estado`; dejar antes de `Acciones` el dato operativo más relevante.
   - Acciones ordenadas: editar, cambiar contraseña si aplica, cambiar estado, eliminar.
   - Filtros deben incluir búsqueda por ID cuando exista.
+  - Evitar subtexto repetido en celdas; si un dato se repite como metadata, preferir columna propia y búsqueda compatible.
+  - Orden y paginación deben usar indicadores claros, selector no nativo, opción `Todos` y pruebas Playwright autenticadas.
+  - Tablas anchas deben usar scroll horizontal propio en `.maintainer-table-scroll`, con `--maintainer-table-min-width` global suficiente para columnas y acciones completas, sin overflow global.
+  - Si hay scroll horizontal real, mostrar arriba de la tabla la pista `Desliza horizontalmente para ver más columnas`; no mostrarla cuando la tabla cabe completa.
+  - No versionar credenciales de prueba; usar variables locales para Playwright cuando se requiera login.
 - Modales:
   - Fondo sólido estándar, no transparente.
   - Botón de cierre visible.

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
+import FormSelect from "@/components/FormSelect";
 import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
@@ -46,6 +47,12 @@ const LANGUAGE_OPTIONS = [
   { value: "all", label: "Todos" },
   { value: "es-es", label: "Español" },
   { value: "en-us", label: "English" },
+];
+const CHAPTER_LANGUAGE_OPTIONS = LANGUAGE_OPTIONS.filter((option) => option.value !== "all");
+const CHAPTER_STATUS_OPTIONS = [
+  { value: "draft", label: "Borrador" },
+  { value: "published", label: "Publicado" },
+  { value: "hidden", label: "Oculto" },
 ];
 
 const TABLE_COLUMNS = [
@@ -173,6 +180,8 @@ export default function PlatformSpaceDrumChaptersPage({
         chapter.title,
         chapter.legacyId,
         chapter.releaseDate,
+        chapter.pagesCount,
+        `${chapter.pagesCount} páginas`,
         getLanguageLabel(chapter.language),
         getStatusLabel(chapter.status),
       ].some((value) => normalizeText(value).includes(query));
@@ -429,29 +438,22 @@ export default function PlatformSpaceDrumChaptersPage({
             <h3>Identidad</h3>
             <div className="form-row">
               <div className="form-group-modal">
-                <label htmlFor="spacedrum-chapter-language">Idioma</label>
-                <select
+                <FormSelect
                   id="spacedrum-chapter-language"
-                  className="modal-input"
+                  label="Idioma"
                   value={editingChapter.language}
-                  onChange={(event) => setEditingChapter((current) => ({ ...current, language: event.target.value }))}
-                >
-                  <option value="es-es">Español</option>
-                  <option value="en-us">English</option>
-                </select>
+                  options={CHAPTER_LANGUAGE_OPTIONS}
+                  onChange={(language) => setEditingChapter((current) => ({ ...current, language }))}
+                />
               </div>
               <div className="form-group-modal">
-                <label htmlFor="spacedrum-chapter-status">Estado</label>
-                <select
+                <FormSelect
                   id="spacedrum-chapter-status"
-                  className="modal-input"
+                  label="Estado"
                   value={editingChapter.status}
-                  onChange={(event) => setEditingChapter((current) => ({ ...current, status: event.target.value }))}
-                >
-                  <option value="draft">Borrador</option>
-                  <option value="published">Publicado</option>
-                  <option value="hidden">Oculto</option>
-                </select>
+                  options={CHAPTER_STATUS_OPTIONS}
+                  onChange={(status) => setEditingChapter((current) => ({ ...current, status }))}
+                />
               </div>
             </div>
             <div className="form-row">

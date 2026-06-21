@@ -147,6 +147,17 @@ Reglas especiales:
   - `MaintainerTable`
   - `MaintainerModal`
   - `ConfirmModal`
+- Si se crea o modifica un mantenedor, aplicar el estándar de tablas administrativas de `docs/design-system.md`:
+  - datos atómicos por columna;
+  - búsqueda compatible con columnas visibles;
+  - jerarquía visual tranquila;
+  - ordenamiento con indicador activo y dirección;
+  - paginación con selector no nativo y opción `Todos`;
+  - scroll horizontal propio en `.maintainer-table-scroll` cuando la tabla no quepa, sin overflow global;
+  - pista `Desliza horizontalmente para ver más columnas` visible arriba de las tablas solo cuando tengan scroll horizontal real;
+  - `--maintainer-table-min-width` global suficiente para columnas y acciones completas;
+  - pruebas Playwright autenticadas en desktop y mobile.
+- Para pruebas Playwright autenticadas, usar un usuario admin local de prueba y pasar credenciales por variables locales como `PLAYWRIGHT_ADMIN_LOGIN` y `PLAYWRIGHT_ADMIN_PASSWORD`; no versionar usuario/clave concretos.
 - Para botones que requieren sesión: toast/modal con acción para login, no redirección brusca.
 
 ## 8. Auditoría
