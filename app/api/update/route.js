@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readJsonRequest } from "@/lib/http";
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
+import { createPlatformNotification } from "@/lib/repositories/notificationRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 import { deleteLive, getLiveStatuses, readLives, updateLiveStatus, upsertLive, writeLives } from "@/lib/repositories/liveRepository";
 import { normalizeLives, sortLives } from "@/lib/lives";
@@ -84,6 +85,19 @@ export async function POST(request) {
       after: savedLive,
       request,
     });
+    if (!before) {
+      await createPlatformNotification({
+        type: "activity",
+        severity: "success",
+        title: "Nuevo directo en el rastreador",
+        body: savedLive.title,
+        href: `/rastreador/${encodeURIComponent(savedLive.id)}`,
+        icon: "CirclePlay",
+        audience: "authenticated",
+        actor: authorization.user,
+        metadata: { liveId: savedLive.id },
+      });
+    }
     return NextResponse.json({ success: true, lives: sortedLives, statuses });
   }
 

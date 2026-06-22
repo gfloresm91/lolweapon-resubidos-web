@@ -25,6 +25,7 @@ Memoria externa de Claude:
 - **Tailwind CSS** + shadcn/ui
 - **Autenticación**: Twitch OAuth + login manual con sesiones persistentes
 - **Deploy**: DigitalOcean Droplet, systemd, GitHub Actions CI/CD
+- **Servidor runtime**: `server.mjs` envuelve Next.js y atiende WebSocket para notificaciones en `/api/notifications/ws`.
 
 ## Fuente de datos
 
@@ -145,7 +146,10 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 - **`npm run db:generate` es obligatorio después de `npm ci`** — sin esto, el build falla con `Cannot find module '.prisma/client/default'`. Ya está en los workflows de GitHub Actions, pero si se corre el build manualmente hay que hacerlo explícitamente.
 - **`unset DATABASE_URL` antes de migrar en el servidor QA** — si la variable está seteada en el shell (puede pasar al hacer `source .env` de producción), Prisma la usa y conecta a la BD de producción ignorando el `.env` local del directorio de QA.
 - **El deploy es exclusivamente vía GitHub Actions** — `scripts/deploy.sh` fue eliminado. Push a `dev` → QA, push a `main` → producción.
+- **`npm start` usa servidor custom** — `server.mjs` mantiene Next.js y el canal WebSocket de notificaciones en el mismo puerto. Nginx debe permitir `Upgrade`/`Connection` para `/api/notifications/ws`.
+- **YouTube notifica desde el servidor** — `server.mjs` ejecuta un sincronizador en background para detectar nuevos videos y emitir notificaciones por WebSocket aunque el usuario esté en cualquier página. Configuración: `YOUTUBE_NOTIFICATION_SYNC_ENABLED` y `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS`.
 - **El `PersistentTwitchPlayer` es un componente complejo** — flota sobre todas las rutas como mini-player. El iframe de Twitch es cross-origin y no se puede controlar su `document.visibilityState`. Las pausas inesperadas se combaten con un keep-alive interval y `schedulePlaybackResume`.
+- **Dropdowns sobre Twitch** — si topbar/notificaciones/menú de usuario quedan debajo del player en `/inicio`, revisar primero stacking contexts. Caso corregido: `.app-shell { z-index: 1; }` encerraba el topbar bajo el `PersistentTwitchPlayer` fijo; se quitó ese `z-index` y se mantuvo el topbar sobre el player. No ocultar video/chat en desktop como parche.
 
 ## Infraestructura oficial
 

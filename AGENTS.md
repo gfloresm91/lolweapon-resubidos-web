@@ -5,6 +5,7 @@ Guía operativa para agentes de código en este repositorio. Aplica a todo el pr
 ## Contexto Del Proyecto
 
 - App Next.js 15 App Router para el archivo VOD de Lolweapon y la biblioteca de anime.
+- Runtime con `server.mjs`: envuelve Next.js y atiende WebSocket para notificaciones en `/api/notifications/ws`.
 - Dos dominios principales desde la misma app:
   - `resubidos.lolweapon.com` → rastreador de directos.
   - `viendo.lolweapon.com` → biblioteca de anime.
@@ -224,6 +225,7 @@ npm run db:migrate:deploy
 - Twitch iframe es cross-origin y puede pausar por reglas del navegador/Twitch.
 - Cambios en full/mini player deben probar navegación, scroll, cambio de pestaña y estado offline.
 - Si no hay directo, el mini player debe ocultarse.
+- Si un dropdown/topbar queda bajo el player en `/inicio`, revisar stacking contexts antes de ocultar iframes o subir números a ciegas. Caso corregido: `.app-shell { z-index: 1; }` atrapaba el topbar bajo el `PersistentTwitchPlayer` fijo. La solución fue quitar ese `z-index`, mantener `.topbar` por encima y dejar los dropdowns superpuestos sin esconder video/chat. Ver `docs/design-system.md` → `Centro De Notificaciones` → `Capas Sobre Twitch`.
 
 ### Chulopuntos
 
@@ -261,6 +263,8 @@ npm run db:migrate:deploy
 - Push a `dev` despliega QA.
 - Push a `main` despliega producción.
 - Deploy recomendado vía GitHub Actions, no manual, salvo instrucciones explícitas.
+- `npm start` usa `server.mjs`; Nginx debe permitir `Upgrade`/`Connection` para el WebSocket de notificaciones.
+- `server.mjs` también ejecuta el sincronizador de YouTube en background para notificaciones realtime; revisar `YOUTUBE_NOTIFICATION_SYNC_ENABLED` y `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` si se cambia la cadencia.
 - Servicios systemd oficiales:
   - Producción: `resubidos.service`.
   - QA: `resubidos-qa.service`.
