@@ -147,6 +147,35 @@ Usar primero estos componentes antes de crear algo nuevo:
 - En mobile, botones de toolbar deben ocupar ancho completo si se apilan.
 - Evitar texto que no quepa dentro del botón; si ocurre, ajustar layout antes que reducir excesivamente fuente.
 
+## Centro De Notificaciones
+
+- El centro vive en `topbar-actions`, antes del menú de cuenta.
+- El trigger es un botón circular con `aria-label`, icono de campana y badge compacto de no leídas (`99+` como máximo visual).
+- El panel se alinea a la derecha, usa fondo oscuro sólido, borde sutil y sombra consistente con `account-menu`.
+- Mantener tabs `Alertas`, `Actividad` y `Sistema`; no agregar más categorías sin necesidad real.
+- Usar `Alertas` para señales externas de alto interés comunitario, como Twitch online o nuevo video de YouTube. Usar `Actividad` para contenido agregado dentro de la plataforma. Usar `Sistema` para procesos operativos.
+- Cada item debe tener icono, título, texto corto, tiempo relativo y estado no leído claro.
+- Acciones esperadas:
+  - click en item con `href`: marcar leído y navegar;
+  - notificaciones `Alertas` con `href`: abrir en pestaña nueva para no sacar al usuario de la pantalla actual;
+  - item sin `href`: marcar leído;
+  - botón de descartar;
+  - footer `Marcar todo como leído`.
+- En mobile el panel debe usar `width: calc(100vw - 2rem)` como máximo, scroll interno y no generar overflow global.
+- El contador debe refrescar sin recargar la página usando WebSocket; mantener polling suave como respaldo cuando el canal no esté disponible.
+- El panel debe superponerse sobre el player y chat de Twitch sin ocultarlos en desktop, igual que `account-menu`.
+- Si una acción que genera notificación falla al crearla, no debe romper la operación principal.
+- Para videos de YouTube, el productor principal es el sincronizador de `server.mjs`; no debe depender de que el usuario visite `/inicio`. La primera sincronización debe quedar como línea base silenciosa; solo videos detectados después se muestran como actividad nueva.
+
+### Capas Sobre Twitch
+
+- Problema observado en `/inicio`: el centro de notificaciones quedaba sobre el chat, pero bajo el player principal, y el topbar también se pintaba bajo el player.
+- Causa: `.app-shell` tenía `z-index: 1`, creando un stacking context completo. Aunque `.topbar` tuviera un `z-index` alto, seguía atrapado dentro de esa capa y no podía superar al `PersistentTwitchPlayer`, que es `position: fixed` en la capa raíz.
+- Intento incorrecto: ocultar `.persistent-twitch-player`, `iframe`, `.twitch-player-anchor` o `.twitch-player-embed` cuando se abría el centro. Eso evitaba el solape, pero hacía desaparecer el video/chat y no coincidía con el comportamiento del menú de usuario.
+- Solución correcta aplicada: quitar el `z-index` de `.app-shell`, mantener `.topbar` por encima del player (`z-index: 900`) y dejar `.notification-popover`/`.account-menu-popover` como capas internas del topbar. Así el dropdown se superpone sin apagar iframes.
+- Regla para futuras pantallas: antes de subir números de `z-index`, revisar si algún contenedor padre creó un stacking context con `z-index`, `transform`, `filter`, `opacity`, `contain`, `isolation` o `position` combinada con `z-index`.
+- No ocultar iframes cross-origin como primera solución en desktop. Solo usar ocultación puntual en responsive/menús laterales cuando el embed impida interacción o genere overflow, y documentar el alcance.
+
 ## Cards
 
 ### Novedades

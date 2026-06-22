@@ -42,6 +42,7 @@ TWITCH_REQUIRE_ACTIVE_STREAM
 ### YouTube
 
 **Archivo:** `lib/youtube.js`
+**Sincronización local:** `lib/repositories/youtubeVideoRepository.js`
 
 | Endpoint | Uso |
 |---|---|
@@ -52,12 +53,16 @@ TWITCH_REQUIRE_ACTIVE_STREAM
 
 No retorna duración ni views (requeriría llamada extra a `/videos` con `contentDetails`/`statistics` — costo adicional de cuota).
 
+`server.mjs` ejecuta un sincronizador en background para detectar nuevos videos aunque ningún usuario visite `/inicio`. El intervalo se controla con `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` y puede desactivarse con `YOUTUBE_NOTIFICATION_SYNC_ENABLED=false`. Cuando `DATA_SOURCE=postgres`, el sistema guarda IDs en `YoutubeVideo`: la primera sincronización crea una línea base silenciosa para evitar notificaciones antiguas; los videos nuevos posteriores crean una notificación `Actividad` y se empujan por WebSocket. `/api/youtube/videos` mantiene la sincronización como respaldo al cargar el home.
+
 **Variables de entorno requeridas:**
 ```
 YOUTUBE_API_KEY
 YOUTUBE_CHANNEL_ID
 YOUTUBE_CHANNEL_URL
 YOUTUBE_UPLOADS_PLAYLIST_ID
+YOUTUBE_NOTIFICATION_SYNC_ENABLED
+YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 ```
 
 ---
@@ -111,6 +116,9 @@ YOUTUBE_UPLOADS_PLAYLIST_ID
 | `PlatformSession` | Sesión activa (token, expiresAt — 14 días) |
 | `LoginAttempt` | Auditoría de intentos de login |
 | `AuditLog` | Historial de acciones administrativas por mantenedor |
+| `PlatformNotification` | Notificaciones persistentes visibles por audiencia (`authenticated`, `admin`, `permission:<code>`, `user:<id>`) |
+| `PlatformUserNotification` | Estado por usuario de lectura y descarte de notificaciones |
+| `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
 
 ### Actividad del usuario
 
@@ -133,6 +141,35 @@ Módulos auditados:
 - `admin.anime.completed`
 
 Antes de desplegar cambios que incluyan auditoría, aplicar la migración Prisma que crea la tabla `AuditLog`.
+
+### Centro de notificaciones
+
+El topbar incluye un centro de notificaciones persistente para usuarios autenticados. El panel muestra badge de no leídas, tabs `Alertas`, `Actividad` y `Sistema`, acciones para marcar como leído o descartar, y enlaces directos al recurso afectado.
+
+Las notificaciones se guardan en `PlatformNotification` y el estado individual en `PlatformUserNotification`. La API `/api/notifications` lista notificaciones visibles para el usuario actual y permite marcar una, marcar todas o descartar. Si `DATA_SOURCE` no es `postgres`, el repositorio devuelve lista vacía.
+
+El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling suave queda como respaldo.
+
+Productores implementados:
+- Nuevo directo creado en el rastreador.
+- Directo online detectado por Twitch EventSub.
+- Nuevo anime agregado a biblioteca.
+- Importación remota de SpaceDrum completada.
+- Nuevo video de YouTube detectado por el sincronizador de `server.mjs` después de la línea base inicial.
+
+Tipos iniciales:
+- `Alertas`: emisiones en vivo y publicaciones nuevas externas relevantes para la comunidad, como Twitch online o nuevo video de YouTube.
+- `Actividad`: contenido agregado o gestionado dentro de la plataforma, como nuevos directos del rastreador o nuevos animes.
+- `Sistema`: procesos operativos o administrativos, como importaciones SpaceDrum.
+
+Las alertas con `href` se abren en una pestaña nueva para no sacar al usuario de la pantalla actual. Actividad y sistema navegan en la misma pestaña.
+
+Audiencias soportadas:
+- `all`
+- `authenticated`
+- `admin`
+- `permission:<code>`
+- `user:<id>`
 
 ### SpaceDrum
 
@@ -227,6 +264,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/login` | POST | Login manual |
 | `/api/register` | POST | Registro |
 | `/api/logout` | POST | Cerrar sesión |
+| `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
+| `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |
 | `/api/auth/twitch/start` | GET | Inicia OAuth Twitch |
 | `/api/auth/twitch/callback` | GET | Callback OAuth Twitch |
 | `/api/profile` | GET | Perfil del usuario actual |
@@ -239,7 +278,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/twitch/status` | GET | Estado en vivo: stream, perfil, canal, juego |
 | `/api/twitch/eventsub` | POST | Webhook `stream.online` de Twitch |
 | `/api/twitch/eventsub/subscribe` | POST | Registrar suscripción EventSub |
-| `/api/youtube/videos` | GET | Últimos videos de YouTube |
+| `/api/youtube/videos` | GET | Últimos videos de YouTube; también sincroniza `YoutubeVideo` como respaldo al scheduler de `server.mjs` |
 | `/api/platform-users` | GET/POST | CRUD de usuarios |
 | `/api/platform-roles` | GET/POST | CRUD de roles |
 | `/api/tags` | GET/POST | CRUD de tags |

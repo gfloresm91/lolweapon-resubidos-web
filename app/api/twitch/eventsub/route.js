@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { createPlatformNotification } from "@/lib/repositories/notificationRepository";
 import { upsertTwitchLive } from "@/lib/twitchArchive";
 
 export const dynamic = "force-dynamic";
@@ -86,5 +87,17 @@ export async function POST(request) {
   }
 
   const live = await upsertTwitchLive(payload.event || {});
+  if (live) {
+    await createPlatformNotification({
+      type: "alert",
+      severity: "success",
+      title: "Lolweapon está en directo",
+      body: live.title || "Se detectó un nuevo directo desde Twitch.",
+      href: "/inicio",
+      icon: "Radio",
+      audience: "authenticated",
+      metadata: { liveId: live.id, twitchEventId: payload.event?.id || null },
+    });
+  }
   return NextResponse.json({ success: true, live });
 }
