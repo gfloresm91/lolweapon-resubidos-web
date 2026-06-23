@@ -145,8 +145,8 @@ body::before {
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  z-index: 320;
-  transition: all var(--t-fast);
+  z-index: 950;
+  transition: background var(--t-fast), border-color var(--t-fast);
 }
 
 .sidebar-overlay {
@@ -13399,6 +13399,7 @@ a.empty-state-action {
 
   .sidebar.is-open {
     transform: translateX(0);
+    z-index: 920;
   }
 
   .sidebar-brand {
@@ -15135,6 +15136,15 @@ a.empty-state-action {
   .bg-orb,
   body::before {
     display: none !important;
+  }
+
+  .notification-popover {
+    position: fixed;
+    top: var(--topbar-height);
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-height: calc(100dvh - var(--topbar-height) - 1rem);
   }
 }
 

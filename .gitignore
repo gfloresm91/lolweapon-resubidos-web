@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 
+# Playwright — auth state y resultados de tests
+playwright/.auth/
+test-results/
+
 # Next / build outputs
 .next/
 out/
