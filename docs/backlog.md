@@ -8,6 +8,18 @@ _(vacío)_
 
 ## Pendiente
 
+### Player Twitch — pausa al abrir el centro de notificaciones
+
+- **Problema:** Al abrir el centro de notificaciones en `/inicio`, el video del player de Twitch se pausa brevemente y luego se reanuda solo. El chat no se pausa (usa un `<iframe>` independiente sin SDK).
+- **Causa probable:** El SDK de Twitch (`player.twitch.tv/js/embed/v1.js`) registra un listener de `click` en `document` y pausa el player cuando detecta un click fuera de su iframe. No hay forma de confirmarlo sin acceso al código fuente del SDK.
+- **Lo que se intentó:**
+  - Eliminar `visibility: hidden` del bloque CSS `body.is-notification-center-open` (solo aplicaba a ≤900px; no era la causa en desktop).
+  - Agregar listener `Twitch.Player.PAUSE` que llama `player.play()` al detectar la pausa — reduce el tiempo de freeze pero no lo elimina.
+  - Agregar listener `click` en `document` con `stopImmediatePropagation()` cuando el click viene de `.notification-center`, para bloquear el SDK antes de que vea el evento — el player sigue pausando (probablemente el SDK también escucha `pointerdown` u otro evento).
+- **Pendiente:** Identificar qué evento exacto usa el SDK para detectar clicks fuera del player (podría ser `pointerdown`, `mousedown`, o `click` en capture phase), y usar el mismo mecanismo para bloquearlo. Alternativa: proxy del método `pause()` del player para ignorar llamadas no iniciadas por el usuario.
+- **Estado:** Diferido (2026-06-23). El PAUSE listener ya en producción garantiza recuperación rápida.
+- **Archivos involucrados:** `components/PersistentTwitchPlayer.js`, `app/globals.css`
+
 ### Player Twitch — transición full→mini
 
 - **Problema:** Al navegar de `/inicio` al mini player, el reproductor se pausa brevemente.
