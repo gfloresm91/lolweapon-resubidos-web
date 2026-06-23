@@ -9,7 +9,7 @@ const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
 const MINI_PLAYER_DEFAULT_WIDTH = 380;
 const MINI_PLAYER_MIN_WIDTH = 380;
 const MINI_PLAYER_MAX_WIDTH = 720;
-const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum"];
+const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum", "/novedades", "/changelog"];
 const PLAY_RESUME_DELAYS = [0, 120, 350, 900, 1800, 3200];
 const PLAY_KEEP_ALIVE_INTERVAL_MS = 10000;
 
@@ -166,6 +166,8 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const resizeStateRef = useRef(null);
   const resizeFrameRef = useRef(null);
   const wasDockedToHomeRef = useRef(false);
+  const dockedStyleRef = useRef(null);
+  const isMiniDismissedRef = useRef(false);
   const isOnline = Boolean(currentStream);
   const isStreamPlayable = isOnline || isPlayerOnline;
   const routeMode = getRouteMode(currentPath, currentHostname);
@@ -275,6 +277,13 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
           setHasActivatedPlayer(true);
           tryAutoplay(player, mutedPreferenceRef);
         });
+        if (window.Twitch.Player.PAUSE) {
+          player.addEventListener(window.Twitch.Player.PAUSE, () => {
+            if (!isMiniDismissedRef.current) {
+              tryAutoplay(player, mutedPreferenceRef);
+            }
+          });
+        }
 
         if (window.Twitch.Player.OFFLINE) {
           player.addEventListener(window.Twitch.Player.OFFLINE, () => {
@@ -297,6 +306,8 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [twitchChannel, twitchParent]);
 
   useEffect(() => {
+    isMiniDismissedRef.current = isMiniDismissed;
+
     if (!playerRef.current) {
       return;
     }
@@ -305,6 +316,17 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       stopPlayerPlayback(playerRef.current);
     }
   }, [isMiniDismissed]);
+
+  useEffect(() => {
+    function preventSdkPause(e) {
+      const nc = document.querySelector(".notification-center");
+      if (nc?.contains(e.target)) {
+        e.stopImmediatePropagation();
+      }
+    }
+    document.addEventListener("click", preventSdkPause);
+    return () => document.removeEventListener("click", preventSdkPause);
+  }, []);
 
   useEffect(() => {
     if (!isVisible || !playerRef.current) {
@@ -420,8 +442,9 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
                 return nextSize;
               });
-              setPlayerStyle({
-                borderRadius: window.getComputedStyle(anchor.parentElement || anchor).borderRadius,
+              const borderRadius = window.getComputedStyle(anchor.parentElement || anchor).borderRadius;
+              const nextDockedStyle = {
+                borderRadius,
                 bottom: "auto",
                 "--twitch-frame-height": `${rect.height}px`,
                 "--twitch-frame-scale": 1,
@@ -433,7 +456,17 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
                 right: "auto",
                 top: `${rect.top}px`,
                 width: `${rect.width}px`,
-              });
+              };
+              const prev = dockedStyleRef.current;
+              const changed = !prev
+                || prev.top !== nextDockedStyle.top
+                || prev.left !== nextDockedStyle.left
+                || prev.width !== nextDockedStyle.width
+                || prev.height !== nextDockedStyle.height;
+              if (changed) {
+                dockedStyleRef.current = nextDockedStyle;
+                setPlayerStyle(nextDockedStyle);
+              }
               setIsDockedToHome(true);
               wasDockedToHomeRef.current = true;
               return;

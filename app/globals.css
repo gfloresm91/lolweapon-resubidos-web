@@ -13717,7 +13717,6 @@ a.empty-state-action {
   body.is-notification-center-open .home-stream-section .twitch-player-anchor,
   body.is-notification-center-open .home-stream-section .twitch-player-embed {
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
   }
 
@@ -13726,7 +13725,6 @@ a.empty-state-action {
   body.is-app-sidebar-open .home-stream-section .twitch-player-anchor,
   body.is-app-sidebar-open .home-stream-section .twitch-player-embed {
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
   }
 
