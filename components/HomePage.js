@@ -16,6 +16,7 @@ import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import NewsGuidePage from "@/components/NewsGuidePage";
+import NotificationCenter from "@/components/NotificationCenter";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
@@ -1368,6 +1369,7 @@ export default function HomePage({
             </div>
 
             <div className="topbar-actions">
+              <NotificationCenter user={currentUser} />
               <AccountMenu user={currentUser} canManageUsers={canManageUsers} />
             </div>
           </header>

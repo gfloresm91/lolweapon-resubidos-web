@@ -215,6 +215,21 @@ model LinkPlatform {
   links     LiveLink[]
 }
 
+model YoutubeVideo {
+  id          String   @id
+  title       String
+  publishedAt DateTime?
+  thumbnail   String?
+  url         String
+  notifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([notifiedAt])
+}
+
 model SpaceDrum {
   id          Int                 @id @default(autoincrement())
   key         String              @unique
@@ -376,6 +391,8 @@ model PlatformUser {
   animeActivity  PlatformUserAnime[]
   animeRatings   AnimeRating[]
   spaceDrumProgress PlatformUserSpaceDrumProgress[]
+  createdNotifications PlatformNotification[] @relation("NotificationCreator")
+  notificationStates PlatformUserNotification[]
 
   @@index([roleId])
   @@index([isActive])
@@ -453,6 +470,51 @@ model LoginAttempt {
   @@index([ip])
   @@index([success])
   @@index([createdAt])
+}
+
+model PlatformNotification {
+  id              Int                        @id @default(autoincrement())
+  type            String
+  severity        String                     @default("info")
+  title           String
+  body            String?
+  href            String?
+  icon            String?
+  metadata        Json?
+  dedupeKey       String?                    @unique
+  audience        String                     @default("authenticated")
+  createdByUserId Int?
+  createdAt       DateTime                   @default(now())
+  expiresAt       DateTime?
+
+  createdBy       PlatformUser?              @relation("NotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  userStates      PlatformUserNotification[]
+
+  @@index([type])
+  @@index([severity])
+  @@index([audience])
+  @@index([dedupeKey])
+  @@index([createdByUserId])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+model PlatformUserNotification {
+  id             Int                  @id @default(autoincrement())
+  userId         Int
+  notificationId Int
+  readAt         DateTime?
+  dismissedAt    DateTime?
+  createdAt      DateTime             @default(now())
+
+  user           PlatformUser         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification   PlatformNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@index([userId])
+  @@index([notificationId])
+  @@index([readAt])
+  @@index([dismissedAt])
 }
 
 model AnimeRating {

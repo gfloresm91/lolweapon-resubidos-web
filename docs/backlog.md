@@ -66,9 +66,10 @@ _(vacío)_
 - **Pasos pendientes:** desde el inicio (paso 1 del checklist — schema)
 - **Motivo del diferimiento:** diferido por el usuario (2026-05-20).
 
-### Feature: Centro de notificaciones persistente
+### ~~Feature: Centro de notificaciones persistente~~
 
 - **Qué es:** Centro de notificaciones en la barra superior, inspirado en el dropdown de Metronic: botón con icono y badge de no leídas, panel desplegable con header, tabs por tipo, listado de eventos y acciones rápidas. Debe ser un sistema persistente real, no solo notificaciones derivadas en cliente.
+- **Estado:** Implementado en la rama `feature/notification-center` (2026-06-21): schema, migración, repositorio, API `/api/notifications`, WebSocket `/api/notifications/ws`, componente `NotificationCenter`, integración en topbar y eventos productores iniciales, incluyendo detección de nuevos videos de YouTube con línea base silenciosa.
 - **Objetivo funcional:** Informar al usuario sobre eventos relevantes de la plataforma y permitir leer, descartar y navegar al recurso asociado desde cualquier pantalla principal.
 - **Decisiones tomadas:**
   - Implementar directamente con PostgreSQL/Prisma y estado de lectura por usuario.
@@ -82,7 +83,7 @@ _(vacío)_
 - **Eventos sugeridos para primera versión:**
   - Nuevo directo agregado o actualizado en el rastreador.
   - Directo en vivo detectado por Twitch/EventSub.
-  - Nuevo video de YouTube disponible, si se decide guardar/importar ese evento.
+  - Nuevo video de YouTube disponible, detectado por `/api/youtube/videos` y persistido en `YoutubeVideo`.
   - Nueva entrada de `/novedades` o `/changelog`.
   - Anime agregado o actualizado en Viendo/Terminados.
   - Alertas administrativas: import SpaceDrum ejecutado, EventSub registrado, cambios relevantes auditados o fallos operativos si se decide registrarlos.
@@ -151,7 +152,7 @@ _(vacío)_
   - Estados vacíos por tab: mensaje breve, sin página explicativa.
   - Cerrar al hacer click fuera y con Escape.
 - **Consideraciones técnicas:**
-  - Evitar polling agresivo; primera versión puede cargar al montar y refrescar al abrir el panel. Si luego hace falta tiempo real, evaluar polling suave o SSE.
+  - Tiempo real implementado con WebSocket en `server.mjs`. El polling suave cada 30 segundos queda como respaldo cuando el canal no esté disponible.
   - Si se crean notificaciones desde acciones administrativas, la creación no debe romper la operación principal si falla.
   - Evitar duplicados con una clave en `metadata` o helper específico cuando un evento pueda dispararse varias veces.
   - Si un evento deriva de `AuditLog`, evaluar si conviene generar notificación explícita al mismo tiempo en vez de leer desde logs.
@@ -164,8 +165,8 @@ _(vacío)_
   - Probar contador, tabs, marcar una, marcar todas, descartar, navegación por `href` y estado vacío.
   - Playwright/screenshots en desktop y mobile del topbar con panel abierto.
   - Verificar que el panel no tape incoherentemente el menú de cuenta y que no haya overflow global.
-- **Pasos pendientes:** empezar desde schema Prisma y migración, luego repositorio/API, después componente visual e integración en topbar, finalmente eventos productores.
-- **Motivo del diferimiento:** se documenta antes de release para retomar con árbol limpio después de desplegar `dev` actual.
+- **Verificación aplicada:** `npm run db:generate`, `npm run build`, `git diff --check`.
+- **Pendiente operativo:** aplicar las migraciones `20260621180000_add_platform_notifications` y `20260621193000_add_youtube_video_notifications` en PostgreSQL local/QA/producción con `npm run db:migrate:deploy`. La validación local con `npm run db:migrate` no pudo completarse porque Prisma devolvió `Schema engine error` sin detalle en el entorno actual.
 
 ## Ideas / Mejoras futuras
 

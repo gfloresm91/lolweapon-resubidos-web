@@ -268,6 +268,14 @@ curl -I http://127.0.0.1:3000/administracion/usuarios
 curl -I http://127.0.0.1:3000/administracion/roles
 ```
 
+Si el release incluye el centro de notificaciones, confirmar que Nginx permite WebSocket hacia la app. La ruta usa el mismo puerto de Next.js:
+
+```text
+/api/notifications/ws
+```
+
+La configuración del proxy debe reenviar los headers `Upgrade` y `Connection` para que el canal WebSocket no caiga a polling.
+
 Desde navegador:
 
 - abrir `/login`

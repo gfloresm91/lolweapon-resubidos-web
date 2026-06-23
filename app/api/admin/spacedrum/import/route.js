@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { readJsonRequest } from "@/lib/http";
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
+import { createPlatformNotification } from "@/lib/repositories/notificationRepository";
 import { readSpaceDrumLibrary } from "@/lib/repositories/spaceDrumRepository";
 import { getSpaceDrumImportSummary, importRemoteSpaceDrum } from "@/lib/spacedrumRemoteImport";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
@@ -44,6 +45,17 @@ export async function POST(request) {
       before,
       after: result.summary,
       request,
+    });
+    await createPlatformNotification({
+      type: "system",
+      severity: "success",
+      title: "SpaceDrum importado",
+      body: "La importación remota terminó correctamente.",
+      href: "/administracion/spacedrum/importacion",
+      icon: "BookOpen",
+      audience: "permission:admin.spacedrum.import.view",
+      actor: authorization.user,
+      metadata: { summary: result.summary },
     });
 
     return NextResponse.json({ success: true, summary: result.summary });

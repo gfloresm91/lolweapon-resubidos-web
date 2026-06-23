@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { readJsonRequest } from "@/lib/http";
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
+import { createPlatformNotification } from "@/lib/repositories/notificationRepository";
 import {
   ensureAnyPermissionAuthorized,
   ensurePermissionAuthorized,
@@ -92,6 +93,20 @@ export async function POST(request) {
       after: savedAnime,
       request,
     });
+    if (action === "create") {
+      const targetPath = section === "completed" ? "/biblioteca-anime/terminados" : "/biblioteca-anime/viendo";
+      await createPlatformNotification({
+        type: "activity",
+        severity: "info",
+        title: "Nuevo anime en la biblioteca",
+        body: savedAnime?.titleEs || savedAnime?.title || payload.anime?.titleEs || payload.anime?.title,
+        href: targetPath,
+        icon: "BookOpen",
+        audience: "authenticated",
+        actor: authorization.user,
+        metadata: { animeKey: savedAnime?.key || payload.anime?.key, section },
+      });
+    }
     const animes = await getAnimeLibrary({ includeHidden: true });
     return NextResponse.json({ success: true, animes });
   }
