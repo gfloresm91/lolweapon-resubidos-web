@@ -22,6 +22,7 @@ const TABS = [
   { key: "system", label: "Sistema" },
 ];
 const REFRESH_INTERVAL_MS = 30000;
+const GUEST_NOTIFICATION_STATE_KEY = "lolweapon_guest_notification_state";
 
 const ICONS = {
   Bell,
@@ -83,6 +84,51 @@ function NotificationIcon({ notification }) {
   );
 }
 
+function readGuestNotificationState() {
+  if (typeof window === "undefined") {
+    return { readIds: [], dismissedIds: [] };
+  }
+
+  try {
+    const state = JSON.parse(window.localStorage.getItem(GUEST_NOTIFICATION_STATE_KEY) || "{}");
+
+    return {
+      readIds: Array.isArray(state.readIds) ? state.readIds.map(String) : [],
+      dismissedIds: Array.isArray(state.dismissedIds) ? state.dismissedIds.map(String) : [],
+    };
+  } catch {
+    return { readIds: [], dismissedIds: [] };
+  }
+}
+
+function writeGuestNotificationState(state) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(GUEST_NOTIFICATION_STATE_KEY, JSON.stringify({
+    readIds: Array.from(new Set(state.readIds || [])).slice(-200),
+    dismissedIds: Array.from(new Set(state.dismissedIds || [])).slice(-200),
+  }));
+}
+
+function applyGuestNotificationState(notifications, state = readGuestNotificationState()) {
+  const readIds = new Set(state.readIds || []);
+  const dismissedIds = new Set(state.dismissedIds || []);
+
+  return notifications
+    .filter((notification) => !dismissedIds.has(String(notification.id)))
+    .map((notification) => ({
+      ...notification,
+      isRead: notification.isRead || readIds.has(String(notification.id)),
+      isDismissed: notification.isDismissed || dismissedIds.has(String(notification.id)),
+    }));
+}
+
+function countUnreadNotifications(notifications) {
+  return notifications.filter((notification) => !notification.isRead).length;
+}
+
 export default function NotificationCenter({ user = null }) {
   const rootRef = useRef(null);
   const isLoadingRef = useRef(false);
@@ -93,6 +139,7 @@ export default function NotificationCenter({ user = null }) {
   const [activeTab, setActiveTab] = useState("alert");
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const isAuthenticated = Boolean(user?.id);
 
   const visibleNotifications = useMemo(
     () => notifications.filter((notification) => notification.type === activeTab),
@@ -120,8 +167,11 @@ export default function NotificationCenter({ user = null }) {
       const data = await response.json().catch(() => null);
 
       if (response.ok && data?.success) {
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
+        const nextNotifications = isAuthenticated
+          ? data.notifications || []
+          : applyGuestNotificationState(data.notifications || []);
+        setNotifications(nextNotifications);
+        setUnreadCount(isAuthenticated ? data.unreadCount || 0 : countUnreadNotifications(nextNotifications));
       }
     } finally {
       isLoadingRef.current = false;
@@ -132,7 +182,39 @@ export default function NotificationCenter({ user = null }) {
     }
   }
 
+  function runGuestAction(action, id = null) {
+    const state = readGuestNotificationState();
+    const nextState = {
+      readIds: [...state.readIds],
+      dismissedIds: [...state.dismissedIds],
+    };
+
+    if (action === "mark-read" && id != null) {
+      nextState.readIds.push(String(id));
+    }
+
+    if (action === "dismiss" && id != null) {
+      nextState.readIds.push(String(id));
+      nextState.dismissedIds.push(String(id));
+    }
+
+    if (action === "mark-all-read") {
+      nextState.readIds.push(...notifications.map((notification) => String(notification.id)));
+    }
+
+    writeGuestNotificationState(nextState);
+
+    const nextNotifications = applyGuestNotificationState(notifications, nextState);
+    setNotifications(nextNotifications);
+    setUnreadCount(countUnreadNotifications(nextNotifications));
+  }
+
   async function runAction(action, id = null) {
+    if (!isAuthenticated) {
+      runGuestAction(action, id);
+      return;
+    }
+
     const response = await fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,7 +230,7 @@ export default function NotificationCenter({ user = null }) {
 
   useEffect(() => {
     loadNotifications({ showLoading: true });
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     let isMounted = true;
@@ -210,7 +292,7 @@ export default function NotificationCenter({ user = null }) {
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     function refreshIfVisible() {
@@ -229,7 +311,7 @@ export default function NotificationCenter({ user = null }) {
       window.removeEventListener("focus", refreshIfVisible);
       document.removeEventListener("visibilitychange", refreshIfVisible);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     document.body.classList.toggle("is-notification-center-open", isOpen);
