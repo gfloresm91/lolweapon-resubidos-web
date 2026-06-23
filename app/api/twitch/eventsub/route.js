@@ -95,7 +95,7 @@ export async function POST(request) {
       body: live.title || "Se detectó un nuevo directo desde Twitch.",
       href: "/inicio",
       icon: "Radio",
-      audience: "authenticated",
+      audience: "all",
       metadata: { liveId: live.id, twitchEventId: payload.event?.id || null },
     });
   }

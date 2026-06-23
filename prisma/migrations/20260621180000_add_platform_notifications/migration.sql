@@ -8,6 +8,7 @@ CREATE TABLE "PlatformNotification" (
     "href" TEXT,
     "icon" TEXT,
     "metadata" JSONB,
+    "dedupeKey" TEXT,
     "audience" TEXT NOT NULL DEFAULT 'authenticated',
     "createdByUserId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -36,6 +37,12 @@ CREATE INDEX "PlatformNotification_severity_idx" ON "PlatformNotification"("seve
 
 -- CreateIndex
 CREATE INDEX "PlatformNotification_audience_idx" ON "PlatformNotification"("audience");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlatformNotification_dedupeKey_key" ON "PlatformNotification"("dedupeKey");
+
+-- CreateIndex
+CREATE INDEX "PlatformNotification_dedupeKey_idx" ON "PlatformNotification"("dedupeKey");
 
 -- CreateIndex
 CREATE INDEX "PlatformNotification_createdByUserId_idx" ON "PlatformNotification"("createdByUserId");

@@ -53,7 +53,7 @@ TWITCH_REQUIRE_ACTIVE_STREAM
 
 No retorna duración ni views (requeriría llamada extra a `/videos` con `contentDetails`/`statistics` — costo adicional de cuota).
 
-`server.mjs` ejecuta un sincronizador en background para detectar nuevos videos aunque ningún usuario visite `/inicio`. El intervalo se controla con `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` y puede desactivarse con `YOUTUBE_NOTIFICATION_SYNC_ENABLED=false`. Cuando `DATA_SOURCE=postgres`, el sistema guarda IDs en `YoutubeVideo`: la primera sincronización crea una línea base silenciosa para evitar notificaciones antiguas; los videos nuevos posteriores crean una notificación `Actividad` y se empujan por WebSocket. `/api/youtube/videos` mantiene la sincronización como respaldo al cargar el home.
+`server.mjs` ejecuta un sincronizador en background para detectar nuevos videos aunque ningún usuario visite `/inicio`. El intervalo se controla con `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` y puede desactivarse con `YOUTUBE_NOTIFICATION_SYNC_ENABLED=false`. Cuando `DATA_SOURCE=postgres`, el sistema guarda IDs en `YoutubeVideo`: la primera sincronización crea una línea base silenciosa para evitar notificaciones antiguas; los videos nuevos posteriores crean una notificación `Alerta` pública y se empujan por WebSocket. `/api/youtube/videos` mantiene la sincronización como respaldo al cargar el home.
 
 **Variables de entorno requeridas:**
 ```
@@ -116,7 +116,7 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 | `PlatformSession` | Sesión activa (token, expiresAt — 14 días) |
 | `LoginAttempt` | Auditoría de intentos de login |
 | `AuditLog` | Historial de acciones administrativas por mantenedor |
-| `PlatformNotification` | Notificaciones persistentes visibles por audiencia (`authenticated`, `admin`, `permission:<code>`, `user:<id>`) |
+| `PlatformNotification` | Notificaciones persistentes visibles por audiencia (`all`, `authenticated`, `admin`, `permission:<code>`, `user:<id>`) |
 | `PlatformUserNotification` | Estado por usuario de lectura y descarte de notificaciones |
 | `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
 
@@ -150,16 +150,22 @@ Las notificaciones se guardan en `PlatformNotification` y el estado individual e
 
 El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling suave queda como respaldo.
 
+Los invitados solo reciben notificaciones con `audience: all`. Como no tienen `PlatformUser.id`, su estado de leído/descartado se guarda en `localStorage`; los usuarios autenticados usan `PlatformUserNotification`.
+
+`server.mjs` también sincroniza notificaciones de contenido estático al arrancar mediante claves únicas (`dedupeKey`) para novedades/changelog, evitando duplicados cuando el proceso reinicia.
+
 Productores implementados:
 - Nuevo directo creado en el rastreador.
 - Directo online detectado por Twitch EventSub.
 - Nuevo anime agregado a biblioteca.
 - Importación remota de SpaceDrum completada.
 - Nuevo video de YouTube detectado por el sincronizador de `server.mjs` después de la línea base inicial.
+- Nueva comunicación pública de `/novedades`.
+- Nueva comunicación pública de `/changelog`.
 
 Tipos iniciales:
 - `Alertas`: emisiones en vivo y publicaciones nuevas externas relevantes para la comunidad, como Twitch online o nuevo video de YouTube.
-- `Actividad`: contenido agregado o gestionado dentro de la plataforma, como nuevos directos del rastreador o nuevos animes.
+- `Actividad`: contenido agregado o gestionado dentro de la plataforma, como nuevos directos del rastreador, nuevos animes o actualización de changelog.
 - `Sistema`: procesos operativos o administrativos, como importaciones SpaceDrum.
 
 Las alertas con `href` se abren en una pestaña nueva para no sacar al usuario de la pantalla actual. Actividad y sistema navegan en la misma pestaña.

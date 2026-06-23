@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import next from "next";
 import { WebSocketServer } from "ws";
 
+import { syncContentNotifications } from "./lib/contentNotificationSync.js";
 import { registerNotificationSocket } from "./lib/notificationRealtime.js";
 import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/youtubeVideoRepository.js";
 
@@ -63,6 +64,15 @@ function startYoutubeNotificationSync() {
   console.log(`> YouTube notification sync every ${Math.round(intervalMs / 1000)}s`);
 }
 
+async function syncStartupNotifications() {
+  try {
+    const result = await syncContentNotifications();
+    console.log(`> Content notification sync: synced=${result.synced}/${result.total}`);
+  } catch (error) {
+    console.error("> Content notification sync failed:", error);
+  }
+}
+
 await app.prepare();
 
 const handleUpgrade = app.getUpgradeHandler();
@@ -86,5 +96,6 @@ server.on("upgrade", (request, socket, head) => {
 
 server.listen(port, hostname, () => {
   console.log(`> Ready on http://${hostname}:${port}`);
+  void syncStartupNotifications();
   startYoutubeNotificationSync();
 });

@@ -265,6 +265,7 @@ npm run db:migrate:deploy
 - Deploy recomendado vía GitHub Actions, no manual, salvo instrucciones explícitas.
 - `npm start` usa `server.mjs`; Nginx debe permitir `Upgrade`/`Connection` para el WebSocket de notificaciones.
 - `server.mjs` también ejecuta el sincronizador de YouTube en background para notificaciones realtime; revisar `YOUTUBE_NOTIFICATION_SYNC_ENABLED` y `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` si se cambia la cadencia.
+- Notificaciones públicas usan `audience: all` y pueden llegar a invitados; invitados guardan leído/descartado en `localStorage`, autenticados en `PlatformUserNotification`. Novedades/changelog se sincronizan por `dedupeKey` desde `server.mjs`.
 - Servicios systemd oficiales:
   - Producción: `resubidos.service`.
   - QA: `resubidos-qa.service`.

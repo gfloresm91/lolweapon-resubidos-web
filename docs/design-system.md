@@ -165,7 +165,10 @@ Usar primero estos componentes antes de crear algo nuevo:
 - El contador debe refrescar sin recargar la página usando WebSocket; mantener polling suave como respaldo cuando el canal no esté disponible.
 - El panel debe superponerse sobre el player y chat de Twitch sin ocultarlos en desktop, igual que `account-menu`.
 - Si una acción que genera notificación falla al crearla, no debe romper la operación principal.
-- Para videos de YouTube, el productor principal es el sincronizador de `server.mjs`; no debe depender de que el usuario visite `/inicio`. La primera sincronización debe quedar como línea base silenciosa; solo videos detectados después se muestran como actividad nueva.
+- Para videos de YouTube, el productor principal es el sincronizador de `server.mjs`; no debe depender de que el usuario visite `/inicio`. La primera sincronización debe quedar como línea base silenciosa; solo videos detectados después se muestran como alerta nueva.
+- Invitados solo deben ver notificaciones públicas (`audience: all`): Twitch online, nuevo video de YouTube y comunicaciones públicas de novedades/changelog. No deben ver actividad interna autenticada ni sistema administrativo.
+- Para invitados, leído/descartado se guarda en `localStorage`; para usuarios autenticados se guarda en `PlatformUserNotification`.
+- Novedades/changelog deben crearse con `dedupeKey` estable para no duplicarse al reiniciar `server.mjs`.
 
 ### Capas Sobre Twitch
 
