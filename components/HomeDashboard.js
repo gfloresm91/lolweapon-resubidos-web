@@ -195,14 +195,14 @@ export default function HomeDashboard({
             <div className="stream-main-column">
               <div className="stream-frame stream-player">
                 {twitchParent ? (
-                  <div
-                    data-twitch-player-anchor="home"
-                    className="twitch-player-anchor"
-                    aria-label="Directo de Twitch"
+                  <iframe
+                    src={`https://player.twitch.tv/?channel=${encodeURIComponent(twitchChannel)}&parent=${encodeURIComponent(twitchParent)}&autoplay=true`}
+                    allowFullScreen
+                    allow="autoplay; fullscreen"
+                    title="Directo de Twitch"
                   />
                 ) : null}
               </div>
-
               <div className="stream-details">
                 <div className="stream-avatar">
                   {currentProfile?.profile_image_url ? (

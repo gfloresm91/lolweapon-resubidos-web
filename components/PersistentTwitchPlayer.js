@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { House, X } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
 const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
@@ -38,15 +38,7 @@ function clampMiniPlayerWidth(value) {
   return Math.min(MINI_PLAYER_MAX_WIDTH, Math.max(MINI_PLAYER_MIN_WIDTH, value));
 }
 
-function getRouteMode(pathname, hostname = "") {
-  if (pathname === "/" && /^(resubidos|viendo)(-|\.|$)/.test(hostname)) {
-    return "mini";
-  }
-
-  if (pathname === "/" || pathname === "/inicio") {
-    return "full";
-  }
-
+function getRouteMode(pathname) {
   if (MINI_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
     return "mini";
   }
@@ -146,35 +138,32 @@ function stopPlayerPlayback(player) {
 
 export default function PersistentTwitchPlayer({ twitchLogin }) {
   const pathname = usePathname();
-  const router = useRouter();
+
   const twitchChannel = twitchLogin || "kalathraslolweapon";
   const [currentPath, setCurrentPath] = useState("");
-  const [currentHostname, setCurrentHostname] = useState("");
   const [twitchParent, setTwitchParent] = useState("");
   const [currentStream, setCurrentStream] = useState(null);
   const [isPlayerOnline, setIsPlayerOnline] = useState(false);
   const [hasActivatedPlayer, setHasActivatedPlayer] = useState(false);
   const [isMiniDismissed, setIsMiniDismissed] = useState(false);
   const [isSuppressingTransition, setIsSuppressingTransition] = useState(false);
-  const [isDockedToHome, setIsDockedToHome] = useState(false);
   const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
-  const [playerBaseSize, setPlayerBaseSize] = useState(null);
   const [playerStyle, setPlayerStyle] = useState(buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH));
   const playerRef = useRef(null);
+  const playerContainerRef = useRef(null);
   const routeModeRef = useRef("hidden");
   const mutedPreferenceRef = useRef(true);
   const resizeStateRef = useRef(null);
   const resizeFrameRef = useRef(null);
-  const wasDockedToHomeRef = useRef(false);
-  const dockedStyleRef = useRef(null);
   const isMiniDismissedRef = useRef(false);
+  const isHomeRouteRef = useRef(false);
   const isOnline = Boolean(currentStream);
   const isStreamPlayable = isOnline || isPlayerOnline;
-  const routeMode = getRouteMode(currentPath, currentHostname);
+  const routeMode = getRouteMode(currentPath);
+  const isHomeRoute = currentPath === "/inicio" || currentPath === "/";
   const shouldKeepPlayerVisible = isStreamPlayable && !isMiniDismissed;
-  const playerMode = routeMode === "hidden" && shouldKeepPlayerVisible ? "mini" : routeMode;
-  const isVisible = (playerMode === "full" && (isDockedToHome || isStreamPlayable)) || (playerMode === "mini" && shouldKeepPlayerVisible);
-  const showMiniControls = playerMode === "mini" || (playerMode === "full" && !isDockedToHome);
+  const playerMode = !isHomeRoute && routeMode === "hidden" && shouldKeepPlayerVisible ? "mini" : routeMode;
+  const isVisible = playerMode === "mini" && shouldKeepPlayerVisible;
 
   useEffect(() => {
     routeModeRef.current = routeMode;
@@ -186,7 +175,6 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
-    setCurrentHostname(window.location.hostname);
 
     const savedWidth = Number(window.localStorage.getItem(MINI_PLAYER_SIZE_STORAGE_KEY));
 
@@ -206,10 +194,10 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   }, [isStreamPlayable]);
 
   useEffect(() => {
-    if (routeMode === "full" || isStreamPlayable) {
+    if (isStreamPlayable) {
       setHasActivatedPlayer(true);
     }
-  }, [isStreamPlayable, routeMode]);
+  }, [isStreamPlayable]);
 
   useEffect(() => {
     if (routeMode !== "mini" && isMiniDismissed) {
@@ -220,23 +208,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   useEffect(() => {
     function notifyPathChange(event) {
       const nextPath = event.detail?.path || window.location.pathname;
-      const nextMode = getRouteMode(nextPath, window.location.hostname);
-
-      const isFullToMini = routeModeRef.current === "full" && nextMode === "mini";
-
-      if (isFullToMini) {
-        setIsSuppressingTransition(true);
-        setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
-        window.requestAnimationFrame(() => {
-          setIsSuppressingTransition(false);
-          if (playerRef.current) {
-            schedulePlaybackResume(playerRef.current, mutedPreferenceRef);
-          }
-        });
-      }
-
       setCurrentPath(nextPath);
-      setCurrentHostname(window.location.hostname);
     }
 
     window.addEventListener("popstate", notifyPathChange);
@@ -246,7 +218,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       window.removeEventListener("popstate", notifyPathChange);
       window.removeEventListener("kala:navigation", notifyPathChange);
     };
-  }, [miniPlayerWidth, playerBaseSize]);
+  }, []);
 
   useEffect(() => {
     if (!twitchParent) {
@@ -279,7 +251,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
         });
         if (window.Twitch.Player.PAUSE) {
           player.addEventListener(window.Twitch.Player.PAUSE, () => {
-            if (!isMiniDismissedRef.current) {
+            if (!isMiniDismissedRef.current && !isHomeRouteRef.current) {
               tryAutoplay(player, mutedPreferenceRef);
             }
           });
@@ -316,6 +288,14 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       stopPlayerPlayback(playerRef.current);
     }
   }, [isMiniDismissed]);
+
+  useEffect(() => {
+    isHomeRouteRef.current = isHomeRoute;
+
+    if (isHomeRoute && playerRef.current) {
+      stopPlayerPlayback(playerRef.current);
+    }
+  }, [isHomeRoute]);
 
   useEffect(() => {
     function preventSdkPause(e) {
@@ -417,100 +397,35 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   useLayoutEffect(() => {
     let frameId = 0;
-    let retryTimeoutId = 0;
-    let observer = null;
 
     function updatePlayerPosition() {
       window.cancelAnimationFrame(frameId);
       frameId = window.requestAnimationFrame(() => {
-        if (playerMode === "full") {
-          const anchor = document.querySelector('[data-twitch-player-anchor="home"]');
-
-          if (anchor) {
-            const rect = anchor.getBoundingClientRect();
-
-            if (isAnchorVisible(rect)) {
-              setPlayerBaseSize((currentSize) => {
-                const nextSize = {
-                  height: Math.round(rect.height),
-                  width: Math.round(rect.width),
-                };
-
-                if (currentSize?.height === nextSize.height && currentSize?.width === nextSize.width) {
-                  return currentSize;
-                }
-
-                return nextSize;
-              });
-              const borderRadius = window.getComputedStyle(anchor.parentElement || anchor).borderRadius;
-              const nextDockedStyle = {
-                borderRadius,
-                bottom: "auto",
-                "--twitch-frame-height": `${rect.height}px`,
-                "--twitch-frame-scale": 1,
-                "--twitch-frame-width": `${rect.width}px`,
-                height: `${rect.height}px`,
-                left: `${rect.left}px`,
-                opacity: 1,
-                pointerEvents: "auto",
-                right: "auto",
-                top: `${rect.top}px`,
-                width: `${rect.width}px`,
-              };
-              const prev = dockedStyleRef.current;
-              const changed = !prev
-                || prev.top !== nextDockedStyle.top
-                || prev.left !== nextDockedStyle.left
-                || prev.width !== nextDockedStyle.width
-                || prev.height !== nextDockedStyle.height;
-              if (changed) {
-                dockedStyleRef.current = nextDockedStyle;
-                setPlayerStyle(nextDockedStyle);
-              }
-              setIsDockedToHome(true);
-              wasDockedToHomeRef.current = true;
-              return;
-            }
-          }
-
-          setIsDockedToHome(false);
-          setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
-
-          if (wasDockedToHomeRef.current && playerRef.current) {
-            schedulePlaybackResume(playerRef.current, mutedPreferenceRef);
-          }
-
-          wasDockedToHomeRef.current = false;
-          window.clearTimeout(retryTimeoutId);
-          retryTimeoutId = window.setTimeout(updatePlayerPosition, 120);
-
-          return;
-        }
-
-        setIsDockedToHome(false);
-        wasDockedToHomeRef.current = false;
-        setPlayerStyle(buildMiniStyle(miniPlayerWidth, playerBaseSize));
+        setPlayerStyle(buildMiniStyle(miniPlayerWidth));
       });
     }
 
     updatePlayerPosition();
-
-    if (routeMode === "full") {
-      observer = new MutationObserver(updatePlayerPosition);
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
-
     window.addEventListener("resize", updatePlayerPosition);
-    window.addEventListener("scroll", updatePlayerPosition, true);
 
     return () => {
       window.cancelAnimationFrame(frameId);
-      window.clearTimeout(retryTimeoutId);
-      observer?.disconnect();
       window.removeEventListener("resize", updatePlayerPosition);
-      window.removeEventListener("scroll", updatePlayerPosition, true);
     };
-  }, [miniPlayerWidth, playerBaseSize, playerMode, routeMode]);
+  }, [miniPlayerWidth]);
+
+  function applyStyleToContainer(style) {
+    const el = playerContainerRef.current;
+    if (!el) return;
+    el.style.transition = "none";
+    Object.entries(style).forEach(([key, value]) => {
+      if (key.startsWith("--")) {
+        el.style.setProperty(key, String(value));
+      } else {
+        el.style[key] = value;
+      }
+    });
+  }
 
   function startMiniResize(event) {
     event.preventDefault();
@@ -521,6 +436,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
       pointerId: event.pointerId,
       startX: event.clientX,
       startWidth: miniPlayerWidth,
+      currentWidth: miniPlayerWidth,
     };
   }
 
@@ -533,13 +449,14 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
     event.preventDefault();
     const nextWidth = clampMiniPlayerWidth(resizeState.startWidth + (resizeState.startX - event.clientX));
+    resizeState.currentWidth = nextWidth;
 
     if (resizeFrameRef.current) {
       window.cancelAnimationFrame(resizeFrameRef.current);
     }
 
     resizeFrameRef.current = window.requestAnimationFrame(() => {
-      setMiniPlayerWidth(nextWidth);
+      applyStyleToContainer(buildMiniStyle(nextWidth));
       resizeFrameRef.current = null;
     });
   }
@@ -550,14 +467,23 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     }
 
     event.currentTarget.releasePointerCapture?.(event.pointerId);
+    const finalWidth = resizeStateRef.current.currentWidth;
     resizeStateRef.current = null;
+
+    if (playerContainerRef.current) {
+      playerContainerRef.current.style.transition = "";
+    }
+
+    setMiniPlayerWidth(finalWidth);
   }
 
   function goToHome(event) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setIsMiniDismissed(false);
-    router.push("/inicio");
+    window.scrollTo(0, 0);
+    window.history.pushState(null, "", "/inicio");
+    window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: "/inicio" } }));
   }
 
   function closeMiniPlayer(event) {
@@ -569,12 +495,13 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   return (
     <div
-      className={`persistent-twitch-player is-${playerMode} ${!isDockedToHome ? "is-floating" : ""} ${isVisible ? "" : "is-hidden"}`}
+      ref={playerContainerRef}
+      className={`persistent-twitch-player is-mini is-floating ${isVisible ? "" : "is-hidden"}`}
       data-suppress-transition={isSuppressingTransition ? "true" : "false"}
       style={playerStyle}
       aria-hidden={!isVisible}
     >
-      {showMiniControls ? (
+      {isVisible ? (
         <>
           <button
             type="button"
