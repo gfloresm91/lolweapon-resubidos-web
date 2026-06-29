@@ -99,7 +99,7 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 
 | Modelo | Descripción |
 |---|---|
-| `Live` | Directo (legacyId, title, date, year, statusId, image, additionalInfo) |
+| `Live` | Directo (legacyId, title, date, year, statusId, image, additionalInfo, notifiedAt) |
 | `LiveStatus` | En directo, Completo, Pendiente, Lost Media, Subiendo, Incompleto |
 | `LiveTag` | Relación many-to-many Live ↔ Tag |
 | `LiveLink` | Links por plataforma (telegram, okru, patreon, piero…) |
@@ -156,6 +156,7 @@ Los invitados solo reciben notificaciones con `audience: all`. Como no tienen `P
 
 Productores implementados:
 - Nuevo directo creado en el rastreador.
+- Aviso manual de resubido disponible, con reenvío explícito y audiencia pública.
 - Directo online detectado por Twitch EventSub.
 - Nuevo anime agregado a biblioteca.
 - Importación remota de SpaceDrum completada.
@@ -227,7 +228,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Plataforma: Inicio | `home.view` |
 | Plataforma: Novedades | `news.view` |
 | Plataforma: Historial de cambios | `changelog.view` |
-| Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.form.full/compact` |
+| Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.lives.notify`, `tracker.form.full/compact` |
 | Archivo VOD: Calendario | `tracker.calendar.view` |
 | Biblioteca de anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
 | Biblioteca de anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
@@ -235,7 +236,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Lecturas: SpaceDrum | `spacedrum.view` |
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
-| Administración: Rastreador | `admin.tracker.view` |
+| Administración: Rastreador | `admin.tracker.view`, `admin.lives.notify` |
 | Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
 | Administración: Anime Viendo | `admin.anime.tracking.view` |
 | Administración: Anime Terminados | `admin.anime.completed.view` |
@@ -277,6 +278,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/profile` | GET | Perfil del usuario actual |
 | `/api/profile/avatar` | POST | Actualizar avatar |
 | `/api/lives` | GET | Lista de directos y estatuses |
+| `/api/lives/[id]/notify` | POST | Crea una notificación pública manual de resubido y registra `Live.notifiedAt`; requiere `tracker.lives.notify` o `admin.lives.notify`, responde 403 ante sesión sin permiso y bloquea reenvíos concurrentes durante 10 segundos |
 | `/api/live-activity` | GET/POST | Actividad del usuario en directos |
 | `/api/anime-library` | GET/POST | Biblioteca de anime (CRUD) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { CirclePlay } from "lucide-react";
+import { CirclePlay, FileText, Link2 } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 
 function parseDate(value) {
@@ -25,6 +25,7 @@ function RecentLiveCard({ live }) {
   const okruCount = Array.isArray(live.links?.okru) ? live.links.okru.length : 0;
   const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
   const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
+  const DetailIcon = okruCount > 0 ? CirclePlay : telegramCount > 0 ? Link2 : FileText;
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const liveStatus = live.status || PENDING_LIVE_STATUS_LABEL;
 
@@ -43,7 +44,7 @@ function RecentLiveCard({ live }) {
       </div>
       <a href={detailPath} className="platform-btn platform-detail home-live-detail-link">
         <span>{detailCtaLabel}</span>
-        <CirclePlay size={15} aria-hidden="true" />
+        <DetailIcon size={15} aria-hidden="true" />
       </a>
     </article>
   );
