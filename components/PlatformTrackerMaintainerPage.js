@@ -7,7 +7,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Edit3, History, Plus, Power, Radio, Trash2, Zap } from "lucide-react";
+import { Bell, BellRing, Edit3, History, Plus, Power, Radio, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import AuditLogModal from "@/components/AuditLogModal";
@@ -21,6 +21,7 @@ import MaintainerToolbar from "@/components/MaintainerToolbar";
 import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
+import { formatPlatformDateTime } from "@/lib/dateTime";
 import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -49,6 +50,7 @@ const TRACKER_COLUMNS = [
   { key: "tags", label: "Tags", sortable: true },
   { key: "links", label: "Enlaces", sortable: true },
   { key: "platforms", label: "Plataformas", sortable: true },
+  { key: "notifiedAt", label: "Notificado" },
   { key: "actions", label: "Acciones" },
 ];
 
@@ -122,6 +124,7 @@ export default function PlatformTrackerMaintainerPage({
   canCreate = false,
   canUpdate = false,
   canDelete = false,
+  canNotify = false,
   canUpdateTags = false,
   twitchLogin = "",
   onLivesChange,
@@ -142,6 +145,8 @@ export default function PlatformTrackerMaintainerPage({
   const [statusLive, setStatusLive] = useState(null);
   const [nextStatus, setNextStatus] = useState("");
   const [deleteLive, setDeleteLive] = useState(null);
+  const [pendingNotifyLive, setPendingNotifyLive] = useState(null);
+  const [isNotifying, setIsNotifying] = useState(false);
   const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
   const [isEventSubConfirmOpen, setIsEventSubConfirmOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
@@ -449,6 +454,40 @@ export default function PlatformTrackerMaintainerPage({
     }
   }
 
+  async function confirmNotify() {
+    if (!pendingNotifyLive || !canNotify) {
+      return;
+    }
+
+    setIsNotifying(true);
+
+    try {
+      const response = await fetch(`/api/lives/${pendingNotifyLive.dbId}/notify`, { method: "POST" });
+      const data = await response.json();
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "No se pudo enviar la notificación.");
+      }
+
+      setLives((current) =>
+        current.map((l) =>
+          l.dbId === pendingNotifyLive.dbId ? { ...l, notifiedAt: data.notifiedAt } : l,
+        ),
+      );
+      toast.success("Notificación enviada a todos los usuarios.");
+      setPendingNotifyLive(null);
+    } catch (error) {
+      toast.error(error.message || "No se pudo enviar la notificación.");
+    } finally {
+      setIsNotifying(false);
+    }
+  }
+
   function openStatusChange(live) {
     setStatusLive(live);
     setNextStatus(live.status || DEFAULT_LIVE_STATUS_LABEL);
@@ -729,7 +768,24 @@ export default function PlatformTrackerMaintainerPage({
               ))}
               {!getLiveLinksCount(live) ? <span className="is-empty">Sin enlaces</span> : null}
             </div>
+            <span className="admin-user-cell admin-tracker-notified-cell">
+              {live.notifiedAt
+                ? formatPlatformDateTime(live.notifiedAt)
+                : <span className="is-empty">—</span>}
+            </span>
             <div className="admin-user-actions">
+              {canNotify ? (
+                <button
+                  type="button"
+                  className="icon-tool-button"
+                  aria-label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
+                  title={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
+                  onClick={() => setPendingNotifyLive(live)}
+                  disabled={isNotifying}
+                >
+                  {live.notifiedAt ? <Bell size={17} /> : <BellRing size={17} />}
+                </button>
+              ) : null}
               {canUpdate ? (
                 <button
                   type="button"
@@ -821,6 +877,21 @@ export default function PlatformTrackerMaintainerPage({
           <p className="admin-modal-help">Esta operación actualiza solo el estado del directo.</p>
         </MaintainerModal>
       ) : null}
+
+      <ConfirmModal
+        isOpen={Boolean(pendingNotifyLive)}
+        title={pendingNotifyLive?.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
+        description={
+          pendingNotifyLive?.notifiedAt
+            ? `Este resubido ya fue notificado el ${formatPlatformDateTime(pendingNotifyLive.notifiedAt)}. ¿Enviar de nuevo?`
+            : "¿Notificar a todos los usuarios que este resubido está disponible?"
+        }
+        confirmLabel={pendingNotifyLive?.notifiedAt ? "Sí, reenviar" : "Notificar"}
+        cancelLabel="Cancelar"
+        isLoading={isNotifying}
+        onCancel={() => setPendingNotifyLive(null)}
+        onConfirm={confirmNotify}
+      />
 
       <ConfirmModal
         isOpen={Boolean(deleteLive)}

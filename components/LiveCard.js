@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, CheckCircle2, CirclePlay, Edit3 } from "lucide-react";
+import { Bookmark, BellRing, Bell, CheckCircle2, CirclePlay, Edit3, FileText, Link2 } from "lucide-react";
 
 import Tooltip from "@/components/Tooltip";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
@@ -86,9 +86,11 @@ function LiveCard({
   live,
   cardDensity = "comfortable",
   isAdmin,
+  canNotify = false,
   activity = null,
   isAuthenticated = false,
   onEdit,
+  onNotify,
   onFilterTag,
   onFilterYear,
   onFilterStatus,
@@ -108,11 +110,13 @@ function LiveCard({
   const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
   const hasAnyLinks = okruCount > 0 || telegramCount > 0;
   const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
+  const DetailIcon = okruCount > 0 ? CirclePlay : telegramCount > 0 ? Link2 : FileText;
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
   const showThumbnail = false;
   const isSaved = Boolean(activity?.isSaved);
   const isWatched = Boolean(activity?.isWatched);
+  const actionIconCount = 2 + (canNotify ? 1 : 0) + (isAdmin ? 1 : 0);
   const compactTags = allTags.slice(0, 2);
   const compactHiddenCount = Math.max(allTags.length - compactTags.length, 0);
   const compactTitle = truncateCompactTitle(live.title);
@@ -214,17 +218,20 @@ function LiveCard({
               <CheckCircle2 size={15} />
             </button>
           </Tooltip>
-          <button
-            type="button"
-            className="platform-btn platform-detail"
-            onClick={(event) => {
-              event.stopPropagation();
-              openDetail();
-            }}
-          >
-            <span>{detailCtaLabel}</span>
-            <CirclePlay size={15} aria-hidden="true" />
-          </button>
+          <Tooltip label={detailCtaLabel}>
+            <button
+              type="button"
+              className="platform-btn platform-detail"
+              aria-label={detailCtaLabel}
+              onClick={(event) => {
+                event.stopPropagation();
+                openDetail();
+              }}
+            >
+              <span>{detailCtaLabel}</span>
+              <DetailIcon size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </article>
     );
@@ -340,7 +347,7 @@ function LiveCard({
           {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
         </div>
 
-        <div className="links-container">
+        <div className={`links-container has-${actionIconCount}-icon-actions`}>
           <Tooltip label={isSaved ? "Quitar de guardados" : "Guardar para después"}>
             <button
               type="button"
@@ -379,6 +386,21 @@ function LiveCard({
               <span className="platform-personal-label">Visto</span>
             </button>
           </Tooltip>
+          {canNotify ? (
+            <Tooltip label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}>
+              <button
+                type="button"
+                className="platform-btn platform-notify"
+                aria-label={live.notifiedAt ? `Reenviar notificación de ${live.title || "directo"}` : `Notificar que ${live.title || "directo"} está disponible`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onNotify?.(live);
+                }}
+              >
+                {live.notifiedAt ? <Bell size={15} /> : <BellRing size={15} />}
+              </button>
+            </Tooltip>
+          ) : null}
           {isAdmin ? (
             <Tooltip label="Editar directo">
               <button
@@ -394,17 +416,20 @@ function LiveCard({
               </button>
             </Tooltip>
           ) : null}
-          <button
-            type="button"
-            className="platform-btn platform-detail"
-            onClick={(event) => {
-              event.stopPropagation();
-              openDetail();
-            }}
-          >
-            <span>{detailCtaLabel}</span>
-            <CirclePlay size={15} aria-hidden="true" />
-          </button>
+          <Tooltip label={detailCtaLabel}>
+            <button
+              type="button"
+              className="platform-btn platform-detail"
+              aria-label={detailCtaLabel}
+              onClick={(event) => {
+                event.stopPropagation();
+                openDetail();
+              }}
+            >
+              <span>{detailCtaLabel}</span>
+              <DetailIcon size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </article>

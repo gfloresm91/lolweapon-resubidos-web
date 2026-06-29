@@ -4,7 +4,12 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
-_(vacío)_
+### Notificación manual de resubidos
+
+- **Estado:** En implementación en `feature/notify-resubido`.
+- **Alcance actual:** acción con confirmación desde el rastreador y su mantenedor, permisos separados por pantalla, notificación pública realtime, reenvío explícito, auditoría y marca `Live.notifiedAt`.
+- **Persistencia:** migración `20260623120000_add_live_notified_at`; la creación de la notificación y la actualización de `notifiedAt` se ejecutan en una única transacción PostgreSQL, con protección de 10 segundos frente a envíos concurrentes.
+- **Pendiente operativo:** aplicar la migración versionada en los entornos correspondientes antes de desplegar la feature.
 
 ## Pendiente
 

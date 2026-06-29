@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
@@ -19,6 +20,14 @@ export default defineConfig({
     {
       name: "notification-responsive",
       testMatch: "**/notification-center-responsive.spec.js",
+      dependencies: ["setup"],
+      use: {
+        storageState: "./playwright/.auth/user.json",
+      },
+    },
+    {
+      name: "notify-resubido",
+      testMatch: "**/notify-resubido.spec.js",
       dependencies: ["setup"],
       use: {
         storageState: "./playwright/.auth/user.json",

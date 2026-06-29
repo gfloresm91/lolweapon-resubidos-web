@@ -32,6 +32,7 @@ import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import TrackerCalendarPage from "@/components/TrackerCalendarPage";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
 import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
+import { formatPlatformDateTime } from "@/lib/dateTime";
 
 const CARD_DENSITY_STORAGE_KEY = "kala_card_density";
 const CARD_DENSITY_VERSION_KEY = "kala_card_density_version";
@@ -295,6 +296,7 @@ export default function HomePage({
   const canCreateTracker = hasPermission("tracker.create");
   const canUpdateTracker = hasPermission("tracker.update");
   const canDeleteTracker = hasPermission("tracker.delete");
+  const canNotifyTracker = hasPermission("tracker.lives.notify");
   const canViewTrackerMaintainer = hasPermission("admin.tracker.view");
   const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker);
   const canViewTagsMaintainer = hasPermission("admin.tags.view");
@@ -376,6 +378,8 @@ export default function HomePage({
   const [isSaving, setIsSaving] = useState(false);
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [pendingNotifyLive, setPendingNotifyLive] = useState(null);
+  const [isNotifying, setIsNotifying] = useState(false);
   const [pendingTrackerRestore, setPendingTrackerRestore] = useState(null);
   const [cardDensity, setCardDensity] = useState("comfortable");
   const [isTableViewAvailable, setIsTableViewAvailable] = useState(false);
@@ -1056,6 +1060,36 @@ export default function HomePage({
     }
   }
 
+  async function notifyLive(live) {
+    if (!canNotifyTracker) {
+      toast.error("No tienes permiso para notificar resubidos.");
+      return;
+    }
+
+    setIsNotifying(true);
+
+    try {
+      const response = await fetch(`/api/lives/${live.dbId}/notify`, { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || "No se pudo enviar la notificación.");
+      }
+
+      setLives((current) =>
+        current.map((l) =>
+          l.dbId === live.dbId ? { ...l, notifiedAt: data.notifiedAt } : l,
+        ),
+      );
+      toast.success("Notificación enviada a todos los usuarios.");
+    } catch (error) {
+      toast.error(error?.message || "No se pudo enviar la notificación.");
+    } finally {
+      setIsNotifying(false);
+      setPendingNotifyLive(null);
+    }
+  }
+
   async function deleteLive(id) {
     if (!canDeleteTracker) {
       toast.error("No tienes permiso para eliminar directos.");
@@ -1605,10 +1639,12 @@ export default function HomePage({
                         key={live.id}
                         live={live}
                         isAdmin={canUpdateTracker}
+                        canNotify={currentView === "tracker" && canNotifyTracker}
                         activity={liveActivity[live.id]}
                         isAuthenticated={isAuthenticated}
                         searchTerm={deferredSearch}
                         onEdit={() => setEditingLive(live)}
+                        onNotify={(l) => setPendingNotifyLive(l)}
                         onLoginRequired={requireLoginForTracker}
                         onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
                         onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
@@ -1640,10 +1676,12 @@ export default function HomePage({
                       live={live}
                       cardDensity={effectiveCardDensity}
                       isAdmin={canUpdateTracker}
+                      canNotify={currentView === "tracker" && canNotifyTracker}
                       activity={liveActivity[live.id]}
                       isAuthenticated={isAuthenticated}
                       searchTerm={deferredSearch}
                       onEdit={() => setEditingLive(live)}
+                      onNotify={(l) => setPendingNotifyLive(l)}
                       onLoginRequired={requireLoginForTracker}
                       onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
                       onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
@@ -1809,6 +1847,7 @@ export default function HomePage({
                 canCreate={canCreateTracker}
                 canUpdate={canUpdateTracker}
                 canDelete={canDeleteTracker}
+                canNotify={hasPermission("admin.lives.notify")}
                 canUpdateTags={canUpdateTags}
                 twitchLogin={twitchLogin}
                 onLivesChange={setLives}
@@ -1893,6 +1932,21 @@ export default function HomePage({
           </footer>
         </div>
       </AppSidebarShell>
+
+      <ConfirmModal
+        isOpen={Boolean(pendingNotifyLive)}
+        title={pendingNotifyLive?.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
+        description={
+          pendingNotifyLive?.notifiedAt
+            ? `Este resubido ya fue notificado el ${formatPlatformDateTime(pendingNotifyLive.notifiedAt)}. ¿Enviar de nuevo?`
+            : "¿Notificar a todos los usuarios que este resubido está disponible?"
+        }
+        confirmLabel={pendingNotifyLive?.notifiedAt ? "Sí, reenviar" : "Notificar"}
+        cancelLabel="Cancelar"
+        isLoading={isNotifying}
+        onCancel={() => setPendingNotifyLive(null)}
+        onConfirm={() => notifyLive(pendingNotifyLive)}
+      />
 
       <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}
