@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE } from "@/lib/auth";
+import { setSessionCookie } from "@/lib/auth";
 import {
   createPlatformSession,
   findOrCreateTwitchUser,
@@ -63,13 +63,7 @@ export async function GET(request) {
     const session = await createPlatformSession(user.id);
     const response = NextResponse.redirect(buildTwitchAppUrl(request, returnTo));
 
-    response.cookies.set(SESSION_COOKIE, session.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      expires: session.expiresAt,
-    });
+    setSessionCookie(response, request, session.token, session.expiresAt);
     response.cookies.set(TWITCH_OAUTH_STATE_COOKIE, "", {
       httpOnly: true,
       path: "/",

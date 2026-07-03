@@ -126,6 +126,7 @@ export default function PlatformTrackerMaintainerPage({
   canDelete = false,
   canNotify = false,
   canUpdateTags = false,
+  formVariant = "full",
   twitchLogin = "",
   onLivesChange,
   onStatusesChange,
@@ -602,7 +603,7 @@ export default function PlatformTrackerMaintainerPage({
         throw new Error(data.error || "No se pudo registrar EventSub.");
       }
 
-      toast.success("EventSub registrado. Twitch notificará el próximo directo.");
+      toast.success(data.alreadyActive ? "EventSub ya estaba activo para este canal." : "EventSub registrado. Twitch notificará el próximo directo.");
       setIsEventSubConfirmOpen(false);
     } catch (error) {
       toast.error(error.message || "No se pudo registrar EventSub.");
@@ -642,7 +643,7 @@ export default function PlatformTrackerMaintainerPage({
             <History size={17} />
             Historial
           </button>
-          {canCreate ? (
+          {canCreate && formVariant ? (
             <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
               <Plus size={18} />
               Nuevo directo
@@ -786,7 +787,7 @@ export default function PlatformTrackerMaintainerPage({
                   {live.notifiedAt ? <Bell size={17} /> : <BellRing size={17} />}
                 </button>
               ) : null}
-              {canUpdate ? (
+              {canUpdate && formVariant ? (
                 <button
                   type="button"
                   className="icon-tool-button"
@@ -832,6 +833,7 @@ export default function PlatformTrackerMaintainerPage({
         statuses={statuses}
         availableTags={availableTags}
         tagCounts={tagCounts}
+        formVariant={formVariant}
       />
 
       <TagPanel
@@ -852,6 +854,7 @@ export default function PlatformTrackerMaintainerPage({
           className="admin-modal tracker-status-modal"
           title="Cambiar estado"
           subtitle={getLiveTitle(statusLive)}
+          closeOnBackdrop={false}
           onClose={() => setStatusLive(null)}
           actions={(
             <>
@@ -934,6 +937,7 @@ export default function PlatformTrackerMaintainerPage({
         module="admin.tracker"
         title="Historial del rastreador"
         subtitle="Últimas acciones realizadas en el mantenedor del rastreador."
+        closeOnBackdrop={false}
         onClose={() => setIsAuditOpen(false)}
       />
     </>

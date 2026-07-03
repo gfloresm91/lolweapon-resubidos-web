@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -111,6 +111,13 @@ const ADMIN_TREE_ITEMS = [
     label: "Roles",
     icon: ShieldCheck,
     permission: "roles.read",
+  },
+  {
+    key: "platformNotifications",
+    href: "/administracion/notificaciones",
+    label: "Notificaciones",
+    icon: Bell,
+    permission: "admin.notifications.view",
   },
   {
     key: "platformTracker",
@@ -306,7 +313,7 @@ export default function AppSidebar({
   // isAdmin is intentionally omitted — permissions are controlled individually above
 }) {
   const sidebarClassName = ["sidebar", className].filter(Boolean).join(" ");
-  const topLevelItems = TOP_LEVEL_ITEMS.filter((item) => canAccess(item.permission));
+  const topLevelItems = TOP_LEVEL_ITEMS.filter((item) => canAccess(item.permission) && (!item.authOnly || isAuthenticated));
   const authItems = isAuthenticated ? AUTH_ITEMS.filter((item) => canAccess(item.permission)) : [];
   const archiveItems = filterTreeItems([...ARCHIVE_ITEMS, ...authItems], canAccess);
   const animeItems = ANIME_ITEMS.filter((item) => canAccess(item.permission) && (!item.authOnly || isAuthenticated));

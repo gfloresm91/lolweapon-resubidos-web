@@ -3,22 +3,38 @@ import { NextResponse } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth";
 import {
   dismissNotification,
-  listNotifications,
+  listNotifications, listUserNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  markNotificationUnread,
+  restoreNotification,
 } from "@/lib/repositories/notificationRepository";
 import { getAccessUserFromToken, getCurrentUserFromToken } from "@/lib/serverAuth";
+import { can } from "@/lib/repositories/platformUserRepository";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const user = await getAccessUserFromToken(token);
+  const [user, accessUser] = await Promise.all([
+    getCurrentUserFromToken(token),
+    getAccessUserFromToken(token),
+  ]);
   const { searchParams } = new URL(request.url);
-  const result = await listNotifications({
-    user,
-    limit: searchParams.get("limit") || 20,
-  });
+  const isFullPage = searchParams.has("page") || searchParams.has("status") || searchParams.has("search") || searchParams.has("type");
+
+  if (isFullPage && (!user?.id || !can(user, "notifications.full.view"))) {
+    return NextResponse.json({ success: false, error: user ? "Permiso insuficiente" : "No autorizado" }, { status: user ? 403 : 401 });
+  }
+
+  if (!isFullPage && !can(accessUser, "notifications.view")) {
+    return NextResponse.json({ success: false, error: "Permiso insuficiente" }, { status: 403 });
+  }
+
+  const result = isFullPage ? await listUserNotifications({
+    user, search: searchParams.get("search") || "", type: searchParams.get("type") || "all",
+    status: searchParams.get("status") || "all", page: searchParams.get("page") || 1, pageSize: searchParams.get("pageSize") || 10,
+  }) : await listNotifications({ user: user || accessUser, limit: searchParams.get("limit") || 20 });
 
   return NextResponse.json({ success: true, ...result });
 }
@@ -27,7 +43,7 @@ export async function POST(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const user = await getCurrentUserFromToken(token);
 
-  if (!user?.id) {
+  if (!user?.id || (!can(user, "notifications.view") && !can(user, "notifications.full.view"))) {
     return NextResponse.json({ success: false, error: "Inicia sesión para gestionar notificaciones." }, { status: 401 });
   }
 
@@ -45,6 +61,11 @@ export async function POST(request) {
     return NextResponse.json({ success: true, ...result });
   }
 
+  if (payload?.action === "mark-unread") {
+    await markNotificationUnread({ user, notificationId: payload.id });
+    return NextResponse.json({ success: true });
+  }
+
   if (payload?.action === "mark-all-read") {
     await markAllNotificationsRead({ user });
     const result = await listNotifications({ user });
@@ -55,6 +76,11 @@ export async function POST(request) {
     await dismissNotification({ user, notificationId: payload.id });
     const result = await listNotifications({ user });
     return NextResponse.json({ success: true, ...result });
+  }
+
+  if (payload?.action === "restore") {
+    await restoreNotification({ user, notificationId: payload.id });
+    return NextResponse.json({ success: true });
   }
 
   return NextResponse.json({ success: false, error: "Acción no soportada." }, { status: 400 });

@@ -478,6 +478,7 @@ model PlatformNotification {
   id              Int                        @id @default(autoincrement())
   type            String
   severity        String                     @default("info")
+  source          String                     @default("system")
   title           String
   body            String?
   href            String?
@@ -485,20 +486,30 @@ model PlatformNotification {
   metadata        Json?
   dedupeKey       String?                    @unique
   audience        String                     @default("authenticated")
+  isActive        Boolean                    @default(true)
   createdByUserId Int?
   createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
   expiresAt       DateTime?
+  deletedAt       DateTime?
 
   createdBy       PlatformUser?              @relation("NotificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   userStates      PlatformUserNotification[]
 
   @@index([type])
   @@index([severity])
+  @@index([source])
   @@index([audience])
+  @@index([isActive])
   @@index([dedupeKey])
   @@index([createdByUserId])
   @@index([createdAt])
+  @@index([scheduledAt])
+  @@index([publishedAt])
   @@index([expiresAt])
+  @@index([deletedAt])
 }
 
 model PlatformUserNotification {

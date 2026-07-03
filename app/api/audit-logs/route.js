@@ -12,6 +12,7 @@ const AUDIT_VIEW_PERMISSIONS = [
   "tags.read",
   "admin.anime.tracking.view",
   "admin.anime.completed.view",
+  "admin.notifications.view",
 ];
 
 export async function GET(request) {

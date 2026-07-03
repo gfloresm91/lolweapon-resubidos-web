@@ -98,6 +98,7 @@ export async function POST(request) {
       await createPlatformNotification({
         type: "activity",
         severity: "info",
+        source: "anime",
         title: "Nuevo anime en la biblioteca",
         body: savedAnime?.titleEs || savedAnime?.title || payload.anime?.titleEs || payload.anime?.title,
         href: targetPath,
