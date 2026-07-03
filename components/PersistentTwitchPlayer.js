@@ -7,9 +7,9 @@ import { usePathname } from "next/navigation";
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
 const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
 const MINI_PLAYER_DEFAULT_WIDTH = 380;
-const MINI_PLAYER_MIN_WIDTH = 380;
+const MINI_PLAYER_MIN_WIDTH = 280;
 const MINI_PLAYER_MAX_WIDTH = 720;
-const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum", "/novedades", "/changelog"];
+const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum", "/novedades", "/changelog", "/notificaciones"];
 const PLAY_RESUME_DELAYS = [0, 120, 350, 900, 1800, 3200];
 const PLAY_KEEP_ALIVE_INTERVAL_MS = 10000;
 
@@ -46,9 +46,13 @@ function getRouteMode(pathname) {
   return "hidden";
 }
 
-function buildMiniStyle(width, baseSize = null) {
-  const viewportWidth = typeof window === "undefined" ? width + 32 : window.innerWidth || width + 32;
-  const visualWidth = Math.min(width, Math.max(MINI_PLAYER_MIN_WIDTH, viewportWidth - 32));
+function buildMiniStyle(width, baseSize = null, viewportWidthOverride = null) {
+  const viewportWidth = viewportWidthOverride ?? (typeof window === "undefined" ? width + 32 : window.innerWidth || width + 32);
+  const viewportGap = viewportWidth <= 420 ? 24 : 32;
+  const visualWidth = Math.max(
+    Math.min(MINI_PLAYER_MIN_WIDTH, viewportWidth - viewportGap),
+    Math.min(width, viewportWidth - viewportGap),
+  );
   const visualHeight = Math.round((visualWidth * 9) / 16);
   const baseWidth = baseSize?.width > 0 ? baseSize.width : visualWidth;
   const baseHeight = baseSize?.height > 0 ? baseSize.height : visualHeight;
@@ -60,7 +64,7 @@ function buildMiniStyle(width, baseSize = null) {
     "--twitch-frame-scale": scale,
     "--twitch-frame-width": `${baseWidth}px`,
     height: `${visualHeight}px`,
-    right: "1.25rem",
+    right: viewportWidth <= 420 ? "0.75rem" : "1.25rem",
     top: "auto",
     width: `${visualWidth}px`,
   };
@@ -146,9 +150,12 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const [isPlayerOnline, setIsPlayerOnline] = useState(false);
   const [hasActivatedPlayer, setHasActivatedPlayer] = useState(false);
   const [isMiniDismissed, setIsMiniDismissed] = useState(false);
+  const [isMiniViewportAllowed, setIsMiniViewportAllowed] = useState(false);
   const [isSuppressingTransition, setIsSuppressingTransition] = useState(false);
   const [miniPlayerWidth, setMiniPlayerWidth] = useState(MINI_PLAYER_DEFAULT_WIDTH);
-  const [playerStyle, setPlayerStyle] = useState(buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH));
+  const [playerStyle, setPlayerStyle] = useState(() => (
+    buildMiniStyle(MINI_PLAYER_DEFAULT_WIDTH, null, MINI_PLAYER_DEFAULT_WIDTH + 32)
+  ));
   const playerRef = useRef(null);
   const playerContainerRef = useRef(null);
   const routeModeRef = useRef("hidden");
@@ -163,7 +170,7 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
   const isHomeRoute = currentPath === "/inicio" || currentPath === "/";
   const shouldKeepPlayerVisible = isStreamPlayable && !isMiniDismissed;
   const playerMode = !isHomeRoute && routeMode === "hidden" && shouldKeepPlayerVisible ? "mini" : routeMode;
-  const isVisible = playerMode === "mini" && shouldKeepPlayerVisible;
+  const isVisible = isMiniViewportAllowed && playerMode === "mini" && shouldKeepPlayerVisible;
 
   useEffect(() => {
     routeModeRef.current = routeMode;
@@ -181,6 +188,16 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
     if (Number.isFinite(savedWidth)) {
       setMiniPlayerWidth(clampMiniPlayerWidth(savedWidth));
     }
+  }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const updateViewportAllowance = () => setIsMiniViewportAllowed(mediaQuery.matches);
+
+    updateViewportAllowance();
+    mediaQuery.addEventListener("change", updateViewportAllowance);
+
+    return () => mediaQuery.removeEventListener("change", updateViewportAllowance);
   }, []);
 
   useEffect(() => {

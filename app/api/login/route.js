@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE } from "@/lib/auth";
+import { setSessionCookie } from "@/lib/auth";
 import { readJsonRequest } from "@/lib/http";
 import {
   auditLoginAttempt,
@@ -50,14 +50,8 @@ export async function POST(request) {
   clearLoginRateLimit(rateLimitKey);
   await auditLoginAttempt({ login, ip, userAgent, success: true, reason: "manual" });
   const session = await createPlatformSession(user.id);
-  const response = NextResponse.json({ success: true, user });
-  response.cookies.set(SESSION_COOKIE, session.token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: session.expiresAt,
-  });
+  const response = NextResponse.json({ success: true, user: session.user });
+  setSessionCookie(response, request, session.token, session.expiresAt);
 
   return response;
 }

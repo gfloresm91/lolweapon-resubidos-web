@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import flatpickr from "flatpickr";
-import { Spanish } from "flatpickr/dist/l10n/es.js";
 import { Trash2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import DatePickerInput from "@/components/DatePickerInput";
 import FormSelect from "@/components/FormSelect";
 import MaintainerModal from "@/components/MaintainerModal";
 import TagCombobox from "@/components/TagCombobox";
@@ -18,6 +17,7 @@ import {
   TRACKER_TAGS_MAX_COUNT,
   TRACKER_TAG_MAX_LENGTH,
   TRACKER_TITLE_MAX_LENGTH,
+  trackerLiveCompactFormSchema,
   trackerLiveFormSchema,
 } from "@/lib/trackerValidation";
 
@@ -58,49 +58,6 @@ function fromDateInputValue(date) {
 
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
-}
-
-function TrackerDatePicker({ value, onChange }) {
-  const [inputElement, setInputElement] = useState(null);
-
-  useEffect(() => {
-    if (!inputElement) {
-      return undefined;
-    }
-
-    const instance = flatpickr(inputElement, {
-      allowInput: true,
-      altFormat: "d-m-Y",
-      altInput: true,
-      dateFormat: "Y-m-d",
-      disableMobile: true,
-      locale: Spanish,
-      maxDate: new Date(currentYear + 1, 11, 31),
-      minDate: new Date(currentYear - 15, 0, 1),
-      monthSelectorType: "dropdown",
-      onChange: (selectedDates, dateStr) => {
-        onChange(dateStr);
-      },
-    });
-
-    return () => instance.destroy();
-  }, [inputElement, onChange]);
-
-  useEffect(() => {
-    if (inputElement?._flatpickr && inputElement._flatpickr.input.value !== value) {
-      inputElement._flatpickr.setDate(value || "", false);
-    }
-  }, [inputElement, value]);
-
-  return (
-    <input
-      ref={setInputElement}
-      type="text"
-      className="modal-input tracker-date-input"
-      placeholder="Seleccionar fecha"
-      defaultValue={value || ""}
-    />
-  );
 }
 
 function TrackerTagsSelector({ value = [], tags = [], tagCounts = {}, onChange, error }) {
@@ -167,11 +124,13 @@ export default function TrackerMaintainerModal({
   onClose,
   onSave,
   isSaving,
+  formVariant = "full",
   statuses = LIVE_STATUS_OPTIONS,
   availableTags = [],
   tagCounts = {},
   onDelete = null,
 }) {
+  const isFullForm = formVariant === "full";
   const [imageFile, setImageFile] = useState(null);
   const [imageError, setImageError] = useState("");
   const [isImageCleared, setIsImageCleared] = useState(false);
@@ -220,7 +179,7 @@ export default function TrackerMaintainerModal({
     handleSubmit,
     formState: { errors },
   } = useForm({
-    resolver: zodResolver(trackerLiveFormSchema),
+    resolver: zodResolver(isFullForm ? trackerLiveFormSchema : trackerLiveCompactFormSchema),
     defaultValues: {
       title: "",
       year: String(currentYear),
@@ -267,18 +226,21 @@ export default function TrackerMaintainerModal({
   }
 
   function onSubmit(form) {
+    const nextLinks = {
+      telegram: splitLines(form.links.telegram),
+      okru: splitLines(form.links.okru),
+      piero: isFullForm ? splitLines(form.links.piero) : (Array.isArray(live?.links?.piero) ? live.links.piero : []),
+      patreon: isFullForm ? splitLines(form.links.patreon) : (Array.isArray(live?.links?.patreon) ? live.links.patreon : []),
+    };
+
     onSave({
       ...live,
       ...form,
-      image: isImageCleared ? "" : live?.image || "",
+      image: isFullForm ? (isImageCleared ? "" : live?.image || "") : live?.image || "",
       date: fromDateInputValue(form.date),
-      links: {
-        telegram: splitLines(form.links.telegram),
-        okru: splitLines(form.links.okru),
-        piero: splitLines(form.links.piero),
-        patreon: splitLines(form.links.patreon),
-      },
-      imageFile,
+      additional_info: isFullForm ? form.additional_info : live?.additional_info || "",
+      links: nextLinks,
+      imageFile: isFullForm ? imageFile : null,
     });
   }
 
@@ -288,6 +250,7 @@ export default function TrackerMaintainerModal({
       className="admin-modal tracker-maintainer-modal"
       title={live ? "Editar directo" : "Nuevo directo"}
       subtitle={live?.title || "Completa los datos del registro del rastreador."}
+      closeOnBackdrop={false}
       onClose={onClose}
       noValidate
       onSubmit={handleSubmit(onSubmit)}
@@ -347,7 +310,12 @@ export default function TrackerMaintainerModal({
               control={control}
               name="date"
               render={({ field }) => (
-                <TrackerDatePicker value={field.value} onChange={field.onChange} />
+                <DatePickerInput
+                  value={field.value}
+                  onChange={field.onChange}
+                  maxDate={new Date(currentYear + 1, 11, 31)}
+                  minDate={new Date(currentYear - 15, 0, 1)}
+                />
               )}
             />
             {errors.date ? <p className="field-error">{errors.date.message}</p> : null}
@@ -373,7 +341,7 @@ export default function TrackerMaintainerModal({
       </section>
 
       <section className="admin-modal-section">
-        <h3>Tags y descripción</h3>
+        <h3>{isFullForm ? "Tags y descripción" : "Tags"}</h3>
         <div className="form-group-modal">
           <label>Tags</label>
           <Controller
@@ -391,51 +359,55 @@ export default function TrackerMaintainerModal({
           />
         </div>
 
-        <div className="form-group-modal">
-          <label>Información adicional</label>
-          <textarea
-            className="modal-input textarea-links"
-            rows="4"
-            maxLength={TRACKER_INFO_MAX_LENGTH}
-            {...register("additional_info")}
-          />
-          <span className="field-help">Opcional. Soporta saltos de línea.</span>
-          {errors.additional_info ? <p className="field-error">{errors.additional_info.message}</p> : null}
-        </div>
+        {isFullForm ? (
+          <div className="form-group-modal">
+            <label>Información adicional</label>
+            <textarea
+              className="modal-input textarea-links"
+              rows="4"
+              maxLength={TRACKER_INFO_MAX_LENGTH}
+              {...register("additional_info")}
+            />
+            <span className="field-help">Opcional. Soporta saltos de línea.</span>
+            {errors.additional_info ? <p className="field-error">{errors.additional_info.message}</p> : null}
+          </div>
+        ) : null}
       </section>
 
-      <section className="admin-modal-section">
-        <h3>Imagen</h3>
-        <div className="form-group-modal">
-          <label>Miniatura local</label>
-          <div
-            {...getRootProps({
-              className: `anime-image-dropzone ${isDragActive ? "is-active" : ""} ${imageError ? "is-error" : ""}`,
-            })}
-          >
-            <input {...getInputProps()} />
-            <strong>{isDragActive ? "Suelta la imagen aquí" : "Arrastra una imagen aquí"}</strong>
-            <span>PNG, JPG o WebP. Máximo 2 MB.</span>
-            <button type="button" className="btn-modal btn-modal-secondary" onClick={open}>
-              Seleccionar imagen
-            </button>
-          </div>
-          <div className="anime-image-uploader-footer">
-            <span>{imageStatus}</span>
-            {imageFile ? (
-              <button type="button" className="profile-avatar-clear" onClick={() => setImageFile(null)}>
-                Quitar imagen
+      {isFullForm ? (
+        <section className="admin-modal-section">
+          <h3>Imagen</h3>
+          <div className="form-group-modal">
+            <label>Miniatura local</label>
+            <div
+              {...getRootProps({
+                className: `anime-image-dropzone ${isDragActive ? "is-active" : ""} ${imageError ? "is-error" : ""}`,
+              })}
+            >
+              <input {...getInputProps()} />
+              <strong>{isDragActive ? "Suelta la imagen aquí" : "Arrastra una imagen aquí"}</strong>
+              <span>PNG, JPG o WebP. Máximo 2 MB.</span>
+              <button type="button" className="btn-modal btn-modal-secondary" onClick={open}>
+                Seleccionar imagen
               </button>
-            ) : live?.image && !isImageCleared ? (
-              <button type="button" className="profile-avatar-clear" onClick={() => setIsImageCleared(true)}>
-                Quitar miniatura actual
-              </button>
-            ) : null}
+            </div>
+            <div className="anime-image-uploader-footer">
+              <span>{imageStatus}</span>
+              {imageFile ? (
+                <button type="button" className="profile-avatar-clear" onClick={() => setImageFile(null)}>
+                  Quitar imagen
+                </button>
+              ) : live?.image && !isImageCleared ? (
+                <button type="button" className="profile-avatar-clear" onClick={() => setIsImageCleared(true)}>
+                  Quitar miniatura actual
+                </button>
+              ) : null}
+            </div>
+            {live?.image && !imageFile && !isImageCleared ? <div className="current-image-note">{live.image}</div> : null}
+            {imageError ? <span className="field-error">{imageError}</span> : null}
           </div>
-          {live?.image && !imageFile && !isImageCleared ? <div className="current-image-note">{live.image}</div> : null}
-          {imageError ? <span className="field-error">{imageError}</span> : null}
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="admin-modal-section">
         <h3>Enlaces VOD</h3>
@@ -452,18 +424,20 @@ export default function TrackerMaintainerModal({
             {errors.links?.okru ? <p className="field-error">{errors.links.okru.message}</p> : null}
           </div>
         </div>
-        <div className="form-row">
-          <div className="form-group-modal">
-            <label>Patreon</label>
-            <textarea className="modal-input textarea-links" rows="4" {...register("links.patreon")} />
-            {errors.links?.patreon ? <p className="field-error">{errors.links.patreon.message}</p> : null}
+        {isFullForm ? (
+          <div className="form-row">
+            <div className="form-group-modal">
+              <label>Patreon</label>
+              <textarea className="modal-input textarea-links" rows="4" {...register("links.patreon")} />
+              {errors.links?.patreon ? <p className="field-error">{errors.links.patreon.message}</p> : null}
+            </div>
+            <div className="form-group-modal">
+              <label>Piero</label>
+              <textarea className="modal-input textarea-links" rows="4" {...register("links.piero")} />
+              {errors.links?.piero ? <p className="field-error">{errors.links.piero.message}</p> : null}
+            </div>
           </div>
-          <div className="form-group-modal">
-            <label>Piero</label>
-            <textarea className="modal-input textarea-links" rows="4" {...register("links.piero")} />
-            {errors.links?.piero ? <p className="field-error">{errors.links.piero.message}</p> : null}
-          </div>
-        </div>
+        ) : null}
       </section>
     </MaintainerModal>
   );

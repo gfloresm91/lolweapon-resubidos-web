@@ -40,6 +40,7 @@ const ROLE_CODE_MAX_LENGTH = 40;
 const ROLE_LABEL_MAX_LENGTH = 60;
 const PERMISSION_GROUP_ORDER = [
   "Plataforma: Inicio",
+  "Plataforma: Notificaciones",
   "Plataforma: Novedades",
   "Plataforma: Historial de cambios",
   "Archivo VOD: Rastreador",
@@ -50,6 +51,7 @@ const PERMISSION_GROUP_ORDER = [
   "Lecturas: SpaceDrum",
   "Administración: Usuarios",
   "Administración: Roles",
+  "Administración: Notificaciones",
   "Administración: Rastreador",
   "Administración: Tags",
   "Administración: Anime Viendo",

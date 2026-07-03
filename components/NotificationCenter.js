@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   BellRing,
@@ -129,7 +130,8 @@ function countUnreadNotifications(notifications) {
   return notifications.filter((notification) => !notification.isRead).length;
 }
 
-export default function NotificationCenter({ user = null }) {
+export default function NotificationCenter({ user = null, canViewAll = false, onViewAll }) {
+  const router = useRouter();
   const rootRef = useRef(null);
   const isLoadingRef = useRef(false);
   const reconnectTimerRef = useRef(null);
@@ -478,6 +480,12 @@ export default function NotificationCenter({ user = null }) {
               <CheckCheck size={15} aria-hidden="true" />
               <span>Marcar todo como leído</span>
             </button>
+            {canViewAll ? (
+              <button type="button" onClick={() => { setIsOpen(false); onViewAll ? onViewAll() : router.push("/notificaciones"); }}>
+                <Bell size={15} aria-hidden="true" />
+                <span>Ver todas</span>
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}

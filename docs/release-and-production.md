@@ -164,6 +164,8 @@ POSTGRES_PASSWORD=<password>
 POSTGRES_PORT=5432
 TWITCH_AUTH_REDIRECT_URI=https://tu-dominio.com/api/auth/twitch/callback
 TWITCH_BROADCASTER_LOGIN=kalathraslolweapon
+SESSION_COOKIE_NAME=kala_admin_session
+SESSION_COOKIE_DOMAIN=.lolweapon.com
 UPLOAD_DIR=public/imagenes
 ```
 
@@ -175,6 +177,20 @@ https://viendo-qa.lolweapon.com/api/auth/twitch/callback
 ```
 
 La app usa el host actual cuando coincide con `RESUBIDOS_HOST` o `VIENDO_HOST`, para que la cookie OAuth `state` y el callback queden en el mismo dominio.
+
+La sesión final debe compartirse entre los dos dominios de cada ambiente. Como QA y producción cuelgan de `lolweapon.com`, deben usar nombres distintos para evitar que una sesión sobrescriba a la otra:
+
+```env
+# QA
+SESSION_COOKIE_NAME=kala_admin_session_qa
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+
+# Producción
+SESSION_COOKIE_NAME=kala_admin_session
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+```
+
+No configurar `SESSION_COOKIE_DOMAIN` en local. El nombre separado es obligatorio en QA porque una cookie de dominio raíz se envía a todos los subdominios bajo `lolweapon.com`; cada aplicación ignora la cookie del otro ambiente al buscar únicamente su nombre configurado.
 
 No expongas el puerto `5432` publicamente. El compose de produccion debe publicar Postgres en `127.0.0.1`.
 

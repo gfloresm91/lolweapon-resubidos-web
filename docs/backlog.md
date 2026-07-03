@@ -4,6 +4,102 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
+### ~~Feature: Centro y mantenedor de notificaciones~~
+
+- **Estado:** Implementada en `feature/notification-management` (2026-06-28). Pendiente aplicar la migración versionada y completar pruebas visuales autenticadas con datos PostgreSQL.
+- **Objetivo:** agregar una página completa para que usuarios autenticados administren sus notificaciones y un mantenedor administrativo para gestionar tanto notificaciones manuales como automáticas.
+- **Rutas acordadas:**
+  - `/notificaciones` — centro completo para el usuario.
+  - `/administracion/notificaciones` — mantenedor administrativo.
+- **Permisos nuevos:**
+  - `notifications.view` — muestra la campana; asignado al rol invitado para avisos públicos.
+  - `notifications.full.view` — permite “Ver todas” y acceder a `/notificaciones`; no asignado al rol invitado.
+  - `admin.notifications.view`
+  - `admin.notifications.create`
+  - `admin.notifications.update`
+  - `admin.notifications.delete`
+- **Asignación inicial:** asignar automáticamente solo `notifications.view` a `invitado`; el resto no se asigna a roles predefinidos. `Dios` los obtiene por su regla general de acceso total; no agregarlos a sus exclusiones.
+- **Centro de usuario:**
+  - Requiere sesión y permiso `notifications.full.view`; no tendrá soporte de página completa para invitados.
+  - Listar todas las notificaciones visibles según su audiencia.
+  - Buscar por título/contenido y filtrar por tipo, estado y fecha.
+  - Implementar paginación real.
+  - Permitir marcar como leída o no leída, marcar todas como leídas, descartar y restaurar.
+  - Mantener actualización por WebSocket.
+  - Agregar `Ver todas` al dropdown actual únicamente con `notifications.full.view`.
+  - Ocultar la campana cuando el usuario no tenga `notifications.view`.
+- **Mantenedor administrativo:**
+  - Administrar notificaciones manuales y automáticas de Twitch, YouTube, rastreador, anime y sistema.
+  - Crear, editar, activar/desactivar, eliminar lógicamente y restaurar.
+  - Permitir publicación inmediata o programada y fecha de expiración.
+  - Audiencias soportadas: todos, usuarios autenticados, administración, permiso específico y usuario específico.
+  - Usar `MaintainerStats`, `MaintainerToolbar`, `MaintainerTable`, `MaintainerModal`, `ConfirmModal`, `FilterSelect` y `FormSelect`.
+  - Columnas sugeridas: `ID`, `Título`, `Tipo`, `Severidad`, `Audiencia`, `Origen`, `Creada`, `Publicación`, `Expira`, `Estado`, `Acciones`.
+  - Registrar operaciones en `AuditLog` con módulo `admin.notifications` y snapshots sanitizados.
+- **Persistencia propuesta:** ampliar `PlatformNotification` con `source`, `isActive`, `scheduledAt`, `publishedAt`, `updatedAt` y `deletedAt`.
+  - Migrar las notificaciones existentes como publicadas usando su `createdAt`.
+  - Usar eliminación lógica para conservar `dedupeKey` y evitar que notificaciones automáticas eliminadas reaparezcan al reiniciar `server.mjs`.
+  - Una notificación es visible solo si está activa, publicada, no eliminada y no expirada, además de cumplir su audiencia.
+- **Programación:**
+  - `server.mjs` debe ejecutar un sincronizador periódico de publicaciones pendientes.
+  - Al alcanzar `scheduledAt`, asignar `publishedAt` de forma segura y emitir `notifications:update` por WebSocket una sola vez.
+  - Las notificaciones automáticas actuales se crean con publicación inmediata.
+  - Validar que la expiración sea posterior a la publicación programada.
+- **Repositorio y APIs:**
+  - Extender `lib/repositories/notificationRepository.js` con filtros, paginación, marcar no leída, restaurar descartadas y CRUD administrativo.
+  - Mantener `/api/notifications`: la campana exige `notifications.view`, la página completa exige sesión y `notifications.full.view`, y las mutaciones autenticadas aceptan cualquiera de ambos permisos.
+  - Crear `/api/admin/notifications` para el mantenedor y validar permisos por acción.
+  - Responder JSON estructurado y emitir actualizaciones realtime después de cambios que afecten visibilidad.
+- **Integración de rutas/UI:**
+  - Crear componentes separados para ambas pantallas para no seguir concentrando lógica en `HomePage.js`.
+  - Integrarlas en `HomePage` únicamente como vistas, labels, paths, permisos y props iniciales.
+  - Agregar ambas opciones a `AppSidebar`.
+  - Soportar acceso directo con datos del Server Component y navegación interna SPA desde cualquier vista.
+  - Agregar `loading.js` para ambas rutas.
+- **Archivos probables:**
+  - `prisma/schema.prisma`
+  - `prisma/migrations/YYYYMMDDHHMMSS_expand_platform_notifications/migration.sql`
+  - `lib/repositories/notificationRepository.js`
+  - `lib/repositories/platformUserRepository.js`
+  - `lib/notificationRealtime.js`
+  - `server.mjs`
+  - `app/api/notifications/route.js`
+  - `app/api/admin/notifications/route.js`
+  - `app/notificaciones/page.js` y `loading.js`
+  - `app/administracion/notificaciones/page.js` y `loading.js`
+  - componentes nuevos para el centro completo, mantenedor y formulario
+  - `components/NotificationCenter.js`, `components/AppSidebar.js`, `components/HomePage.js`
+  - `app/globals.css`
+  - `docs/project-overview.md`, `docs/design-system.md`, `AGENTS.md` y `CLAUDE.md` si se consolidan reglas nuevas.
+- **Verificación prevista:**
+  - `npm run db:generate`
+  - `npm run build`
+  - `git diff --check`
+  - Probar acceso directo y navegación interna para ambas rutas.
+  - Probar permisos de vista y acciones con rol común, rol configurado y `Dios`.
+  - Probar notificación inmediata, programada, expirada, desactivada, eliminada y restaurada.
+  - Probar leer/no leer, descartar/restaurar, marcar todas y recepción WebSocket.
+  - Playwright autenticado en las resoluciones definidas en `docs/workflows/new-feature.md`, incluyendo tabla con scroll horizontal, modales y menú lateral mobile.
+- **Rama sugerida:** partir desde `dev` con `feature/notification-management`.
+- **Decisiones ya confirmadas:** usuarios autenticados solamente; restaurar y marcar como no leída; administrar todas las fuentes; programación futura; permisos sin asignación predeterminada salvo la regla general de `Dios`.
+
+### Evaluación arquitectónica: SPA, App Router y división de `HomePage`
+
+- **Estado:** pendiente para después de implementar la feature de notificaciones.
+- **Objetivo:** evaluar con métricas y dependencias reales si conviene mantener la experiencia SPA actual, evolucionar hacia rutas más independientes con App Router o adoptar otra combinación de renderizado.
+- **Contexto actual:** la aplicación ya es híbrida: las rutas directas se renderizan en servidor, mientras `HomePage` mantiene navegación interna sin recarga mediante `currentView`. El problema principal identificado no es la experiencia SPA, sino la concentración de muchas vistas, datos y estado en `components/HomePage.js`.
+- **Hipótesis inicial:** conservar Next.js App Router, Server Components y navegación cliente, pero mover progresivamente cada pantalla a un componente/contenedor y ruta responsable de sus propios datos. Mantener compartidos el shell, sidebar, topbar y reproductor Twitch mediante layouts cuando sea técnicamente viable.
+- **Análisis pendiente:**
+  - Mapear vistas, rutas, props, estado global, efectos y dependencias de `HomePage`.
+  - Medir tamaño de bundles y código/datos cargados innecesariamente por pantalla.
+  - Identificar qué estado debe persistir entre rutas y cuál debe ser local.
+  - Evaluar `layout.js`, rutas anidadas, Server Components, `Link`/router de Next.js y streaming/loading por ruta.
+  - Revisar cómo preservar el `PersistentTwitchPlayer` durante la navegación sin remontajes, pausas ni pérdida del estado del iframe.
+  - Confirmar compatibilidad con los dos dominios, permisos, acceso directo y navegación interna.
+  - Comparar SPA clásica, SSR/MPA e implementación híbrida con RSC según UX, complejidad, rendimiento y migración.
+  - Diseñar una migración gradual, sin reescritura completa y con posibilidad de revertir cada etapa.
+- **Resultado esperado:** documento de decisión arquitectónica con métricas, propuesta recomendada, etapas, riesgos, archivos afectados y estrategia de verificación antes de modificar la estructura global.
+
 ### Notificación manual de resubidos
 
 - **Estado:** En implementación en `feature/notify-resubido`.

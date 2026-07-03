@@ -91,6 +91,7 @@ export async function POST(request) {
     await createPlatformNotification({
       type: "alert",
       severity: "success",
+      source: "twitch",
       title: "Lolweapon está en directo",
       body: live.title || "Se detectó un nuevo directo desde Twitch.",
       href: "/inicio",

@@ -116,7 +116,7 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 | `PlatformSession` | Sesión activa (token, expiresAt — 14 días) |
 | `LoginAttempt` | Auditoría de intentos de login |
 | `AuditLog` | Historial de acciones administrativas por mantenedor |
-| `PlatformNotification` | Notificaciones persistentes visibles por audiencia (`all`, `authenticated`, `admin`, `permission:<code>`, `user:<id>`) |
+| `PlatformNotification` | Notificaciones persistentes por audiencia, origen y ciclo de publicación; soporta programación, expiración, activación y eliminación lógica |
 | `PlatformUserNotification` | Estado por usuario de lectura y descarte de notificaciones |
 | `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
 
@@ -149,6 +149,8 @@ El topbar incluye un centro de notificaciones persistente para usuarios autentic
 Las notificaciones se guardan en `PlatformNotification` y el estado individual en `PlatformUserNotification`. La API `/api/notifications` lista notificaciones visibles para el usuario actual y permite marcar una, marcar todas o descartar. Si `DATA_SOURCE` no es `postgres`, el repositorio devuelve lista vacía.
 
 El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling suave queda como respaldo.
+
+La campana, protegida por `notifications.view`, muestra avisos rápidos y permite a invitados consultar únicamente notificaciones públicas; su estado leído/descartado se conserva en `localStorage`. La página `/notificaciones`, protegida separadamente por `notifications.full.view`, permite a usuarios autenticados buscar, filtrar, marcar como leída/no leída, descartar y restaurar. El mantenedor `/administracion/notificaciones` gestiona notificaciones manuales y automáticas, incluyendo publicación inmediata o programada. `server.mjs` revisa publicaciones pendientes cada 30 segundos, fija `publishedAt` una sola vez y emite la actualización WebSocket.
 
 Los invitados solo reciben notificaciones con `audience: all`. Como no tienen `PlatformUser.id`, su estado de leído/descartado se guarda en `localStorage`; los usuarios autenticados usan `PlatformUserNotification`.
 
@@ -226,6 +228,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Grupo | Códigos |
 |---|---|
 | Plataforma: Inicio | `home.view` |
+| Plataforma: Notificaciones | `notifications.view`, `notifications.full.view` |
 | Plataforma: Novedades | `news.view` |
 | Plataforma: Historial de cambios | `changelog.view` |
 | Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.lives.notify`, `tracker.form.full/compact` |
@@ -236,6 +239,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Lecturas: SpaceDrum | `spacedrum.view` |
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
+| Administración: Notificaciones | `admin.notifications.view/create/update/delete` |
 | Administración: Rastreador | `admin.tracker.view`, `admin.lives.notify` |
 | Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
 | Administración: Anime Viendo | `admin.anime.tracking.view` |
@@ -252,6 +256,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/inicio` | Home: stream en vivo, últimos directos, últimos videos de YouTube |
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
+| `/notificaciones` | Centro completo para usuarios autenticados con permiso `notifications.full.view` |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
 | `/rastreador/calendario` | Calendario histórico de directos por año, mes y día. Controlado por permiso `tracker.calendar.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación y administración. |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
@@ -263,6 +268,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/registro` | Registro de usuario |
 | `/perfil` | Perfil del usuario (avatar, datos) |
 | `/administracion/...` | Panel de administración |
+| `/administracion/notificaciones` | Mantenedor de notificaciones manuales y automáticas, protegido por permisos `admin.notifications.*` |
 
 ### API Routes
 
@@ -272,6 +278,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/register` | POST | Registro |
 | `/api/logout` | POST | Cerrar sesión |
 | `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
+| `/api/admin/notifications` | GET/POST | Listado, creación, edición, programación, activación y eliminación lógica de notificaciones |
 | `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |
 | `/api/auth/twitch/start` | GET | Inicia OAuth Twitch |
 | `/api/auth/twitch/callback` | GET | Callback OAuth Twitch |
@@ -313,6 +320,18 @@ El middleware (`middleware.js`) distingue el dominio via `RESUBIDOS_HOST` / `VIE
 2. Verificación con hash scrypt en BD
 3. Sesión de 14 días — cookie `kala_admin_session` (httpOnly)
 
+Para compartir la sesión entre `resubidos.lolweapon.com` y `viendo.lolweapon.com`, cada ambiente debe definir `SESSION_COOKIE_DOMAIN=.lolweapon.com` y usar un `SESSION_COOKIE_NAME` distinto. Login manual, registro y Twitch usan la misma configuración; logout elimina tanto la cookie compartida como cualquier cookie antigua limitada al host para el nombre configurado.
+
+```env
+# QA
+SESSION_COOKIE_NAME=kala_admin_session_qa
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+
+# Producción
+SESSION_COOKIE_NAME=kala_admin_session
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+```
+
 ### Login con Twitch (OAuth)
 1. `GET /api/auth/twitch/start` → redirect a Twitch
 2. Twitch callback → `GET /api/auth/twitch/callback`
@@ -325,6 +344,8 @@ El middleware (`middleware.js`) distingue el dominio via `RESUBIDOS_HOST` / `VIE
 1. `POST /api/register` con login, email, password, alias
 2. Hash scrypt + rol `publico`
 3. Sesión creada automáticamente
+
+`lastLoginAt` se actualiza al crear cualquier sesión, por lo que cubre login manual, Twitch y la sesión automática posterior al registro. La migración `20260702123000_backfill_user_last_login_from_sessions` recupera el dato histórico únicamente cuando existe una sesión registrada.
 
 ---
 

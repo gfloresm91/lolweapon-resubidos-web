@@ -137,7 +137,12 @@ export default async function LiveDetailPage({ params }) {
               <span className="topbar-page">Resubido</span>
             </div>
 
-            <DetailTopbarActions currentUser={currentUser} canManageUsers={can(accessUser, "users.read")} />
+            <DetailTopbarActions
+              currentUser={currentUser}
+              canManageUsers={can(accessUser, "users.read")}
+              canViewNotifications={can(accessUser, "notifications.view")}
+              canViewAllNotifications={can(accessUser, "notifications.full.view")}
+            />
           </header>
 
           <main className="app-wrapper live-detail-page">

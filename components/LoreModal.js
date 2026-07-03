@@ -6,7 +6,7 @@ export default function LoreModal({ isOpen, onClose }) {
   }
 
   return (
-    <div id="lore-modal" className="modal-backdrop" onClick={onClose}>
+    <div id="lore-modal" className="modal-backdrop">
       <div
         className="modal-content admin-modal"
         style={{

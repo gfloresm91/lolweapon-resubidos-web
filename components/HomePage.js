@@ -17,6 +17,8 @@ import LiveCard from "@/components/LiveCard";
 import LoreModal from "@/components/LoreModal";
 import NewsGuidePage from "@/components/NewsGuidePage";
 import NotificationCenter from "@/components/NotificationCenter";
+import NotificationsPage from "@/components/NotificationsPage";
+import PlatformNotificationsPage from "@/components/PlatformNotificationsPage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
@@ -105,6 +107,7 @@ const VIEW_LABELS = {
   home: "Inicio",
   news: "Novedades",
   changelog: "Historial de cambios",
+  notifications: "Notificaciones",
   tracker: "Rastreador de directos",
   trackerCalendar: "Calendario de directos",
   myList: "Mi lista",
@@ -121,6 +124,7 @@ const VIEW_LABELS = {
   platformAnimeCompleted: "Mantenedor Terminados",
   platformUsers: "Usuarios",
   platformRoles: "Roles",
+  platformNotifications: "Mantenedor Notificaciones",
   spacedrum: "SpaceDrum",
 };
 
@@ -128,6 +132,7 @@ const VIEW_PATHS = {
   home: "/inicio",
   news: "/novedades",
   changelog: "/changelog",
+  notifications: "/notificaciones",
   tracker: "/rastreador",
   trackerCalendar: "/rastreador/calendario",
   myList: "/mi-lista",
@@ -144,6 +149,7 @@ const VIEW_PATHS = {
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
+  platformNotifications: "/administracion/notificaciones",
   spacedrum: "/spacedrum",
 };
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
@@ -283,6 +289,8 @@ export default function HomePage({
   initialAnimeActivity = EMPTY_OBJECT,
   initialStreamerRatings = EMPTY_OBJECT,
   initialUserRatings = EMPTY_OBJECT,
+  initialNotificationsResult = null,
+  initialAdminNotificationsResult = null,
   twitchLogin,
   youtubeChannelUrl,
   isAdmin,
@@ -293,10 +301,21 @@ export default function HomePage({
   const hasPermission = (permission) => (currentUser?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || effectivePermissions.has(permission);
   const canManageUsers = hasPermission("users.read");
   const canManageRoles = hasPermission("roles.read");
+  const canViewNotifications = hasPermission("notifications.view");
+  const canViewAllNotifications = hasPermission("notifications.full.view");
+  const canViewNotificationMaintainer = hasPermission("admin.notifications.view");
+  const canCreateNotifications = hasPermission("admin.notifications.create");
+  const canUpdateNotifications = hasPermission("admin.notifications.update");
+  const canDeleteNotifications = hasPermission("admin.notifications.delete");
   const canCreateTracker = hasPermission("tracker.create");
   const canUpdateTracker = hasPermission("tracker.update");
   const canDeleteTracker = hasPermission("tracker.delete");
   const canNotifyTracker = hasPermission("tracker.lives.notify");
+  const trackerFormVariant = hasPermission("tracker.form.full")
+    ? "full"
+    : hasPermission("tracker.form.compact")
+      ? "compact"
+      : null;
   const canViewTrackerMaintainer = hasPermission("admin.tracker.view");
   const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker);
   const canViewTagsMaintainer = hasPermission("admin.tags.view");
@@ -1303,7 +1322,7 @@ export default function HomePage({
         throw new Error(data.error || "No se pudo registrar EventSub");
       }
 
-      toast.success("EventSub registrado. Twitch notificará el próximo directo.");
+      toast.success(data.alreadyActive ? "EventSub ya estaba activo para este canal." : "EventSub registrado. Twitch notificará el próximo directo.");
     } catch (error) {
       toast.error(error.message || "No se pudo registrar EventSub.");
     } finally {
@@ -1316,6 +1335,7 @@ export default function HomePage({
       home: "home.view",
       news: "news.view",
       changelog: "changelog.view",
+      notifications: "notifications.full.view",
       tracker: "tracker.view",
       trackerCalendar: "tracker.calendar.view",
       myList: "tracker.view",
@@ -1332,6 +1352,7 @@ export default function HomePage({
       platformSpaceDrumImport: "admin.spacedrum.import.view",
       platformUsers: "users.read",
       platformRoles: "roles.read",
+      platformNotifications: "admin.notifications.view",
       spacedrum: "spacedrum.view",
     };
     const requiredPermission = viewPermissions[view];
@@ -1403,7 +1424,7 @@ export default function HomePage({
             </div>
 
             <div className="topbar-actions">
-              <NotificationCenter user={currentUser} />
+              {canViewNotifications ? <NotificationCenter user={currentUser} canViewAll={canViewAllNotifications} onViewAll={() => selectView("notifications")} /> : null}
               <AccountMenu user={currentUser} canManageUsers={canManageUsers} />
             </div>
           </header>
@@ -1434,6 +1455,8 @@ export default function HomePage({
             {currentView === "changelog" && hasPermission("changelog.view") ? (
               <ChangelogPage />
             ) : null}
+
+            {currentView === "notifications" && canViewAllNotifications ? <NotificationsPage initialResult={initialNotificationsResult} /> : null}
 
             {["tracker", "myList"].includes(currentView) ? (
               <>
@@ -1482,16 +1505,13 @@ export default function HomePage({
         {currentView === "tracker" ? <StatsBar stats={stats} /> : null}
 
         {currentView === "tracker" && (canCreateTracker || canUpdateTracker) ? (
-          <details className="tracker-actions tracker-admin-actions" aria-label="Acciones del rastreador">
-            <summary className="tracker-admin-summary">
-              <div>
-                <span className="tracker-actions-label">Gestión</span>
-                <p className="tracker-actions-copy">Herramientas de administración del archivo.</p>
-              </div>
-              <span className="tracker-admin-summary-pill">Acciones</span>
-            </summary>
-            <div className="tracker-admin-actions-body">
-              {canCreateTracker ? (
+          <section className="tracker-actions public-tracker-actions" aria-label="Acciones del rastreador">
+            <div>
+              <span className="tracker-actions-label">Rastreador</span>
+              <p className="tracker-actions-copy">Gestiona los registros del archivo histórico.</p>
+            </div>
+            <div className="tracker-actions-buttons">
+              {canCreateTracker && trackerFormVariant ? (
                 <button type="button" id="btn-add-live" className="tracker-action-primary" onClick={() => setEditingLive({})}>
                   <Plus size={18} />
                   Nuevo directo
@@ -1505,7 +1525,7 @@ export default function HomePage({
                   disabled={isTwitchActionLoading}
                 >
                   <Radio size={17} />
-                  Crear card desde Twitch
+                  Crear desde Twitch
                 </button>
               ) : null}
               {canUpdateTracker ? (
@@ -1520,7 +1540,7 @@ export default function HomePage({
                 </button>
               ) : null}
             </div>
-          </details>
+          </section>
         ) : null}
 
         <FiltersBar
@@ -1638,7 +1658,7 @@ export default function HomePage({
                       <LiveCard
                         key={live.id}
                         live={live}
-                        isAdmin={canUpdateTracker}
+                        isAdmin={canUpdateTracker && Boolean(trackerFormVariant)}
                         canNotify={currentView === "tracker" && canNotifyTracker}
                         activity={liveActivity[live.id]}
                         isAuthenticated={isAuthenticated}
@@ -1675,7 +1695,7 @@ export default function HomePage({
                       key={live.id}
                       live={live}
                       cardDensity={effectiveCardDensity}
-                      isAdmin={canUpdateTracker}
+                        isAdmin={canUpdateTracker && Boolean(trackerFormVariant)}
                       canNotify={currentView === "tracker" && canNotifyTracker}
                       activity={liveActivity[live.id]}
                       isAuthenticated={isAuthenticated}
@@ -1840,15 +1860,25 @@ export default function HomePage({
               <PlatformRolesPage initialRoles={initialPlatformRoles} initialPermissions={initialPlatformPermissions} />
             ) : null}
 
+            {currentView === "platformNotifications" && canViewNotificationMaintainer ? (
+              <PlatformNotificationsPage
+                initialResult={initialAdminNotificationsResult}
+                canCreate={canCreateNotifications}
+                canUpdate={canUpdateNotifications}
+                canDelete={canDeleteNotifications}
+              />
+            ) : null}
+
             {currentView === "platformTracker" && canManageTracker ? (
               <PlatformTrackerMaintainerPage
                 initialLives={lives}
                 initialStatuses={liveStatuses}
-                canCreate={canCreateTracker}
-                canUpdate={canUpdateTracker}
+                canCreate={canCreateTracker && Boolean(trackerFormVariant)}
+                canUpdate={canUpdateTracker && Boolean(trackerFormVariant)}
                 canDelete={canDeleteTracker}
                 canNotify={hasPermission("admin.lives.notify")}
                 canUpdateTags={canUpdateTags}
+                formVariant={trackerFormVariant || "compact"}
                 twitchLogin={twitchLogin}
                 onLivesChange={setLives}
                 onStatusesChange={setLiveStatuses}
@@ -1971,6 +2001,7 @@ export default function HomePage({
         statuses={liveStatuses}
         availableTags={allTags}
         tagCounts={tagCounts}
+        formVariant={trackerFormVariant || "compact"}
         onDelete={canDeleteTracker ? (id) => {
           setEditingLive(null);
           setPendingDeleteId(id);

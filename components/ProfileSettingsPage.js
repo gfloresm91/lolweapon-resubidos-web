@@ -9,6 +9,7 @@ import AccountMenu from "@/components/AccountMenu";
 import AvatarUploader, { uploadAvatarFile } from "@/components/AvatarUploader";
 import AppSidebar from "@/components/AppSidebar";
 import AppSidebarShell from "@/components/AppSidebarShell";
+import NotificationCenter from "@/components/NotificationCenter";
 import {
   ALIAS_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
@@ -92,6 +93,8 @@ export default function ProfileSettingsPage({ currentUser }) {
   const canAccess = (permission) => (user?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || permissions.has(permission);
   const canManageUsers = canAccess("users.read");
   const canManageRoles = canAccess("roles.read");
+  const canViewNotifications = canAccess("notifications.view");
+  const canViewAllNotifications = canAccess("notifications.full.view");
   const passwordStrength = getPasswordStrength(passwordForm.password);
   const showPasswordStrength = Boolean(passwordForm.password);
   const canChangePassword = user?.hasPassword && user?.role !== "dios";
@@ -273,6 +276,7 @@ export default function ProfileSettingsPage({ currentUser }) {
               <span className="topbar-page">Configurar perfil</span>
             </div>
             <div className="topbar-actions">
+              {canViewNotifications ? <NotificationCenter user={user} canViewAll={canViewAllNotifications} /> : null}
               <AccountMenu user={user} canManageUsers={canManageUsers} />
             </div>
           </header>
