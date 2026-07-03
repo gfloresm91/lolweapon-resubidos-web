@@ -320,7 +320,17 @@ El middleware (`middleware.js`) distingue el dominio via `RESUBIDOS_HOST` / `VIE
 2. Verificación con hash scrypt en BD
 3. Sesión de 14 días — cookie `kala_admin_session` (httpOnly)
 
-Para compartir la sesión entre `resubidos.lolweapon.com` y `viendo.lolweapon.com`, producción debe definir `SESSION_COOKIE_DOMAIN=.lolweapon.com`. Login manual, registro y Twitch usan la misma configuración; logout elimina tanto la cookie compartida como cualquier cookie antigua limitada al host.
+Para compartir la sesión entre `resubidos.lolweapon.com` y `viendo.lolweapon.com`, cada ambiente debe definir `SESSION_COOKIE_DOMAIN=.lolweapon.com` y usar un `SESSION_COOKIE_NAME` distinto. Login manual, registro y Twitch usan la misma configuración; logout elimina tanto la cookie compartida como cualquier cookie antigua limitada al host para el nombre configurado.
+
+```env
+# QA
+SESSION_COOKIE_NAME=kala_admin_session_qa
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+
+# Producción
+SESSION_COOKIE_NAME=kala_admin_session
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+```
 
 ### Login con Twitch (OAuth)
 1. `GET /api/auth/twitch/start` → redirect a Twitch
