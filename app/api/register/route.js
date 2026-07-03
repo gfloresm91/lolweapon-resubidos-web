@@ -5,7 +5,7 @@ import {
   createPlatformSession,
   registerManualUser,
 } from "@/lib/repositories/platformUserRepository";
-import { SESSION_COOKIE } from "@/lib/auth";
+import { setSessionCookie } from "@/lib/auth";
 
 export async function POST(request) {
   const payload = await readJsonRequest(request);
@@ -20,15 +20,9 @@ export async function POST(request) {
   try {
     const user = await registerManualUser(payload);
     const session = await createPlatformSession(user.id);
-    const response = NextResponse.json({ success: true, user });
+    const response = NextResponse.json({ success: true, user: session.user });
 
-    response.cookies.set(SESSION_COOKIE, session.token, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      expires: session.expiresAt,
-    });
+    setSessionCookie(response, request, session.token, session.expiresAt);
 
     return response;
   } catch (error) {

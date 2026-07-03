@@ -89,6 +89,7 @@ export async function POST(request) {
       await createPlatformNotification({
         type: "activity",
         severity: "success",
+        source: "tracker",
         title: "Nuevo directo en el rastreador",
         body: savedLive.title,
         href: `/rastreador/${encodeURIComponent(savedLive.id)}`,

@@ -164,6 +164,7 @@ POSTGRES_PASSWORD=<password>
 POSTGRES_PORT=5432
 TWITCH_AUTH_REDIRECT_URI=https://tu-dominio.com/api/auth/twitch/callback
 TWITCH_BROADCASTER_LOGIN=kalathraslolweapon
+SESSION_COOKIE_DOMAIN=.lolweapon.com
 UPLOAD_DIR=public/imagenes
 ```
 
@@ -175,6 +176,14 @@ https://viendo-qa.lolweapon.com/api/auth/twitch/callback
 ```
 
 La app usa el host actual cuando coincide con `RESUBIDOS_HOST` o `VIENDO_HOST`, para que la cookie OAuth `state` y el callback queden en el mismo dominio.
+
+La sesión final sí debe compartirse entre ambos dominios de producción. Configurar en el entorno productivo:
+
+```env
+SESSION_COOKIE_DOMAIN=.lolweapon.com
+```
+
+No configurar este valor en local. En QA, usarlo solo si se acepta compartir el mismo alcance de cookie con otros subdominios bajo `lolweapon.com`; una cookie de dominio raíz con el mismo nombre puede interferir con sesiones de producción.
 
 No expongas el puerto `5432` publicamente. El compose de produccion debe publicar Postgres en `127.0.0.1`.
 

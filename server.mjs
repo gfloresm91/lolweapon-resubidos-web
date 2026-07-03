@@ -5,12 +5,14 @@ import { WebSocketServer } from "ws";
 import { syncContentNotifications } from "./lib/contentNotificationSync.js";
 import { registerNotificationSocket } from "./lib/notificationRealtime.js";
 import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/youtubeVideoRepository.js";
+import { publishDueNotifications } from "./lib/repositories/notificationRepository.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
 const port = Number(process.env.PORT || 3000);
 const DEFAULT_YOUTUBE_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const MIN_YOUTUBE_SYNC_INTERVAL_MS = 60 * 1000;
+const NOTIFICATION_PUBLISH_INTERVAL_MS = 30 * 1000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
@@ -64,6 +66,25 @@ function startYoutubeNotificationSync() {
   console.log(`> YouTube notification sync every ${Math.round(intervalMs / 1000)}s`);
 }
 
+function startScheduledNotificationPublisher() {
+  let isPublishing = false;
+  async function publish() {
+    if (isPublishing) return;
+    isPublishing = true;
+    try {
+      const count = await publishDueNotifications();
+      if (count) console.log(`> Scheduled notifications published=${count}`);
+    } catch (error) {
+      console.error("> Scheduled notification publisher failed:", error);
+    } finally {
+      isPublishing = false;
+    }
+  }
+  setTimeout(publish, 2000);
+  setInterval(publish, NOTIFICATION_PUBLISH_INTERVAL_MS);
+  console.log(`> Scheduled notification publisher every ${NOTIFICATION_PUBLISH_INTERVAL_MS / 1000}s`);
+}
+
 async function syncStartupNotifications() {
   try {
     const result = await syncContentNotifications();
@@ -98,4 +119,5 @@ server.listen(port, hostname, () => {
   console.log(`> Ready on http://${hostname}:${port}`);
   void syncStartupNotifications();
   startYoutubeNotificationSync();
+  startScheduledNotificationPublisher();
 });

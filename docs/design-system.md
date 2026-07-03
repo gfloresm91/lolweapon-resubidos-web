@@ -169,6 +169,10 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Invitados solo deben ver notificaciones públicas (`audience: all`): Twitch online, nuevo video de YouTube y comunicaciones públicas de novedades/changelog. No deben ver actividad interna autenticada ni sistema administrativo.
 - Para invitados, leído/descartado se guarda en `localStorage`; para usuarios autenticados se guarda en `PlatformUserNotification`.
 - Novedades/changelog deben crearse con `dedupeKey` estable para no duplicarse al reiniciar `server.mjs`.
+- El footer del panel incluye `Ver todas` solo cuando el usuario tiene `notifications.full.view`; la campana se controla independientemente con `notifications.view`.
+- El rol invitado recibe `notifications.view` para consultar avisos públicos, pero no `notifications.full.view` ni acceso a `/notificaciones`.
+- La página completa reutiliza tipos, severidades y estados visuales del panel; debe ofrecer filtros y acciones sin convertir cada aviso en una card excesivamente decorada.
+- El mantenedor administrativo sigue el estándar de tablas, modales, filtros, paginación, scroll horizontal y confirmaciones. Las eliminaciones son lógicas y las publicaciones programadas deben distinguirse claramente de publicadas, expiradas e inactivas.
 
 ### Capas Sobre Twitch
 

@@ -49,6 +49,7 @@ export async function POST(request) {
     await createPlatformNotification({
       type: "system",
       severity: "success",
+      source: "spacedrum",
       title: "SpaceDrum importado",
       body: "La importación remota terminó correctamente.",
       href: "/administracion/spacedrum/importacion",

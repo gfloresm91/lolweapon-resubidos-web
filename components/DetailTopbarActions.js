@@ -3,10 +3,10 @@
 import AccountMenu from "@/components/AccountMenu";
 import NotificationCenter from "@/components/NotificationCenter";
 
-export default function DetailTopbarActions({ currentUser = null, canManageUsers = false }) {
+export default function DetailTopbarActions({ currentUser = null, canManageUsers = false, canViewNotifications = false, canViewAllNotifications = false }) {
   return (
     <div className="topbar-actions">
-      <NotificationCenter user={currentUser} />
+      {canViewNotifications ? <NotificationCenter user={currentUser} canViewAll={canViewAllNotifications} /> : null}
       <AccountMenu user={currentUser} canManageUsers={canManageUsers} />
     </div>
   );

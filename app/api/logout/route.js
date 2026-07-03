@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { SESSION_COOKIE } from "@/lib/auth";
+import { clearSessionCookie, SESSION_COOKIE } from "@/lib/auth";
 import { deletePlatformSession } from "@/lib/repositories/platformUserRepository";
 
 export async function POST(request) {
@@ -8,10 +8,6 @@ export async function POST(request) {
   await deletePlatformSession(token);
 
   const response = NextResponse.json({ success: true });
-  response.cookies.set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    path: "/",
-    maxAge: 0,
-  });
+  clearSessionCookie(response, request);
   return response;
 }

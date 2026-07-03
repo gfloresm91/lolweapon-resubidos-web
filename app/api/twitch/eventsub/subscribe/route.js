@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
-import { createStreamOnlineSubscription } from "@/lib/twitch";
+import { createStreamOnlineSubscription, findActiveStreamOnlineSubscription } from "@/lib/twitch";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +14,16 @@ export async function POST(request) {
   }
 
   try {
+    const activeSubscription = await findActiveStreamOnlineSubscription();
+
+    if (activeSubscription) {
+      return NextResponse.json({
+        success: true,
+        alreadyActive: true,
+        subscription: activeSubscription,
+      });
+    }
+
     const subscription = await createStreamOnlineSubscription();
     await createAuditLog({
       actor: authorization.user,
