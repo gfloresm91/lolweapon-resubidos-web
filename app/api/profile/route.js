@@ -4,6 +4,7 @@ import { SESSION_COOKIE } from "@/lib/auth";
 import { readJsonRequest } from "@/lib/http";
 import { getCurrentUserFromToken } from "@/lib/serverAuth";
 import {
+  disconnectOAuthIdentity,
   updateCurrentUserPassword,
   updateCurrentUserProfile,
 } from "@/lib/repositories/platformUserRepository";
@@ -43,6 +44,11 @@ export async function POST(request) {
 
     if (payload?.action === "password") {
       const savedUser = await updateCurrentUserPassword(payload.password, { user });
+      return NextResponse.json({ success: true, user: savedUser });
+    }
+
+    if (payload?.action === "identity-disconnect") {
+      const savedUser = await disconnectOAuthIdentity(user.id, payload.provider);
       return NextResponse.json({ success: true, user: savedUser });
     }
   } catch (error) {

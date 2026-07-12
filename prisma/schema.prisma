@@ -381,6 +381,7 @@ model PlatformUser {
   passwordSalt   String?
   passwordUpdatedAt DateTime?
   roleId         Int
+  roleSource     String            @default("manual")
   isActive       Boolean           @default(true)
   deletedAt      DateTime?
   lastLoginAt    DateTime?
@@ -395,10 +396,59 @@ model PlatformUser {
   spaceDrumProgress PlatformUserSpaceDrumProgress[]
   createdNotifications PlatformNotification[] @relation("NotificationCreator")
   notificationStates PlatformUserNotification[]
+  authIdentities PlatformAuthIdentity[]
+  identityLinkAttempts PlatformIdentityLinkAttempt[]
 
   @@index([roleId])
   @@index([isActive])
   @@index([deletedAt])
+}
+
+
+model PlatformAuthIdentity {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  provider        String
+  providerSubject String
+  providerEmail   String?
+  emailVerified   Boolean  @default(false)
+  providerLogin   String?
+  displayName     String?
+  avatarUrl       String?
+  metadata        Json?
+  linkedAt        DateTime @default(now())
+  lastUsedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([providerEmail])
+}
+
+model PlatformIdentityLinkAttempt {
+  id              String    @id
+  userId          Int?
+  provider        String
+  providerSubject String
+  providerEmail   String?
+  emailVerified   Boolean   @default(false)
+  providerLogin   String?
+  displayName     String?
+  avatarUrl       String?
+  metadata        Json?
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  user PlatformUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([provider, providerSubject])
 }
 
 model PlatformUserLive {

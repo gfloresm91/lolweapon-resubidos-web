@@ -30,12 +30,56 @@ function getSafeReturnPath(value) {
   return value;
 }
 
+function appendConnectedParam(path, provider) {
+  const [baseAndQuery, hash = ""] = String(path || "/inicio").split("#");
+  const [pathname, query = ""] = baseAndQuery.split("?");
+  const params = new URLSearchParams(query);
+  params.set("connected", provider);
+  return `${pathname}?${params.toString()}${hash ? `#${hash}` : ""}`;
+}
+
+function getProviderLabel(provider) {
+  if (provider === "google") return "Google / YouTube";
+  if (provider === "twitch") return "Twitch";
+  return "la cuenta externa";
+}
+
+function getLoginMethodLabel(method) {
+  if (method === "manual") return "usuario y contraseña";
+  if (method === "google") return "Google / YouTube";
+  if (method === "twitch") return "Twitch";
+  return "tu método actual";
+}
+
+function getLoginMethodsLabel(methods) {
+  const labels = methods.map(getLoginMethodLabel);
+  if (!labels.length) return "tu método actual";
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} o ${labels.at(-1)}`;
+}
+
+function getSafeLoginMethod(method) {
+  return ["manual", "google", "twitch"].includes(method) ? method : null;
+}
+
+function getSafeLoginMethods(value, fallback) {
+  const methods = String(value || "")
+    .split(",")
+    .map((method) => getSafeLoginMethod(method.trim()))
+    .filter(Boolean);
+
+  return [...new Set(methods.length ? methods : [fallback].filter(Boolean))];
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [nextPath, setNextPath] = useState("/inicio");
+  const [pendingProvider, setPendingProvider] = useState(null);
+  const [pendingLoginMethods, setPendingLoginMethods] = useState([]);
   const twitchLoginHref = `/api/auth/twitch/start?returnTo=${encodeURIComponent(nextPath)}`;
+  const googleLoginHref = `/api/auth/google/start?returnTo=${encodeURIComponent(nextPath)}`;
   const {
     formState: { errors },
     handleSubmit,
@@ -57,6 +101,9 @@ export default function LoginPage() {
     const error = params.get("error");
     const next = params.get("next");
     const returnTo = params.get("returnTo");
+    const linkRequired = params.get("linkRequired");
+    const loginMethod = getSafeLoginMethod(params.get("loginMethod"));
+    const loginMethods = getSafeLoginMethods(params.get("loginMethods"), loginMethod);
     const safeReturnTo = getSafeReturnPath(returnTo);
     const safeNext = getSafeReturnPath(next);
 
@@ -66,8 +113,22 @@ export default function LoginPage() {
 
     if (error) {
       toast.error(error);
+    } else if (linkRequired) {
+      setPendingProvider(linkRequired);
+      setPendingLoginMethods(loginMethods);
+      toast.info(
+        `Ya existe una cuenta con ese correo. Inicia sesión con ${getLoginMethodsLabel(loginMethods)} para conectar ${getProviderLabel(linkRequired)}.`,
+      );
     }
   }, []);
+
+  function focusManualLogin() {
+    setFocus("login");
+  }
+
+  const canConfirmWithManual = pendingLoginMethods.includes("manual");
+  const canConfirmWithTwitch = pendingLoginMethods.includes("twitch");
+  const canConfirmWithGoogle = pendingLoginMethods.includes("google");
 
   async function submitLogin(values) {
     setIsSubmitting(true);
@@ -92,7 +153,8 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(nextPath);
+      const redirectTo = data.linkedProvider ? appendConnectedParam(nextPath, data.linkedProvider) : nextPath;
+      router.push(redirectTo);
       router.refresh();
     } catch {
       toast.error("No se pudo iniciar sesión. Intenta nuevamente.");
@@ -111,20 +173,42 @@ export default function LoginPage() {
             <img src="/brand/lolweapon-logo.png" alt="" />
             <strong>LOLWEAPON</strong>
           </span>
-          <h1 id="login-title" className="auth-title">Lives Tracker</h1>
-          <p className="auth-subtitle">Inicia sesión con tu usuario o conecta una cuenta externa.</p>
+          <h1 id="login-title" className="auth-title">Bienvenido a Lolweapon</h1>
+          <p className="auth-subtitle">Inicia sesión con tu cuenta o conecta Twitch / YouTube.</p>
         </div>
 
         <div className="auth-provider-row" aria-label="Proveedores de inicio de sesion">
           <a href={twitchLoginHref} className="auth-provider-button twitch-login-button">
             <span>Twitch</span>
-            <strong>Entrar</strong>
+            <strong>{canConfirmWithTwitch ? "Conectar" : "Entrar"}</strong>
           </a>
-          <button type="button" className="auth-provider-button youtube-login-button" disabled>
+          <a href={googleLoginHref} className="auth-provider-button youtube-login-button">
             <span>YouTube</span>
-            <strong>Próximamente</strong>
-          </button>
+            <strong>{canConfirmWithGoogle ? "Conectar" : "Entrar"}</strong>
+          </a>
         </div>
+
+        {pendingProvider ? (
+          <div className="auth-link-notice" role="status" aria-live="polite">
+            <span className="auth-link-notice-eyebrow">Conexión pendiente</span>
+            <strong>Ya existe una cuenta con ese correo.</strong>
+            <p>
+              Para protegerla, inicia sesión con {getLoginMethodsLabel(pendingLoginMethods)}. Después conectaremos{" "}
+              {getProviderLabel(pendingProvider)} automáticamente y podrás entrar con cualquiera de los dos métodos.
+            </p>
+            {canConfirmWithManual ? (
+              <button type="button" className="auth-link-notice-action" onClick={focusManualLogin}>
+                Iniciar con usuario y contraseña
+              </button>
+            ) : null}
+            {canConfirmWithTwitch ? (
+              <a href={twitchLoginHref} className="auth-link-notice-action">Conectar iniciando con Twitch</a>
+            ) : null}
+            {canConfirmWithGoogle ? (
+              <a href={googleLoginHref} className="auth-link-notice-action">Conectar iniciando con Google / YouTube</a>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="auth-divider">
           <span>Usuario y contraseña</span>

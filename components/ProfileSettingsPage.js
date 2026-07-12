@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Link2, Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Toaster, toast } from "sonner";
 
 import AccountMenu from "@/components/AccountMenu";
 import AvatarUploader, { uploadAvatarFile } from "@/components/AvatarUploader";
+import ConfirmModal from "@/components/ConfirmModal";
 import AppSidebar from "@/components/AppSidebar";
 import AppSidebarShell from "@/components/AppSidebarShell";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -89,6 +90,8 @@ export default function ProfileSettingsPage({ currentUser }) {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [disconnectProvider, setDisconnectProvider] = useState("");
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const permissions = useMemo(() => new Set(user?.permissions || []), [user?.permissions]);
   const canAccess = (permission) => (user?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || permissions.has(permission);
   const canManageUsers = canAccess("users.read");
@@ -97,9 +100,16 @@ export default function ProfileSettingsPage({ currentUser }) {
   const canViewAllNotifications = canAccess("notifications.full.view");
   const passwordStrength = getPasswordStrength(passwordForm.password);
   const showPasswordStrength = Boolean(passwordForm.password);
+  const canSetInitialPassword = !user?.hasPassword;
   const canChangePassword = user?.hasPassword && user?.role !== "dios";
-  const passwordValidationError = validatePasswordChangeFields(passwordForm);
-  const canSubmitPassword = canChangePassword && !passwordValidationError && !isSavingPassword;
+  const canManagePassword = canSetInitialPassword || canChangePassword;
+  const passwordValidationError = validatePasswordChangeFields(passwordForm, { requireCurrentPassword: user?.hasPassword });
+  const canSubmitPassword = canManagePassword && !passwordValidationError && !isSavingPassword;
+  const identities = user?.authIdentities || [];
+  const twitchIdentity = identities.find((identity) => identity.provider === "twitch");
+  const googleIdentity = identities.find((identity) => identity.provider === "google");
+  const connectedIdentityCount = identities.length;
+  const isLastAccessMethod = !user?.hasPassword && connectedIdentityCount <= 1;
   const normalizedProfile = {
     alias: profileForm.alias.trim(),
     email: profileForm.email.trim().toLowerCase(),
@@ -122,6 +132,11 @@ export default function ProfileSettingsPage({ currentUser }) {
 
     return () => URL.revokeObjectURL(objectUrl);
   }, [avatarFile]);
+
+  useEffect(() => {
+    const provider = new URLSearchParams(window.location.search).get("connected");
+    if (provider) toast.success(`${provider === "google" ? "Google" : "Twitch"} se conectó a tu cuenta.`);
+  }, []);
 
   function updateProfileField(field, value) {
     setProfileErrors((current) => ({ ...current, [field]: "", form: "" }));
@@ -213,7 +228,7 @@ export default function ProfileSettingsPage({ currentUser }) {
 
   async function savePassword(event) {
     event.preventDefault();
-    const validationError = validatePasswordChangeFields(passwordForm);
+    const validationError = validatePasswordChangeFields(passwordForm, { requireCurrentPassword: user?.hasPassword });
 
     if (validationError) {
       setPasswordErrors({ [getPasswordErrorField(validationError)]: validationError });
@@ -242,7 +257,7 @@ export default function ProfileSettingsPage({ currentUser }) {
       setUser(data.user);
       setPasswordForm({ currentPassword: "", password: "", confirmPassword: "" });
       setPasswordErrors({});
-      toast.success("Contraseña actualizada.");
+      toast.success(canSetInitialPassword ? "Contraseña configurada." : "Contraseña actualizada.");
     } catch (error) {
       const errorField = getPasswordErrorField(error.message);
       setPasswordErrors({ [errorField]: error.message });
@@ -251,6 +266,28 @@ export default function ProfileSettingsPage({ currentUser }) {
       }
     } finally {
       setIsSavingPassword(false);
+    }
+  }
+
+  async function disconnectIdentity() {
+    if (!disconnectProvider) return;
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "identity-disconnect", provider: disconnectProvider }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "No se pudo desconectar la cuenta.");
+      setUser(data.user);
+      setDisconnectProvider("");
+      toast.success("Cuenta externa desconectada.");
+      router.refresh();
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsDisconnecting(false);
     }
   }
 
@@ -282,7 +319,7 @@ export default function ProfileSettingsPage({ currentUser }) {
           </header>
 
           <main className="app-wrapper profile-settings-page">
-            <header className="watching-header admin-users-header">
+            <header className="watching-header admin-users-header profile-page-header">
               <div className="header-badge">
                 <span className="dot" />
                 PERFIL
@@ -294,136 +331,217 @@ export default function ProfileSettingsPage({ currentUser }) {
             </header>
 
             <section className="profile-settings-grid">
-              <form className="profile-settings-card" onSubmit={saveProfile} noValidate>
-                <div className="profile-settings-card-header">
-                  <div>
-                    <span className="tracker-actions-label">Información</span>
-                    <h2>Datos de cuenta</h2>
-                  </div>
-                  <span className="admin-user-status is-active">{user?.roleLabel || "Usuario"}</span>
-                </div>
-
-                <AvatarUploader
-                  avatarUrl={profileForm.avatarUrl}
-                  alias={profileForm.alias}
-                  login={user?.login}
-                  previewUrl={avatarPreviewUrl}
-                  error={profileErrors.avatarUrl}
-                  onFileChange={updateAvatarFile}
-                  onAvatarClear={clearAvatar}
-                />
-
-                <div className="form-row">
-                  <div className="form-group-modal">
-                    <label htmlFor="profile-alias">Alias</label>
-                    <input
-                      id="profile-alias"
-                      className="modal-input"
-                      value={profileForm.alias}
-                      maxLength={ALIAS_MAX_LENGTH}
-                      onChange={(event) => updateProfileField("alias", event.target.value)}
-                      autoComplete="nickname"
-                      aria-invalid={Boolean(profileErrors.alias)}
-                      aria-describedby={profileErrors.alias ? "profile-alias-error" : undefined}
-                    />
-                    {profileErrors.alias ? <span id="profile-alias-error" className="field-error">{profileErrors.alias}</span> : null}
-                  </div>
-                  <div className="form-group-modal">
-                    <label htmlFor="profile-email">Email</label>
-                    <input
-                      id="profile-email"
-                      className="modal-input"
-                      type="email"
-                      value={profileForm.email}
-                      maxLength={EMAIL_MAX_LENGTH}
-                      onChange={(event) => updateProfileField("email", event.target.value)}
-                      autoComplete="email"
-                      aria-invalid={Boolean(profileErrors.email)}
-                      aria-describedby={profileErrors.email ? "profile-email-error" : undefined}
-                    />
-                    {profileErrors.email ? <span id="profile-email-error" className="field-error">{profileErrors.email}</span> : null}
-                  </div>
-                </div>
-
-                {profileErrors.form ? <p className="field-error">{profileErrors.form}</p> : null}
-
-                <div className="modal-actions">
-                  <button type="submit" className="btn-modal btn-modal-primary" disabled={isSavingProfile || !hasProfileChanges}>
-                    {isSavingProfile ? "Guardando..." : "Guardar perfil"}
-                  </button>
-                </div>
-              </form>
-
-              <form className="profile-settings-card" onSubmit={savePassword} noValidate>
-                <div className="profile-settings-card-header">
-                  <div>
-                    <span className="tracker-actions-label">Seguridad</span>
-                    <h2>Contraseña</h2>
-                    <p>Cambia tu contraseña usando tu clave actual.</p>
-                  </div>
-                </div>
-
-                {canChangePassword ? (
-                  <>
-                    <PasswordInput
-                      id="profile-current-password"
-                      label="Contraseña actual"
-                      field="currentPassword"
-                      autoComplete="current-password"
-                      value={passwordForm.currentPassword}
-                      isVisible={visiblePasswords.currentPassword}
-                      error={passwordErrors.currentPassword}
-                      onChange={updatePasswordField}
-                      onToggle={togglePassword}
-                    />
-                    <PasswordInput
-                      id="profile-new-password"
-                      label="Nueva contraseña"
-                      field="password"
-                      autoComplete="new-password"
-                      value={passwordForm.password}
-                      isVisible={visiblePasswords.password}
-                      error={passwordErrors.password}
-                      onChange={updatePasswordField}
-                      onToggle={togglePassword}
-                    >
-                      {showPasswordStrength ? (
-                        <div className={`auth-password-strength profile-password-strength is-${passwordStrength.tone}`} aria-live="polite">
-                          <span className="auth-password-strength-track" aria-hidden="true">
-                            <span style={{ width: `${(passwordStrength.score / 5) * 100}%` }} />
-                          </span>
-                          <span>{passwordStrength.label}</span>
-                        </div>
-                      ) : null}
-                    </PasswordInput>
-                    <PasswordInput
-                      id="profile-confirm-password"
-                      label="Confirmar contraseña"
-                      field="confirmPassword"
-                      autoComplete="new-password"
-                      value={passwordForm.confirmPassword}
-                      isVisible={visiblePasswords.confirmPassword}
-                      error={passwordErrors.confirmPassword}
-                      onChange={updatePasswordField}
-                      onToggle={togglePassword}
-                    />
-                    {passwordErrors.form ? <p className="field-error">{passwordErrors.form}</p> : null}
-                    <div className="modal-actions">
-                      <button type="submit" className="btn-modal btn-modal-primary" disabled={!canSubmitPassword}>
-                        {isSavingPassword ? "Guardando..." : "Cambiar contraseña"}
-                      </button>
+              <div className="profile-primary-column">
+                <form className="profile-settings-card profile-account-card" onSubmit={saveProfile} noValidate>
+                  <div className="profile-settings-card-header">
+                    <div>
+                      <span className="tracker-actions-label">Información</span>
+                      <h2>Datos de cuenta</h2>
                     </div>
-                  </>
-                ) : (
-                  <p className="profile-settings-note">
-                    Esta cuenta no permite cambio de contraseña desde el perfil.
-                  </p>
-                )}
-              </form>
+                    <span className="admin-user-status is-active">{user?.roleLabel || "Usuario"}</span>
+                  </div>
+
+                  <AvatarUploader
+                    avatarUrl={profileForm.avatarUrl}
+                    alias={profileForm.alias}
+                    login={user?.login}
+                    previewUrl={avatarPreviewUrl}
+                    error={profileErrors.avatarUrl}
+                    onFileChange={updateAvatarFile}
+                    onAvatarClear={clearAvatar}
+                  />
+
+                  <div className="profile-account-meta" aria-label="Resumen de cuenta">
+                    <div>
+                      <span>Usuario</span>
+                      <strong>{user?.login || "Sin usuario"}</strong>
+                    </div>
+                    <div>
+                      <span>Rol</span>
+                      <strong>{user?.roleLabel || "Usuario"}</strong>
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group-modal">
+                      <label htmlFor="profile-alias">Alias</label>
+                      <input
+                        id="profile-alias"
+                        className="modal-input"
+                        value={profileForm.alias}
+                        maxLength={ALIAS_MAX_LENGTH}
+                        onChange={(event) => updateProfileField("alias", event.target.value)}
+                        autoComplete="nickname"
+                        aria-invalid={Boolean(profileErrors.alias)}
+                        aria-describedby={profileErrors.alias ? "profile-alias-error" : undefined}
+                      />
+                      {profileErrors.alias ? <span id="profile-alias-error" className="field-error">{profileErrors.alias}</span> : null}
+                    </div>
+                    <div className="form-group-modal">
+                      <label htmlFor="profile-email">Email</label>
+                      <input
+                        id="profile-email"
+                        className="modal-input"
+                        type="email"
+                        value={profileForm.email}
+                        maxLength={EMAIL_MAX_LENGTH}
+                        onChange={(event) => updateProfileField("email", event.target.value)}
+                        autoComplete="email"
+                        aria-invalid={Boolean(profileErrors.email)}
+                        aria-describedby={profileErrors.email ? "profile-email-error" : undefined}
+                      />
+                      {profileErrors.email ? <span id="profile-email-error" className="field-error">{profileErrors.email}</span> : null}
+                    </div>
+                  </div>
+
+                  {profileErrors.form ? <p className="field-error">{profileErrors.form}</p> : null}
+
+                  <div className="modal-actions">
+                    <button type="submit" className="btn-modal btn-modal-primary" disabled={isSavingProfile || !hasProfileChanges}>
+                      {isSavingProfile ? "Guardando..." : "Guardar perfil"}
+                    </button>
+                  </div>
+                </form>
+
+                <form className="profile-settings-card profile-password-card" onSubmit={savePassword} noValidate>
+                  <div className="profile-settings-card-header">
+                    <div>
+                      <span className="tracker-actions-label">Seguridad</span>
+                      <h2>{canSetInitialPassword ? "Configurar contraseña" : "Contraseña"}</h2>
+                      <p>
+                        {canSetInitialPassword
+                          ? "Crea una contraseña para mantener acceso manual si desconectas tus cuentas externas."
+                          : "Cambia tu contraseña usando tu clave actual."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {canManagePassword ? (
+                    <>
+                      {user?.hasPassword ? (
+                        <PasswordInput
+                          id="profile-current-password"
+                          label="Contraseña actual"
+                          field="currentPassword"
+                          autoComplete="current-password"
+                          value={passwordForm.currentPassword}
+                          isVisible={visiblePasswords.currentPassword}
+                          error={passwordErrors.currentPassword}
+                          onChange={updatePasswordField}
+                          onToggle={togglePassword}
+                        />
+                      ) : null}
+                      <PasswordInput
+                        id="profile-new-password"
+                        label={canSetInitialPassword ? "Contraseña" : "Nueva contraseña"}
+                        field="password"
+                        autoComplete="new-password"
+                        value={passwordForm.password}
+                        isVisible={visiblePasswords.password}
+                        error={passwordErrors.password}
+                        onChange={updatePasswordField}
+                        onToggle={togglePassword}
+                      >
+                        {showPasswordStrength ? (
+                          <div className={`auth-password-strength profile-password-strength is-${passwordStrength.tone}`} aria-live="polite">
+                            <span className="auth-password-strength-track" aria-hidden="true">
+                              <span style={{ width: `${(passwordStrength.score / 5) * 100}%` }} />
+                            </span>
+                            <span>{passwordStrength.label}</span>
+                          </div>
+                        ) : null}
+                      </PasswordInput>
+                      <PasswordInput
+                        id="profile-confirm-password"
+                        label="Confirmar contraseña"
+                        field="confirmPassword"
+                        autoComplete="new-password"
+                        value={passwordForm.confirmPassword}
+                        isVisible={visiblePasswords.confirmPassword}
+                        error={passwordErrors.confirmPassword}
+                        onChange={updatePasswordField}
+                        onToggle={togglePassword}
+                      />
+                      {passwordErrors.form ? <p className="field-error">{passwordErrors.form}</p> : null}
+                      <div className="modal-actions">
+                        <button type="submit" className="btn-modal btn-modal-primary" disabled={!canSubmitPassword}>
+                          {isSavingPassword ? "Guardando..." : canSetInitialPassword ? "Configurar contraseña" : "Cambiar contraseña"}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="profile-settings-note">
+                      Esta cuenta no permite cambio de contraseña desde el perfil.
+                    </p>
+                  )}
+                </form>
+              </div>
+
+              <section className="profile-settings-card profile-identities-card">
+                <div className="profile-settings-card-header">
+                  <div>
+                    <span className="tracker-actions-label">Acceso</span>
+                    <h2>Cuentas conectadas</h2>
+                    <p>Usa cualquiera de estos métodos para entrar a la misma cuenta.</p>
+                  </div>
+                </div>
+
+                <div className="profile-identity-list">
+                  {[
+                    { provider: "twitch", label: "Twitch", identity: twitchIdentity },
+                    { provider: "google", label: "Google / YouTube", identity: googleIdentity },
+                  ].map(({ provider, label, identity }) => {
+                    const cannotDisconnectLastMethod = Boolean(identity && isLastAccessMethod);
+                    return (
+                      <div className="profile-identity-row" key={provider}>
+                        <div className="profile-identity-copy">
+                          <strong>{label}</strong>
+                          <span>{identity ? identity.email || identity.login || "Cuenta conectada" : "No conectado"}</span>
+                          {cannotDisconnectLastMethod ? (
+                            <small>Configura una contraseña antes de desconectar tu último método de acceso.</small>
+                          ) : null}
+                        </div>
+                        {identity ? (
+                          <button
+                            type="button"
+                            className="btn-modal btn-modal-secondary"
+                            disabled={cannotDisconnectLastMethod}
+                            onClick={() => setDisconnectProvider(provider)}
+                          >
+                            <Unlink size={16} aria-hidden="true" />
+                            Desconectar
+                          </button>
+                        ) : (
+                          <a className="btn-modal btn-modal-primary" href={`/api/auth/${provider}/start?intent=connect&returnTo=%2Fperfil`}>
+                            <Link2 size={16} aria-hidden="true" />
+                            Conectar
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div className="profile-identity-row">
+                    <div className="profile-identity-copy">
+                      <strong>Usuario y contraseña</strong>
+                      <span>{user?.hasPassword ? "Configurado" : "No configurado"}</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
             </section>
           </main>
         </div>
       </AppSidebarShell>
+      <ConfirmModal
+        isOpen={Boolean(disconnectProvider)}
+        title="Desconectar cuenta"
+        description="Después de desconectarla ya no podrás usar este proveedor para iniciar sesión. No se eliminará tu perfil ni tu actividad."
+        confirmLabel="Desconectar"
+        isLoading={isDisconnecting}
+        onConfirm={disconnectIdentity}
+        onCancel={() => setDisconnectProvider("")}
+      />
     </>
   );
 }

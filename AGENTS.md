@@ -134,6 +134,10 @@ npm run db:migrate:deploy
 - Mantener la línea visual existente: oscuro, bordes sutiles, radios moderados, estados claros.
 - Antes de cambios visuales grandes o de homologación con trade-offs, explicar la opción en 2-3 líneas y esperar confirmación.
 - Ver `docs/design-system.md` para estándares concretos.
+- Confort visual en tema oscuro:
+  - El usuario reportó mareo/fatiga visual en pantallas con textos grises apagados sobre fondos oscuros texturizados, gradientes/transparencias superpuestas y bordes poco definidos.
+  - Para perfil, formularios, mantenedores y pantallas largas, preferir superficies sólidas, contraste secundario medio-alto, gradientes mínimos y sombras discretas.
+  - Ver `docs/design-system.md` → `Confort Visual En Temas Oscuros` antes de aplicar cambios visuales similares.
 - Reutilizar componentes existentes:
   - `MaintainerTable`
   - `MaintainerToolbar`
@@ -198,6 +202,11 @@ npm run db:migrate:deploy
 ## Autenticación
 
 - Login manual, Twitch OAuth y futuro YouTube deben convivir.
+- `PlatformUser` es la cuenta canónica; Twitch y Google/YouTube se vinculan mediante identidades externas.
+- Una coincidencia de correo no autoriza una fusión automática. El usuario debe autenticarse con un método ya conectado antes de completar la vinculación.
+- El identificador estable de cada proveedor es su subject externo, nunca el correo ni el login visible.
+- Un OAuth nuevo sin cuenta existente debe completar `/registro?oauth=...` antes de crear `PlatformUser`: email bloqueado desde proveedor, login/alias precargados editables y contraseña opcional. Si el usuario agrega contraseña, debe validarse con las mismas reglas del registro manual.
+- Google/YouTube no cambia roles. Twitch sincroniza roles con `roleSource=twitch` o cuando el rol actual es `publico`; una asignación administrativa no pública cambia la fuente a `manual`.
 - Email es único y obligatorio.
 - Usuario/login es único.
 - Alias es visible públicamente y no necesariamente único.
