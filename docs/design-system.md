@@ -128,6 +128,8 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Campos obligatorios deben tener reglas consistentes en cliente y servidor.
 - Inputs y selects deben usar clases estándar (`modal-input`, `FormSelect`, `FilterSelect`).
 - Campos de imagen local deben usar uploader con drag and drop y botón de selección.
+- En registro manual, ofrecer primero registro conectado con Twitch/YouTube y separar con un divisor claro antes del formulario manual. Esto evita que el usuario piense que solo existe una vía de alta.
+- El medidor de fuerza de contraseña no debe mostrarse vacío; aparece solo cuando el usuario empieza a escribir para evitar el estado confuso `Sin contraseña`.
 
 ## Selectores
 
@@ -227,6 +229,31 @@ Usar primero estos componentes antes de crear algo nuevo:
   - ofrecer acción `Iniciar sesión`
 - Esto aplica a favoritos, listas personales, visto/guardado y calificaciones.
 
+## Cuentas Conectadas
+
+- La gestión de proveedores vive en `/perfil`, dentro de un panel único de configuración junto con información y seguridad.
+- Evitar separar `Datos de cuenta`, `Cuentas conectadas` y `Contraseña` en tres cards independientes; se siente fragmentado. Preferir una sola superficie principal con columnas/secciones internas y divisores sutiles.
+- Mostrar Twitch, Google/YouTube y contraseña como métodos de acceso de una sola cuenta.
+- En registro OAuth, la contraseña es opcional. No mostrar campos vacíos de contraseña por defecto porque parecen obligatorios; usar una sección `Acceso manual opcional` con acción `Agregar contraseña` y desplegar campos solo si el usuario decide configurarla.
+- Conectar usa acción primaria; desconectar usa acción secundaria con confirmación estándar.
+- En mobile cada proveedor se apila y su acción ocupa el ancho disponible.
+- Una coincidencia de correo siempre exige autenticación con un método existente antes de vincular.
+
+## Confort Visual En Temas Oscuros
+
+- Señal reportada por el usuario: algunas pantallas oscuras “marean” o fatigan visualmente, especialmente cuando hay textos grises sobre fondos texturizados, muchas transparencias, gradientes superpuestos o contrastes demasiado cercanos entre card, fondo y contenido.
+- Causa probable: en temas oscuros, los bordes suaves, textos apagados y fondos con ruido/gradiente obligan al ojo a reenfocar constantemente. Esto puede sentirse peor con astigmatismo por halos, blooming o bordes poco definidos alrededor de texto claro sobre fondo oscuro.
+- Patrón recomendado para pantallas de configuración, perfil, mantenedores y formularios largos:
+  - usar superficies más planas y legibles que las vistas de contenido;
+  - preferir fondos sólidos (`#0f131b`, `#12161d` o equivalentes) sobre transparencias texturizadas;
+  - reducir gradientes a acentos puntuales, no como base de lectura;
+  - usar bordes visibles pero discretos, por ejemplo `rgba(148, 163, 184, 0.16+)`;
+  - subir el texto secundario a contraste medio-alto (`#aab7ca`, `#b6c2d2` o superior);
+  - evitar texto gris muy apagado sobre fondos con textura, blur o radial gradients;
+  - reemplazar sombras externas grandes por bordes, sombras internas sutiles o separación por espaciado;
+  - validar con capturas reales desktop/mobile, no solo mirando el CSS.
+- Caso documentado: `/perfil` provocaba sensación de mareo por cards transparentes, jerarquía débil y textos secundarios apagados. Se corrigió con layout más claro, cards sólidas, menos sombras/gradientes y textos secundarios de mayor contraste.
+
 ## Responsive
 
 - No escalar tipografía con viewport.
@@ -239,10 +266,10 @@ Usar primero estos componentes antes de crear algo nuevo:
 - En pantallas con muchas cards, evitar combinar sombras grandes, múltiples gradientes, filtros y transiciones de `transform`; esa mezcla puede provocar parpadeos al hacer scroll.
 - Si aparece flicker/titileo durante el scroll, estabilizar primero el CSS:
   - aislar el contenedor principal con `isolation: isolate`;
-  - usar `contain: paint` en hero/cards repetidas;
+  - evitar `contain: paint` como parche en páginas largas con muchas cards y gradientes, porque puede generar recomposición visible;
   - reemplazar `box-shadow` grandes por sombras internas o bordes sutiles;
   - quitar hover basado en `transform` cuando el grid es largo.
-- Caso documentado: la página `Novedades` parpadeaba al hacer scroll por repintados caros de cards con gradientes y sombras. Se resolvió conteniendo pintura y reduciendo sombras sin cambiar la estructura visual.
+- Caso documentado: la página `Novedades` parpadeaba al hacer scroll por repintados caros de cards con gradientes y sombras. Se resolvió aislando el contenedor y reduciendo sombras sin cambiar la estructura visual.
 
 ## Accesibilidad
 

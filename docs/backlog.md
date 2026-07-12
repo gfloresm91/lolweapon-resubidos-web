@@ -4,6 +4,14 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
+### Feature: Google/YouTube y cuentas conectadas
+
+- **Estado:** implementada en `feature/auth-identities` (2026-07-04); pendiente configuración OAuth, migración y pruebas reales en QA.
+- **Alcance:** cuenta canónica `PlatformUser`, identidades Twitch y Google/YouTube, alta OAuth mediante `/registro?oauth=...` con email bloqueado y contraseña opcional, vinculación mediante reautenticación y gestión desde Perfil.
+- **Roles:** la migración conserva `roleId`; `roleSource` distingue asignaciones manuales de sincronizaciones Twitch. Google/YouTube inicia como `publico`; Twitch aplica reglas automáticas al registrar o conectar sobre rol `publico`.
+- **Fuera de alcance:** detección de membresía con `members.list`, condicionada a autorización del creador y acceso oficial de YouTube.
+- **Pendiente operativo:** configurar credenciales y redirect URI de Google por ambiente, aplicar la migración y completar pruebas OAuth reales en local/QA.
+
 ### ~~Feature: Centro y mantenedor de notificaciones~~
 
 - **Estado:** Implementada en `feature/notification-management` (2026-06-28). Pendiente aplicar la migración versionada y completar pruebas visuales autenticadas con datos PostgreSQL.

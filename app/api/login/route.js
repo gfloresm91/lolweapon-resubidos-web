@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { setSessionCookie } from "@/lib/auth";
+import { IDENTITY_LINK_COOKIE, oauthCookieOptions } from "@/lib/googleOAuth";
 import { readJsonRequest } from "@/lib/http";
 import {
   auditLoginAttempt,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/loginSecurity";
 import {
   authenticateManualUser,
+  consumeIdentityLinkAttempt,
   createPlatformSession,
 } from "@/lib/repositories/platformUserRepository";
 
@@ -49,9 +51,21 @@ export async function POST(request) {
 
   clearLoginRateLimit(rateLimitKey);
   await auditLoginAttempt({ login, ip, userAgent, success: true, reason: "manual" });
+  const pendingLinkId = request.cookies.get(IDENTITY_LINK_COOKIE)?.value;
+  let linkedProvider = null;
+  let linkWarning = null;
+  if (pendingLinkId) {
+    try {
+      const linkResult = await consumeIdentityLinkAttempt(pendingLinkId, user.id);
+      linkedProvider = linkResult.provider;
+    } catch {
+      linkWarning = "No se completó la vinculación pendiente. Si aún quieres conectar esa cuenta, inicia el proceso nuevamente desde tu perfil.";
+    }
+  }
   const session = await createPlatformSession(user.id);
-  const response = NextResponse.json({ success: true, user: session.user });
+  const response = NextResponse.json({ success: true, user: session.user, linkedProvider, linkWarning });
   setSessionCookie(response, request, session.token, session.expiresAt);
+  response.cookies.set(IDENTITY_LINK_COOKIE, "", oauthCookieOptions(0));
 
   return response;
 }
