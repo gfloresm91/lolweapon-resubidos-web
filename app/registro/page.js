@@ -22,18 +22,48 @@ import {
   PASSWORD_RULES,
 } from "@/lib/platformUserValidation";
 
+const passwordConfirmationRules = z
+  .string()
+  .max(72, "La confirmación no puede superar 72 caracteres.");
+
 const registerSchema = z.object({
   login: LOGIN_RULES,
   alias: ALIAS_RULES,
   email: EMAIL_RULES,
-  password: PASSWORD_RULES,
-  confirmPassword: z
-    .string()
-    .min(1, "Confirma tu contraseña.")
-    .max(72, "La confirmación no puede superar 72 caracteres."),
-}).refine((values) => values.password === values.confirmPassword, {
-  path: ["confirmPassword"],
-  message: "Las contraseñas no coinciden.",
+  oauthProvider: z.string().optional(),
+  password: z.string().max(PASSWORD_MAX_LENGTH, "La contraseña no puede superar 72 caracteres."),
+  confirmPassword: passwordConfirmationRules,
+}).superRefine((values, context) => {
+  const isOAuthRegister = ["google", "twitch"].includes(values.oauthProvider || "");
+
+  if (isOAuthRegister && !values.password && !values.confirmPassword) return;
+
+  const passwordResult = PASSWORD_RULES.safeParse(values.password);
+  if (!passwordResult.success) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["password"],
+      message: passwordResult.error.issues[0]?.message || "Ingresa una contraseña válida.",
+    });
+    return;
+  }
+
+  if (!values.confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Confirma tu contraseña.",
+    });
+    return;
+  }
+
+  if (values.password !== values.confirmPassword) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["confirmPassword"],
+      message: "Las contraseñas no coinciden.",
+    });
+  }
 });
 
 function getSafeReturnPath(value) {
@@ -49,20 +79,36 @@ function getSafeReturnPath(value) {
   return value;
 }
 
+function getProviderLabel(provider) {
+  if (provider === "google") return "Google / YouTube";
+  if (provider === "twitch") return "Twitch";
+  return "tu cuenta externa";
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingOAuth, setIsLoadingOAuth] = useState(false);
   const [nextPath, setNextPath] = useState("/inicio");
+  const [oauthProvider, setOauthProvider] = useState("");
+  const [showManualAccess, setShowManualAccess] = useState(false);
+  const twitchRegisterHref = `/api/auth/twitch/start?returnTo=${encodeURIComponent(nextPath)}`;
+  const googleRegisterHref = `/api/auth/google/start?returnTo=${encodeURIComponent(nextPath)}`;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const next = params.get("next");
     const returnTo = params.get("returnTo");
+    const oauth = params.get("oauth");
     const safeReturnTo = getSafeReturnPath(returnTo);
     const safeNext = getSafeReturnPath(next);
 
     if (safeReturnTo || safeNext) {
       setNextPath(safeReturnTo || safeNext);
+    }
+
+    if (["google", "twitch"].includes(oauth)) {
+      setOauthProvider(oauth);
     }
   }, []);
   const [visiblePasswords, setVisiblePasswords] = useState({
@@ -83,17 +129,63 @@ export default function RegisterPage() {
       login: "",
       alias: "",
       email: "",
+      oauthProvider: "",
       password: "",
       confirmPassword: "",
     },
   });
-  const passwordStrength = getPasswordStrength(watch("password"));
+  const passwordValue = watch("password");
+  const passwordStrength = getPasswordStrength(passwordValue);
+  const showPasswordStrength = Boolean(passwordValue);
+  const providerLabel = getProviderLabel(oauthProvider);
+
+  useEffect(() => {
+    setValue("oauthProvider", oauthProvider, { shouldValidate: true });
+  }, [oauthProvider, setValue]);
+
+  useEffect(() => {
+    if (!oauthProvider) return;
+    let isMounted = true;
+    setIsLoadingOAuth(true);
+
+    fetch("/api/register/oauth")
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "No se pudo cargar el registro conectado.");
+        }
+        return data.registration;
+      })
+      .then((registration) => {
+        if (!isMounted) return;
+        setValue("login", registration.login || "", { shouldValidate: true });
+        setValue("alias", registration.alias || "", { shouldValidate: true });
+        setValue("email", registration.email || "", { shouldValidate: true });
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        toast.error(error.message);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingOAuth(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [oauthProvider, setValue]);
 
   function togglePassword(field) {
     setVisiblePasswords((current) => ({
       ...current,
       [field]: !current[field],
     }));
+  }
+
+  function hideManualAccess() {
+    setValue("password", "", { shouldValidate: true });
+    setValue("confirmPassword", "", { shouldValidate: true });
+    setShowManualAccess(false);
   }
 
   async function submitRegister(values) {
@@ -139,9 +231,46 @@ export default function RegisterPage() {
             <img src="/brand/lolweapon-logo.png" alt="" />
             <strong>LOLWEAPON</strong>
           </span>
-          <h1 id="register-title" className="auth-title">Crear cuenta</h1>
-          <p className="auth-subtitle">Crea un usuario manual para entrar a la plataforma.</p>
+          <h1 id="register-title" className="auth-title">{oauthProvider ? "Finalizar registro" : "Crear cuenta"}</h1>
+          <p className="auth-subtitle">
+            {oauthProvider
+              ? `Confirma cómo quieres aparecer en Lolweapon. Ya podrás iniciar sesión con ${providerLabel}.`
+              : "Crea tu cuenta para acceder a Lolweapon."}
+          </p>
         </div>
+
+        {oauthProvider ? (
+          <div className="auth-link-notice" role="status" aria-live="polite">
+            <span className="auth-link-notice-eyebrow">Registro conectado</span>
+            <strong>Estás creando una cuenta conectada a {providerLabel}.</strong>
+            <p>
+              Después podrás iniciar sesión con {providerLabel}. Si agregas una contraseña, también podrás entrar con usuario y contraseña.
+              El email viene verificado desde el proveedor y queda bloqueado para este registro.
+            </p>
+            <p>
+              Por ahora, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch.
+              Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
+            </p>
+          </div>
+        ) : null}
+
+        {!oauthProvider ? (
+          <>
+            <div className="auth-provider-row" aria-label="Opciones de registro conectado">
+              <a className="auth-provider-button twitch-login-button" href={twitchRegisterHref}>
+                <span>Twitch</span>
+                <strong>Registrarme</strong>
+              </a>
+              <a className="auth-provider-button youtube-login-button" href={googleRegisterHref}>
+                <span>YouTube</span>
+                <strong>Registrarme</strong>
+              </a>
+            </div>
+            <div className="auth-divider">
+              <span>O crea una cuenta manual</span>
+            </div>
+          </>
+        ) : null}
 
         <form
           className="auth-form"
@@ -158,6 +287,7 @@ export default function RegisterPage() {
                 type="text"
                 autoComplete="username"
                 maxLength={LOGIN_MAX_LENGTH}
+                disabled={isLoadingOAuth}
                 aria-invalid={Boolean(errors.login)}
                 aria-describedby={errors.login ? "register-login-error" : undefined}
                 {...register("login")}
@@ -171,6 +301,7 @@ export default function RegisterPage() {
                 type="text"
                 autoComplete="nickname"
                 maxLength={ALIAS_MAX_LENGTH}
+                disabled={isLoadingOAuth}
                 aria-invalid={Boolean(errors.alias)}
                 aria-describedby={errors.alias ? "register-alias-error" : undefined}
                 {...register("alias")}
@@ -184,69 +315,102 @@ export default function RegisterPage() {
                 type="email"
                 autoComplete="email"
                 maxLength={EMAIL_MAX_LENGTH}
+                readOnly={Boolean(oauthProvider)}
+                disabled={isLoadingOAuth}
                 aria-invalid={Boolean(errors.email)}
                 aria-describedby={errors.email ? "register-email-error" : undefined}
                 {...register("email")}
               />
               {errors.email ? <span id="register-email-error" className="auth-field-error">{errors.email.message}</span> : null}
             </div>
-            <div className="auth-field">
-              <label htmlFor="register-password">Contraseña</label>
-              <div className="auth-password-field">
-                <input
-                  id="register-password"
-                  type={visiblePasswords.password ? "text" : "password"}
-                  autoComplete="new-password"
-                  maxLength={PASSWORD_MAX_LENGTH}
-                  aria-invalid={Boolean(errors.password)}
-                  aria-describedby={errors.password ? "register-password-error" : undefined}
-                  {...register("password")}
-                />
-                <button
-                  type="button"
-                  className="auth-password-toggle"
-                  aria-label={visiblePasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  onClick={() => togglePassword("password")}
-                >
-                  {visiblePasswords.password ? <EyeOff size={18} /> : <Eye size={18} />}
+            {oauthProvider && !showManualAccess ? (
+              <div className="auth-manual-access-card auth-field-full">
+                <div>
+                  <span className="auth-link-notice-eyebrow">Acceso manual opcional</span>
+                  <strong>Tu cuenta ya quedará conectada a {providerLabel}.</strong>
+                  <p>
+                    Agrega una contraseña solo si también quieres entrar con usuario y contraseña.
+                    También puedes configurarla después desde tu perfil.
+                  </p>
+                </div>
+                <button type="button" className="auth-manual-access-button" onClick={() => setShowManualAccess(true)}>
+                  Agregar contraseña
                 </button>
               </div>
-              <div className={`auth-password-strength is-${passwordStrength.tone}`} aria-live="polite">
-                <span className="auth-password-strength-track" aria-hidden="true">
-                  <span style={{ width: `${(passwordStrength.score / 5) * 100}%` }} />
-                </span>
-                <span>{passwordStrength.label}</span>
-              </div>
-              {errors.password ? <span id="register-password-error" className="auth-field-error">{errors.password.message}</span> : null}
-            </div>
-            <div className="auth-field">
-              <label htmlFor="register-confirm">Confirmar contraseña</label>
-              <div className="auth-password-field">
-                <input
-                  id="register-confirm"
-                  type={visiblePasswords.confirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  maxLength={PASSWORD_MAX_LENGTH}
-                  aria-invalid={Boolean(errors.confirmPassword)}
-                  aria-describedby={errors.confirmPassword ? "register-confirm-error" : undefined}
-                  {...register("confirmPassword")}
-                />
-                <button
-                  type="button"
-                  className="auth-password-toggle"
-                  aria-label={visiblePasswords.confirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  onClick={() => togglePassword("confirmPassword")}
-                >
-                  {visiblePasswords.confirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {errors.confirmPassword ? <span id="register-confirm-error" className="auth-field-error">{errors.confirmPassword.message}</span> : null}
-            </div>
+            ) : (
+              <>
+                {oauthProvider ? (
+                  <div className="auth-manual-access-head auth-field-full">
+                    <div>
+                      <span className="auth-link-notice-eyebrow">Acceso manual opcional</span>
+                      <p>Completa estos campos solo si también quieres entrar con usuario y contraseña.</p>
+                    </div>
+                    <button type="button" className="auth-manual-access-clear" onClick={hideManualAccess}>
+                      Quitar contraseña
+                    </button>
+                  </div>
+                ) : null}
+                <div className="auth-field">
+                  <label htmlFor="register-password">{oauthProvider ? "Contraseña opcional" : "Contraseña"}</label>
+                  <div className="auth-password-field">
+                    <input
+                      id="register-password"
+                      type={visiblePasswords.password ? "text" : "password"}
+                      autoComplete="new-password"
+                      maxLength={PASSWORD_MAX_LENGTH}
+                      aria-invalid={Boolean(errors.password)}
+                      aria-describedby={errors.password ? "register-password-error" : undefined}
+                      {...register("password")}
+                    />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      aria-label={visiblePasswords.password ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      onClick={() => togglePassword("password")}
+                    >
+                      {visiblePasswords.password ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {showPasswordStrength ? (
+                    <div className={`auth-password-strength is-${passwordStrength.tone}`} aria-live="polite">
+                      <span className="auth-password-strength-track" aria-hidden="true">
+                        <span style={{ width: `${(passwordStrength.score / 5) * 100}%` }} />
+                      </span>
+                      <span>{passwordStrength.label}</span>
+                    </div>
+                  ) : null}
+                  {errors.password ? <span id="register-password-error" className="auth-field-error">{errors.password.message}</span> : null}
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="register-confirm">Confirmar contraseña</label>
+                  <div className="auth-password-field">
+                    <input
+                      id="register-confirm"
+                      type={visiblePasswords.confirmPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      maxLength={PASSWORD_MAX_LENGTH}
+                      aria-invalid={Boolean(errors.confirmPassword)}
+                      aria-describedby={errors.confirmPassword ? "register-confirm-error" : undefined}
+                      {...register("confirmPassword")}
+                    />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      aria-label={visiblePasswords.confirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      onClick={() => togglePassword("confirmPassword")}
+                    >
+                      {visiblePasswords.confirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword ? <span id="register-confirm-error" className="auth-field-error">{errors.confirmPassword.message}</span> : null}
+                </div>
+              </>
+            )}
           </div>
 
-          <button type="submit" className="auth-submit-button" disabled={isSubmitting}>
+          <button type="submit" className="auth-submit-button" disabled={isSubmitting || isLoadingOAuth}>
             {isSubmitting ? <span className="auth-submit-spinner" aria-hidden="true" /> : null}
-            <span>{isSubmitting ? "Creando..." : "Crear cuenta"}</span>
+            <span>{isSubmitting ? "Creando..." : isLoadingOAuth ? "Cargando..." : oauthProvider ? `Finalizar con ${providerLabel}` : "Crear cuenta"}</span>
             {!isSubmitting ? <span aria-hidden="true">→</span> : null}
           </button>
         </form>

@@ -2,6 +2,7 @@
 
 import { useDropzone } from "react-dropzone";
 
+import UserAvatar from "@/components/UserAvatar";
 import { AVATAR_MAX_BYTES } from "@/lib/platformUserValidation";
 
 export function getAvatarStatus(avatarUrl, previewUrl) {
@@ -41,7 +42,6 @@ export default function AvatarUploader({
 }) {
   const displayAvatar = previewUrl || avatarUrl;
   const avatarStatus = getAvatarStatus(avatarUrl, previewUrl);
-  const initials = (alias || login || "US").slice(0, 2).toUpperCase();
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     accept: {
       "image/jpeg": [".jpg", ".jpeg"],
@@ -69,9 +69,7 @@ export default function AvatarUploader({
   return (
     <div className="profile-avatar-uploader">
       <div className="profile-avatar-preview">
-        <span className="account-avatar account-avatar-large" aria-hidden="true">
-          {displayAvatar ? <img src={displayAvatar} alt="" /> : initials}
-        </span>
+        <UserAvatar user={{ alias, login }} src={displayAvatar} className="account-avatar-large" />
         <div>
           <strong>{login}</strong>
           <span>{avatarStatus}</span>

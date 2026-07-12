@@ -141,6 +141,14 @@ npm run db:migrate:deploy
 
 Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.example` con el valor vacío o un valor por defecto seguro.
 
+## Identidades de acceso
+
+- `PlatformUser` es la cuenta canónica y puede tener contraseña, Twitch y Google/YouTube conectados.
+- Resolver identidades por proveedor + subject; no vincular automáticamente por correo o login.
+- Si el correo ya existe, exigir autenticación con un método actual antes de conectar el proveedor nuevo.
+- Un OAuth nuevo sin cuenta existente debe pasar por `/registro?oauth=...`: email bloqueado desde el proveedor, usuario/alias precargados editables y contraseña opcional. Si el usuario agrega contraseña, se validan las mismas reglas del registro manual.
+- Google/YouTube no modifica roles. Twitch sincroniza roles cuando `roleSource=twitch` o cuando el rol actual es `publico`; una edición administrativa no pública fija `roleSource=manual`.
+
 ## Gotchas conocidos
 
 - **`npm run db:generate` es obligatorio después de `npm ci`** — sin esto, el build falla con `Cannot find module '.prisma/client/default'`. Ya está en los workflows de GitHub Actions, pero si se corre el build manualmente hay que hacerlo explícitamente.

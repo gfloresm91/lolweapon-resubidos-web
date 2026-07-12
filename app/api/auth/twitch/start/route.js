@@ -6,6 +6,7 @@ import {
   buildTwitchAppUrl,
   buildTwitchAuthorizeUrl,
   TWITCH_OAUTH_RETURN_COOKIE,
+  TWITCH_OAUTH_INTENT_COOKIE,
   TWITCH_OAUTH_STATE_COOKIE,
 } from "@/lib/twitchOAuth";
 
@@ -27,9 +28,17 @@ export async function GET(request) {
     const state = crypto.randomBytes(24).toString("hex");
     const url = new URL(request.url);
     const returnTo = getSafeReturnPath(url.searchParams.get("returnTo")) || getSafeReturnPath(url.searchParams.get("next"));
+    const intent = url.searchParams.get("intent") === "connect" ? "connect" : "login";
     const response = NextResponse.redirect(buildTwitchAuthorizeUrl({ request, state }));
 
     response.cookies.set(TWITCH_OAUTH_STATE_COOKIE, state, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 10,
+    });
+    response.cookies.set(TWITCH_OAUTH_INTENT_COOKIE, intent, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",

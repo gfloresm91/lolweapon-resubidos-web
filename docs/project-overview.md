@@ -110,6 +110,8 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 | Modelo | Descripción |
 |---|---|
 | `PlatformUser` | Usuario (twitchUserId, login, alias, email, avatarUrl, tier Twitch, roleId, isActive) |
+| `PlatformAuthIdentity` | Identidades externas vinculadas a una cuenta canónica usando el subject estable del proveedor |
+| `PlatformIdentityLinkAttempt` | Vinculación temporal cuando un proveedor usa un correo ya registrado y se requiere reautenticación |
 | `PlatformRole` | Rol (code, label, canAdmin) |
 | `PlatformPermission` | Permiso granular (code, label, group) |
 | `PlatformRolePermission` | Relación rol ↔ permiso |
@@ -221,7 +223,7 @@ El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/c
 | `publico` | Público | — | Usuario registrado sin tier |
 | `invitado` | Invitado | — | Sin autenticación |
 
-La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`.
+La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`. Por decisión operativa actual, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch. Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
 
 ### Permisos principales
 
@@ -336,9 +338,29 @@ SESSION_COOKIE_DOMAIN=.lolweapon.com
 1. `GET /api/auth/twitch/start` → redirect a Twitch
 2. Twitch callback → `GET /api/auth/twitch/callback`
 3. Intercambio de código por token → fetch perfil + membresía
-4. `findOrCreateTwitchUser` — crea o actualiza PlatformUser
-5. Sincronización automática de rol por membresía
-6. Sesión creada → redirect a home
+4. Si la identidad existe, crea sesión para su `PlatformUser`.
+5. Si el correo ya existe, exige iniciar sesión con un método actual antes de vincular; la pantalla de login recibe pistas (`loginMethod`/`loginMethods`) para recomendar contraseña, Twitch o Google/YouTube sin adivinar. Si la cuenta tiene más de un método existente, se muestran todas las alternativas válidas.
+6. Si es nuevo, guarda un intento temporal y redirige a `/registro?oauth=twitch` con email bloqueado, datos precargados y contraseña opcional.
+7. Al completar registro, crea `PlatformUser`, identidad Twitch y sincroniza el rol automático por membresía.
+8. Sesión creada → redirect a home
+
+Twitch se resuelve por identidad externa, no por email o login. La migración desde `twitchUserId` conserva `roleId`. La sincronización de tiers pagados puede modificar roles con `roleSource=twitch` o rol actual `publico`; una asignación administrativa no pública usa `roleSource=manual` y no se pisa al conectar Twitch. Twitch VIP queda registrado como referencia, pero no debe otorgar beneficios adicionales mientras la regla no esté autorizada.
+
+### Login con Google/YouTube
+
+1. `GET /api/auth/google/start` inicia OpenID Connect con `openid email profile`.
+2. Google retorna a `GET /api/auth/google/callback`.
+3. El servidor valida firma, issuer, audience, expiración, nonce, subject y correo verificado.
+4. Si la identidad existe, crea sesión para su `PlatformUser`.
+5. Si es nueva y el correo no existe, guarda un intento temporal y redirige a `/registro?oauth=google`.
+6. El registro OAuth reutiliza `/registro`: email bloqueado desde Google, usuario/alias precargados editables, contraseña opcional y rol inicial `publico`.
+7. Si el correo ya existe, exige iniciar sesión con contraseña u otro proveedor conectado antes de vincular; la pantalla de login recibe pistas (`loginMethod`/`loginMethods`) para recomendar uno o más métodos correctos.
+
+Los intentos temporales de registro OAuth y vinculación son mutuamente excluyentes: al iniciar uno se limpia la cookie del otro. Un login OAuth normal no debe fallar por una cookie de vinculación expirada o perteneciente a otra cuenta; se ignora y se limpia para no bloquear usuarios sin contraseña manual.
+
+En login manual, una cookie de vinculación pendiente expirada o perteneciente a otra cuenta tampoco debe convertir credenciales válidas en error. Si las credenciales son correctas, se crea la sesión, se limpia la cookie pendiente y la vinculación queda abandonada; para conectar la cuenta externa el usuario debe iniciar de nuevo el flujo desde perfil o desde el proveedor.
+
+Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de membresías del canal es independiente del login. Desde `/perfil` se pueden conectar o desconectar proveedores sin eliminar la cuenta ni su actividad. El estado miembro de YouTube queda fuera de beneficios automáticos hasta autorización explícita.
 
 ### Registro manual
 1. `POST /api/register` con login, email, password, alias

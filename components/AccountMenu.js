@@ -5,15 +5,7 @@ import Link from "next/link";
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-function getInitials(user) {
-  const source = user?.alias || user?.login || "Admin";
-  return source
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+import UserAvatar from "@/components/UserAvatar";
 
 export default function AccountMenu({ user }) {
   const router = useRouter();
@@ -71,9 +63,7 @@ export default function AccountMenu({ user }) {
         aria-expanded={isOpen}
         onClick={() => setIsOpen((current) => !current)}
       >
-        <span className="account-avatar" aria-hidden="true">
-          {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : getInitials(user)}
-        </span>
+        <UserAvatar user={user} />
         <span className="account-trigger-copy">
           <strong>{user.alias || user.login || "Admin"}</strong>
           <em>{user.roleLabel || "Admin"}</em>
@@ -84,9 +74,7 @@ export default function AccountMenu({ user }) {
       {isOpen ? (
         <div className="account-menu-popover" role="menu">
           <div className="account-menu-header">
-            <span className="account-avatar account-avatar-large" aria-hidden="true">
-              {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : getInitials(user)}
-            </span>
+            <UserAvatar user={user} className="account-avatar-large" />
             <div>
               <strong>{user.alias || user.login || "Admin"}</strong>
               <span>{user.roleLabel || "Admin"}</span>
