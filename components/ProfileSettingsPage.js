@@ -96,8 +96,33 @@ export default function ProfileSettingsPage({ currentUser }) {
   const canAccess = (permission) => (user?.role === "dios" && !GOD_EXCLUDED_PERMISSION_CODES.has(permission)) || permissions.has(permission);
   const canManageUsers = canAccess("users.read");
   const canManageRoles = canAccess("roles.read");
+  const canCreateTracker = canAccess("tracker.create");
+  const canUpdateTracker = canAccess("tracker.update");
+  const canDeleteTracker = canAccess("tracker.delete");
+  const canViewTrackerMaintainer = canAccess("admin.tracker.view");
+  const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker);
+  const canViewTagsMaintainer = canAccess("admin.tags.view");
+  const canCreateTrackingAnime = canAccess("anime.tracking.create");
+  const canUpdateTrackingAnime = canAccess("anime.tracking.update");
+  const canDeleteTrackingAnime = canAccess("anime.tracking.delete");
+  const canCreateCompletedAnime = canAccess("anime.completed.create");
+  const canUpdateCompletedAnime = canAccess("anime.completed.update");
+  const canDeleteCompletedAnime = canAccess("anime.completed.delete");
+  const canViewTrackingAnimeMaintainer = canAccess("admin.anime.tracking.view");
+  const canViewCompletedAnimeMaintainer = canAccess("admin.anime.completed.view");
+  const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
+  const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
+  const canViewSpaceDrumChaptersMaintainer = canAccess("admin.spacedrum.chapters.view");
+  const canViewSpaceDrumPagesMaintainer = canAccess("admin.spacedrum.pages.view");
+  const canViewSpaceDrumSettingsMaintainer = canAccess("admin.spacedrum.settings.view");
+  const canViewSpaceDrumImportMaintainer = canAccess("admin.spacedrum.import.view");
+  const canManageSpaceDrum = canViewSpaceDrumChaptersMaintainer
+    || canViewSpaceDrumPagesMaintainer
+    || canViewSpaceDrumSettingsMaintainer
+    || canViewSpaceDrumImportMaintainer;
   const canViewNotifications = canAccess("notifications.view");
   const canViewAllNotifications = canAccess("notifications.full.view");
+  const isAuthenticated = Boolean(user?.id);
   const passwordStrength = getPasswordStrength(passwordForm.password);
   const showPasswordStrength = Boolean(passwordForm.password);
   const canSetInitialPassword = !user?.hasPassword;
@@ -303,6 +328,12 @@ export default function ProfileSettingsPage({ currentUser }) {
           activeView=""
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
+          canManageTracker={canManageTracker}
+          canManageTags={canViewTagsMaintainer}
+          canManageSpaceDrum={canManageSpaceDrum}
+          canManageAnimeTracking={canManageTrackingAnime}
+          canManageAnimeCompleted={canManageCompletedAnime}
+          isAuthenticated={isAuthenticated}
           canAccess={canAccess}
         />
 
