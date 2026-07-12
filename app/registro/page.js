@@ -247,6 +247,10 @@ export default function RegisterPage() {
               Después podrás iniciar sesión con {providerLabel}. Si agregas una contraseña, también podrás entrar con usuario y contraseña.
               El email viene verificado desde el proveedor y queda bloqueado para este registro.
             </p>
+            <p>
+              Por ahora, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch.
+              Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
+            </p>
           </div>
         ) : null}
 

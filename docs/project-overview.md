@@ -223,7 +223,7 @@ El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/c
 | `publico` | Público | — | Usuario registrado sin tier |
 | `invitado` | Invitado | — | Sin autenticación |
 
-La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`.
+La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`. Por decisión operativa actual, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch. Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
 
 ### Permisos principales
 
@@ -344,7 +344,7 @@ SESSION_COOKIE_DOMAIN=.lolweapon.com
 7. Al completar registro, crea `PlatformUser`, identidad Twitch y sincroniza el rol automático por membresía.
 8. Sesión creada → redirect a home
 
-Twitch se resuelve por identidad externa, no por email o login. La migración desde `twitchUserId` conserva `roleId`. La sincronización de tier, VIP o moderación modifica roles con `roleSource=twitch` o rol actual `publico`; una asignación administrativa no pública usa `roleSource=manual` y no se pisa al conectar Twitch.
+Twitch se resuelve por identidad externa, no por email o login. La migración desde `twitchUserId` conserva `roleId`. La sincronización de tiers pagados puede modificar roles con `roleSource=twitch` o rol actual `publico`; una asignación administrativa no pública usa `roleSource=manual` y no se pisa al conectar Twitch. Twitch VIP queda registrado como referencia, pero no debe otorgar beneficios adicionales mientras la regla no esté autorizada.
 
 ### Login con Google/YouTube
 
@@ -360,7 +360,7 @@ Los intentos temporales de registro OAuth y vinculación son mutuamente excluyen
 
 En login manual, una cookie de vinculación pendiente expirada o perteneciente a otra cuenta tampoco debe convertir credenciales válidas en error. Si las credenciales son correctas, se crea la sesión, se limpia la cookie pendiente y la vinculación queda abandonada; para conectar la cuenta externa el usuario debe iniciar de nuevo el flujo desde perfil o desde el proveedor.
 
-Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de membresías del canal es independiente del login. Desde `/perfil` se pueden conectar o desconectar proveedores sin eliminar la cuenta ni su actividad.
+Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de membresías del canal es independiente del login. Desde `/perfil` se pueden conectar o desconectar proveedores sin eliminar la cuenta ni su actividad. El estado miembro de YouTube queda fuera de beneficios automáticos hasta autorización explícita.
 
 ### Registro manual
 1. `POST /api/register` con login, email, password, alias

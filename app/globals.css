@@ -11934,6 +11934,13 @@ html:has(.profile-settings-page) .persistent-footer {
   padding: 1rem;
 }
 
+.profile-benefit-note {
+  margin: 0.1rem 0 0.35rem;
+  border-color: rgba(167, 139, 250, 0.22);
+  background: #111827;
+  font-size: 0.9rem;
+}
+
 .profile-settings-page .modal-actions {
   margin-top: 1.15rem;
 }
