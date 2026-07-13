@@ -18,6 +18,7 @@ import LoreModal from "@/components/LoreModal";
 import NewsGuidePage from "@/components/NewsGuidePage";
 import NotificationCenter from "@/components/NotificationCenter";
 import NotificationsPage from "@/components/NotificationsPage";
+import RtfmPage from "@/components/RtfmPage";
 import PlatformNotificationsPage from "@/components/PlatformNotificationsPage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
@@ -105,6 +106,7 @@ const EMPTY_OBJECT = {};
 const GOD_EXCLUDED_PERMISSION_CODES = new Set(["anime.rating.streamer"]);
 const VIEW_LABELS = {
   home: "Inicio",
+  rtfm: "RTFM",
   news: "Novedades",
   changelog: "Historial de cambios",
   notifications: "Notificaciones",
@@ -130,6 +132,7 @@ const VIEW_LABELS = {
 
 const VIEW_PATHS = {
   home: "/inicio",
+  rtfm: "/rtfm",
   news: "/novedades",
   changelog: "/changelog",
   notifications: "/notificaciones",
@@ -1333,6 +1336,7 @@ export default function HomePage({
   function selectView(view) {
     const viewPermissions = {
       home: "home.view",
+      rtfm: "rtfm.view",
       news: "news.view",
       changelog: "changelog.view",
       notifications: "notifications.full.view",
@@ -1442,6 +1446,15 @@ export default function HomePage({
                 youtubeChannelUrl={youtubeChannelUrl}
                 streamlabsUrl={process.env.NEXT_PUBLIC_STREAMLABS_URL}
                 onTrackerOpen={() => selectView("tracker")}
+              />
+            ) : null}
+
+            {currentView === "rtfm" && hasPermission("rtfm.view") ? (
+              <RtfmPage
+                initialRoles={initialPlatformRoles}
+                initialPermissions={initialPlatformPermissions}
+                canViewAdminDetails={isAdmin}
+                currentUser={currentUser}
               />
             ) : null}
 

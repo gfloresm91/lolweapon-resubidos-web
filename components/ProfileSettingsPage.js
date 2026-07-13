@@ -553,7 +553,7 @@ export default function ProfileSettingsPage({ currentUser }) {
                   })}
                   <p className="profile-settings-note profile-benefit-note">
                     Por ahora, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch.
-                    Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
+                    Los roles TW_VIP y YT_Miembro no se pueden obtener ni entregar beneficios adicionales hasta que Kala autorice su activación (ja!).
                   </p>
                   <div className="profile-identity-row">
                     <div className="profile-identity-copy">
