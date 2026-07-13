@@ -41,6 +41,7 @@ const ROLE_LABEL_MAX_LENGTH = 60;
 const PERMISSION_GROUP_ORDER = [
   "Plataforma: Inicio",
   "Plataforma: Notificaciones",
+  "Plataforma: RTFM",
   "Plataforma: Novedades",
   "Plataforma: Historial de cambios",
   "Archivo VOD: Rastreador",

@@ -223,7 +223,7 @@ El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/c
 | `publico` | Público | — | Usuario registrado sin tier |
 | `invitado` | Invitado | — | Sin autenticación |
 
-La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, VIP → `tw-vip`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`. Por decisión operativa actual, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch. Los estados Twitch VIP y miembro de YouTube quedan registrados como referencia, pero no entregan beneficios adicionales hasta que Kala autorice su activación (ja!).
+La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`. Por decisión operativa actual, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch. Los roles `tw-vip` y `yt-miembro` no se pueden obtener ni entregar beneficios adicionales hasta que Kala autorice su activación (ja!).
 
 ### Permisos principales
 
@@ -231,6 +231,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 |---|---|
 | Plataforma: Inicio | `home.view` |
 | Plataforma: Notificaciones | `notifications.view`, `notifications.full.view` |
+| Plataforma: RTFM | `rtfm.view` |
 | Plataforma: Novedades | `news.view` |
 | Plataforma: Historial de cambios | `changelog.view` |
 | Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.lives.notify`, `tracker.form.full/compact` |
@@ -256,6 +257,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Ruta | Descripción |
 |---|---|
 | `/inicio` | Home: stream en vivo, últimos directos, últimos videos de YouTube |
+| `/rtfm` | RTFM del archivo: origen de los resubidos, notas operativas, mapa de navegación con permisos por rol y enlaces principales. Controlado por permiso `rtfm.view` y asignado por defecto a todos los roles. |
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
 | `/notificaciones` | Centro completo para usuarios autenticados con permiso `notifications.full.view` |
@@ -282,6 +284,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
 | `/api/admin/notifications` | GET/POST | Listado, creación, edición, programación, activación y eliminación lógica de notificaciones |
 | `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |
+| `/api/navigation-map` | GET | Mapa de navegación para RTFM con roles y permisos activos; requiere `rtfm.view` |
 | `/api/auth/twitch/start` | GET | Inicia OAuth Twitch |
 | `/api/auth/twitch/callback` | GET | Callback OAuth Twitch |
 | `/api/profile` | GET | Perfil del usuario actual |
@@ -344,7 +347,7 @@ SESSION_COOKIE_DOMAIN=.lolweapon.com
 7. Al completar registro, crea `PlatformUser`, identidad Twitch y sincroniza el rol automático por membresía.
 8. Sesión creada → redirect a home
 
-Twitch se resuelve por identidad externa, no por email o login. La migración desde `twitchUserId` conserva `roleId`. La sincronización de tiers pagados puede modificar roles con `roleSource=twitch` o rol actual `publico`; una asignación administrativa no pública usa `roleSource=manual` y no se pisa al conectar Twitch. Twitch VIP queda registrado como referencia, pero no debe otorgar beneficios adicionales mientras la regla no esté autorizada.
+Twitch se resuelve por identidad externa, no por email o login. La migración desde `twitchUserId` conserva `roleId`. La sincronización de tiers pagados puede modificar roles con `roleSource=twitch` o rol actual `publico`; una asignación administrativa no pública usa `roleSource=manual` y no se pisa al conectar Twitch. El rol `tw-vip` no se puede obtener ni otorgar beneficios adicionales mientras la regla no esté autorizada.
 
 ### Login con Google/YouTube
 
@@ -360,7 +363,7 @@ Los intentos temporales de registro OAuth y vinculación son mutuamente excluyen
 
 En login manual, una cookie de vinculación pendiente expirada o perteneciente a otra cuenta tampoco debe convertir credenciales válidas en error. Si las credenciales son correctas, se crea la sesión, se limpia la cookie pendiente y la vinculación queda abandonada; para conectar la cuenta externa el usuario debe iniciar de nuevo el flujo desde perfil o desde el proveedor.
 
-Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de membresías del canal es independiente del login. Desde `/perfil` se pueden conectar o desconectar proveedores sin eliminar la cuenta ni su actividad. El estado miembro de YouTube queda fuera de beneficios automáticos hasta autorización explícita.
+Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de membresías del canal es independiente del login. Desde `/perfil` se pueden conectar o desconectar proveedores sin eliminar la cuenta ni su actividad. El rol `yt-miembro` no se puede obtener ni entregar beneficios adicionales hasta autorización explícita.
 
 ### Registro manual
 1. `POST /api/register` con login, email, password, alias

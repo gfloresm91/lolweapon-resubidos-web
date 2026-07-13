@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
@@ -35,7 +35,11 @@ export default async function SpaceDrumRoutePage() {
   const spaceDrumProgress = currentUser?.id ? await getSpaceDrumProgressForUser(currentUser.id) : {};
 
   if (!can(accessUser, "spacedrum.view")) {
-    notFound();
+    if (!currentUser?.id) {
+      redirect("/login?next=/spacedrum");
+    }
+
+    redirect("/sin-acceso?from=/spacedrum");
   }
 
   return (
