@@ -12,6 +12,13 @@ const TOP_LEVEL_ITEMS = [
     permission: "home.view",
   },
   {
+    key: "rtfm",
+    href: "/rtfm",
+    label: "RTFM",
+    icon: FileText,
+    permission: "rtfm.view",
+  },
+  {
     key: "news",
     href: "/novedades",
     label: "Novedades",
