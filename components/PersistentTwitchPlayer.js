@@ -9,7 +9,7 @@ const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
 const MINI_PLAYER_DEFAULT_WIDTH = 380;
 const MINI_PLAYER_MIN_WIDTH = 280;
 const MINI_PLAYER_MAX_WIDTH = 720;
-const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum", "/rtfm", "/novedades", "/changelog", "/notificaciones"];
+const MINI_ROUTES = ["/rastreador", "/mi-lista", "/biblioteca-anime", "/administracion", "/spacedrum", "/rtfm", "/novedades", "/changelog", "/notificaciones", "/sugerencias-reclamos"];
 const PLAY_RESUME_DELAYS = [0, 120, 350, 900, 1800, 3200];
 const PLAY_KEEP_ALIVE_INTERVAL_MS = 10000;
 

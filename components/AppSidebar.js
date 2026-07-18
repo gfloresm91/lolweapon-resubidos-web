@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, MessageSquare, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -125,6 +125,13 @@ const ADMIN_TREE_ITEMS = [
     label: "Notificaciones",
     icon: Bell,
     permission: "admin.notifications.view",
+  },
+  {
+    key: "platformTickets",
+    href: "/administracion/tickets",
+    label: "Tickets",
+    icon: MessageSquare,
+    permission: "admin.tickets.view",
   },
   {
     key: "platformTracker",
@@ -283,6 +290,7 @@ function canShowManagedItem(item, manageAccess) {
   if (item.manageFlag === "spaceDrum") return manageAccess.spaceDrum;
   if (item.key === "platformTracker") return manageAccess.tracker;
   if (item.key === "platformTags") return manageAccess.tags;
+  if (item.key === "platformTickets") return manageAccess.tickets;
   if (item.key === "platformUsers") return manageAccess.users;
   if (item.key === "platformRoles") return manageAccess.roles;
   return true;
@@ -311,6 +319,7 @@ export default function AppSidebar({
   canManageRoles = false,
   canManageTracker = false,
   canManageTags = false,
+  canManageTickets = false,
   canManageSpaceDrum = false,
   canManageAnimeTracking = false,
   canManageAnimeCompleted = false,
@@ -331,6 +340,7 @@ export default function AppSidebar({
     roles: canManageRoles,
     spaceDrum: canManageSpaceDrum,
     tags: canManageTags,
+    tickets: canManageTickets,
     tracker: canManageTracker,
     users: canManageUsers,
   });

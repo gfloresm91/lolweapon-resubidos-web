@@ -176,6 +176,13 @@ Usar primero estos componentes antes de crear algo nuevo:
 - La página completa reutiliza tipos, severidades y estados visuales del panel; debe ofrecer filtros y acciones sin convertir cada aviso en una card excesivamente decorada.
 - El mantenedor administrativo sigue el estándar de tablas, modales, filtros, paginación, scroll horizontal y confirmaciones. Las eliminaciones son lógicas y las publicaciones programadas deben distinguirse claramente de publicadas, expiradas e inactivas.
 
+## Tickets / Sugerencias-Reclamos
+
+- La bandeja de usuario y el mantenedor administrativo usan superficies sólidas, bordes visibles y texto secundario de contraste medio-alto para evitar fatiga visual.
+- La conversación tipo chat debe mantenerse sobria: burbujas con fondo sólido, sin gradientes de lectura, sin sombras grandes y sin hover con transform.
+- Las respuestas administrativas generan notificación directa al usuario y el click debe abrir la conversación del ticket.
+- El mantenedor `Tickets` sigue el estándar de tablas administrativas: columnas atómicas, búsqueda por ID/asunto/usuario/mensaje, filtros no nativos, estado antes de acciones y scroll horizontal propio si la tabla no cabe.
+
 ### Capas Sobre Twitch
 
 - Problema observado en `/inicio`: el centro de notificaciones quedaba sobre el chat, pero bajo el player principal, y el topbar también se pintaba bajo el player.

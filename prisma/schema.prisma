@@ -396,6 +396,8 @@ model PlatformUser {
   spaceDrumProgress PlatformUserSpaceDrumProgress[]
   createdNotifications PlatformNotification[] @relation("NotificationCreator")
   notificationStates PlatformUserNotification[]
+  supportTickets SupportTicket[]
+  supportTicketMessages SupportTicketMessage[]
   authIdentities PlatformAuthIdentity[]
   identityLinkAttempts PlatformIdentityLinkAttempt[]
 
@@ -578,6 +580,44 @@ model PlatformUserNotification {
   @@index([notificationId])
   @@index([readAt])
   @@index([dismissedAt])
+}
+
+model SupportTicket {
+  id              Int                    @id @default(autoincrement())
+  createdByUserId Int
+  type            String
+  subject         String
+  status          String                 @default("open")
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  lastMessageAt   DateTime               @default(now())
+  closedAt        DateTime?
+
+  createdBy       PlatformUser           @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  messages        SupportTicketMessage[]
+
+  @@index([createdByUserId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([lastMessageAt])
+}
+
+model SupportTicketMessage {
+  id        Int           @id @default(autoincrement())
+  ticketId  Int
+  authorId  Int
+  body      String
+  isAdmin   Boolean       @default(false)
+  createdAt DateTime      @default(now())
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    PlatformUser  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([isAdmin])
+  @@index([createdAt])
 }
 
 model AnimeRating {

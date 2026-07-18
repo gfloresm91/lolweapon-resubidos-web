@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, ExternalLink, Eye, EyeOff, Radio, RotateCcw, ShieldAlert, Sparkles, Trash2, Tv, Video } from "lucide-react";
+import { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, ExternalLink, Eye, EyeOff, MessageSquare, Radio, RotateCcw, ShieldAlert, Sparkles, Trash2, Tv, Video } from "lucide-react";
 import { toast } from "sonner";
 
 import ConfirmModal from "@/components/ConfirmModal";
@@ -15,7 +15,7 @@ import { formatPlatformDateTime } from "@/lib/dateTime";
 const TYPE_OPTIONS = [{ value: "all", label: "Todos los tipos" }, { value: "alert", label: "Alertas" }, { value: "activity", label: "Actividad" }, { value: "system", label: "Sistema" }];
 const STATUS_OPTIONS = [{ value: "all", label: "Todos los estados" }, { value: "active", label: "Activas" }, { value: "unread", label: "No leídas" }, { value: "read", label: "Leídas" }, { value: "dismissed", label: "Descartadas" }];
 const COLUMNS = [{ key: "notification", label: "Notificación" }, { key: "type", label: "Tipo" }, { key: "published", label: "Fecha" }, { key: "state", label: "Estado" }, { key: "actions", label: "Operaciones" }];
-const ICONS = { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, Radio, ShieldAlert, Sparkles, Tv, Video };
+const ICONS = { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, MessageSquare, Radio, ShieldAlert, Sparkles, Tv, Video };
 const TYPE_LABELS = { alert: "Alerta", activity: "Actividad", system: "Sistema" };
 
 function getNotificationIcon(notification) {
