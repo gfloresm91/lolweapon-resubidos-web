@@ -13,6 +13,7 @@ import {
   History,
   Lock,
   LogIn,
+  MessageCircle,
   Sparkles,
   Star,
   UserPlus,
@@ -45,6 +46,7 @@ function withReturnTo(href, returnTo) {
 const ADMIN_NAV_LINKS = [
   { code: "users.read", label: "Usuarios", href: "/administracion/usuarios", icon: UserRoundCog },
   { code: "roles.read", label: "Roles", href: "/administracion/roles", icon: ShieldCheck },
+  { code: "admin.tickets.view", label: "Tickets", href: "/administracion/tickets", icon: MessageCircle },
   { code: "admin.tracker.view", label: "Rastreador", href: "/administracion/rastreador", icon: History },
   { code: "admin.tags.view", label: "Tags", href: "/administracion/tags", icon: BadgeCheck },
   { code: "admin.spacedrum.chapters.view", label: "SpaceDrum", href: "/administracion/spacedrum/capitulos", icon: BookOpenCheck },
@@ -64,6 +66,7 @@ const ICONS = {
   Download,
   History,
   LogIn,
+  MessageCircle,
   ShieldCheck,
   Star,
   UserRoundCog,
