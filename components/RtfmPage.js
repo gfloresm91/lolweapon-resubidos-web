@@ -105,6 +105,7 @@ const navigationTree = [
       { title: "Historial de cambios", href: "/changelog", permission: "changelog.view", icon: History },
       { title: "Notificaciones", href: "/notificaciones", permission: "notifications.full.view", authRequired: true, icon: Bell },
       { title: "Perfil", href: "/perfil", authRequired: true, icon: User },
+      { title: "Sugerencias/Reclamos", href: "/sugerencias-reclamos", permission: "support.tickets.view", authRequired: true, icon: MessageCircle },
     ],
   },
   {
@@ -156,6 +157,7 @@ const navigationTree = [
       { title: "Usuarios", href: "/administracion/usuarios", permission: "users.read", adminArea: true, icon: Users },
       { title: "Roles", href: "/administracion/roles", permission: "roles.read", adminArea: true, icon: ShieldCheck },
       { title: "Notificaciones", href: "/administracion/notificaciones", permission: "admin.notifications.view", adminArea: true, icon: Bell },
+      { title: "Tickets", href: "/administracion/tickets", permission: "admin.tickets.view", adminArea: true, icon: MessageCircle },
       { title: "Rastreador", href: "/administracion/rastreador", permission: "admin.tracker.view", adminArea: true, icon: Archive },
       { title: "Tags", href: "/administracion/tags", permission: "admin.tags.view", adminArea: true, icon: Tags },
       {

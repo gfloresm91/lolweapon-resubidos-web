@@ -121,6 +121,8 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 | `PlatformNotification` | Notificaciones persistentes por audiencia, origen y ciclo de publicación; soporta programación, expiración, activación y eliminación lógica |
 | `PlatformUserNotification` | Estado por usuario de lectura y descarte de notificaciones |
 | `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
+| `SupportTicket` | Sugerencias/reclamos creados por usuarios registrados, con tipo, asunto, estado y última actividad |
+| `SupportTicketMessage` | Mensajes de la conversación del ticket, escritos por usuario o administración |
 
 ### Actividad del usuario
 
@@ -167,6 +169,8 @@ Productores implementados:
 - Nuevo video de YouTube detectado por el sincronizador de `server.mjs` después de la línea base inicial.
 - Nueva comunicación pública de `/novedades`.
 - Nueva comunicación pública de `/changelog`.
+- Nuevo ticket de sugerencia/reclamo para usuarios con `admin.tickets.view`.
+- Respuesta o cierre de ticket para el usuario creador.
 
 Tipos iniciales:
 - `Alertas`: emisiones en vivo y publicaciones nuevas externas relevantes para la comunidad, como Twitch online o nuevo video de YouTube.
@@ -231,6 +235,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 |---|---|
 | Plataforma: Inicio | `home.view` |
 | Plataforma: Notificaciones | `notifications.view`, `notifications.full.view` |
+| Plataforma: Sugerencias/Reclamos | `support.tickets.view`, `support.tickets.create` |
 | Plataforma: RTFM | `rtfm.view` |
 | Plataforma: Novedades | `news.view` |
 | Plataforma: Historial de cambios | `changelog.view` |
@@ -243,6 +248,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
 | Administración: Notificaciones | `admin.notifications.view/create/update/delete` |
+| Administración: Tickets | `admin.tickets.view/update` |
 | Administración: Rastreador | `admin.tracker.view`, `admin.lives.notify` |
 | Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
 | Administración: Anime Viendo | `admin.anime.tracking.view` |
@@ -261,6 +267,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
 | `/notificaciones` | Centro completo para usuarios autenticados con permiso `notifications.full.view` |
+| `/sugerencias-reclamos` | Bandeja y formulario de tickets para usuarios registrados con `support.tickets.view` |
+| `/sugerencias-reclamos/[id]` | Conversación del ticket propio, enlazada desde notificaciones de respuesta |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
 | `/rastreador/calendario` | Calendario histórico de directos por año, mes y día. Controlado por permiso `tracker.calendar.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación y administración. |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
@@ -273,6 +281,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/perfil` | Perfil del usuario (avatar, datos) |
 | `/administracion/...` | Panel de administración |
 | `/administracion/notificaciones` | Mantenedor de notificaciones manuales y automáticas, protegido por permisos `admin.notifications.*` |
+| `/administracion/tickets` | Mantenedor administrativo de sugerencias/reclamos, protegido por `admin.tickets.view` |
+| `/administracion/tickets/[id]` | Conversación administrativa del ticket, permite responder con `admin.tickets.update` |
 
 ### API Routes
 
@@ -284,6 +294,12 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
 | `/api/admin/notifications` | GET/POST | Listado, creación, edición, programación, activación y eliminación lógica de notificaciones |
 | `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |
+| `/api/support-tickets` | GET/POST | Lista tickets propios y crea sugerencias/reclamos |
+| `/api/support-tickets/[id]` | GET | Detalle de ticket propio |
+| `/api/support-tickets/[id]/messages` | POST | Agrega mensaje del usuario al ticket |
+| `/api/admin/tickets` | GET | Listado administrativo paginado de tickets |
+| `/api/admin/tickets/[id]` | GET/PATCH | Detalle administrativo y cambio de estado |
+| `/api/admin/tickets/[id]/messages` | POST | Respuesta administrativa con notificación al usuario |
 | `/api/navigation-map` | GET | Mapa de navegación para RTFM con roles y permisos activos; requiere `rtfm.view` |
 | `/api/auth/twitch/start` | GET | Inicia OAuth Twitch |
 | `/api/auth/twitch/callback` | GET | Callback OAuth Twitch |

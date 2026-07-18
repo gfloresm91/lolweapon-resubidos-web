@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { ChevronDown, LogOut, MessageSquare, Settings, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import UserAvatar from "@/components/UserAvatar";
@@ -84,6 +84,12 @@ export default function AccountMenu({ user }) {
             <Settings size={16} aria-hidden="true" />
             Configurar perfil
           </Link>
+          {user.permissions?.includes("support.tickets.view") || user.role === "dios" ? (
+            <Link href="/sugerencias-reclamos" className="account-menu-item" role="menuitem" onClick={() => setIsOpen(false)}>
+              <MessageSquare size={16} aria-hidden="true" />
+              Sugerencias/Reclamos
+            </Link>
+          ) : null}
           <button type="button" className="account-menu-item danger" role="menuitem" onClick={logout}>
             <LogOut size={16} aria-hidden="true" />
             Cerrar sesión

@@ -9,6 +9,7 @@ import {
   CirclePlay,
   Edit3,
   History,
+  MessageSquare,
   Plus,
   Power,
   Radio,
@@ -53,6 +54,7 @@ const SOURCES = [
   { value: "anime", label: "Anime" },
   { value: "spacedrum", label: "SpaceDrum" },
   { value: "content", label: "Contenido" },
+  { value: "support-ticket", label: "Ticket" },
 ];
 const AUDIENCES = [
   { value: "all", label: "Todos" },
@@ -67,6 +69,7 @@ const ICON_COMPONENTS = {
   BookOpen,
   CheckCheck,
   CirclePlay,
+  MessageSquare,
   Radio,
   ShieldAlert,
   Sparkles,
@@ -85,6 +88,7 @@ const ICON_OPTIONS = [
   { value: "BookOpen", label: "Lectura / capítulo" },
   { value: "Radio", label: "Transmisión" },
   { value: "CheckCheck", label: "Confirmación" },
+  { value: "MessageSquare", label: "Mensaje / ticket" },
 ];
 const EMPTY_FORM = {
   type: "activity",

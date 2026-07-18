@@ -18,8 +18,11 @@ import LoreModal from "@/components/LoreModal";
 import NewsGuidePage from "@/components/NewsGuidePage";
 import NotificationCenter from "@/components/NotificationCenter";
 import NotificationsPage from "@/components/NotificationsPage";
+import SupportTicketThreadPage from "@/components/SupportTicketThreadPage";
+import SupportTicketsPage from "@/components/SupportTicketsPage";
 import RtfmPage from "@/components/RtfmPage";
 import PlatformNotificationsPage from "@/components/PlatformNotificationsPage";
+import PlatformTicketsPage from "@/components/PlatformTicketsPage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
@@ -110,6 +113,8 @@ const VIEW_LABELS = {
   news: "Novedades",
   changelog: "Historial de cambios",
   notifications: "Notificaciones",
+  supportTickets: "Sugerencias",
+  supportTicketThread: "Ticket",
   tracker: "Rastreador de directos",
   trackerCalendar: "Calendario de directos",
   myList: "Mi lista",
@@ -127,6 +132,8 @@ const VIEW_LABELS = {
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   platformNotifications: "Mantenedor Notificaciones",
+  platformTickets: "Tickets",
+  platformTicketThread: "Ticket administrativo",
   spacedrum: "SpaceDrum",
 };
 
@@ -136,6 +143,7 @@ const VIEW_PATHS = {
   news: "/novedades",
   changelog: "/changelog",
   notifications: "/notificaciones",
+  supportTickets: "/sugerencias-reclamos",
   tracker: "/rastreador",
   trackerCalendar: "/rastreador/calendario",
   myList: "/mi-lista",
@@ -153,8 +161,10 @@ const VIEW_PATHS = {
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
   platformNotifications: "/administracion/notificaciones",
+  platformTickets: "/administracion/tickets",
   spacedrum: "/spacedrum",
 };
+const SUPPORT_VIEWS = new Set(["supportTickets", "supportTicketThread"]);
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
 const COMMUNITY_SPREADSHEET_URL = process.env.NEXT_PUBLIC_COMMUNITY_SPREADSHEET_URL
   || "https://onedrive.live.com/:x:/g/personal/87dad8f5b07a6f01/IQABb3qw9djaIICHlm4AAAAAAYc3We7evL0vIGHpS_nUDf8?rtime=ut4s6g6U3kg&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy84N2RhZDhmNWIwN2E2ZjAxL0lRQUJiM3F3OWRqYUlJQ0hsbTRBQUFBQUFZYzNXZTdldkwwdklHSHBTX25VRGY4";
@@ -166,6 +176,8 @@ const DEFAULT_TRACKER_STATE = {
 };
 
 function getViewFromPath(pathname) {
+  if (/^\/sugerencias-reclamos\/\d+\/?$/.test(pathname)) return "supportTicketThread";
+  if (/^\/administracion\/tickets\/\d+\/?$/.test(pathname)) return "platformTicketThread";
   return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
 }
 
@@ -294,6 +306,9 @@ export default function HomePage({
   initialUserRatings = EMPTY_OBJECT,
   initialNotificationsResult = null,
   initialAdminNotificationsResult = null,
+  initialSupportTicketsResult = null,
+  initialAdminSupportTicketsResult = null,
+  initialSupportTicket = null,
   twitchLogin,
   youtubeChannelUrl,
   isAdmin,
@@ -306,10 +321,14 @@ export default function HomePage({
   const canManageRoles = hasPermission("roles.read");
   const canViewNotifications = hasPermission("notifications.view");
   const canViewAllNotifications = hasPermission("notifications.full.view");
+  const canViewSupportTickets = hasPermission("support.tickets.view");
+  const canCreateSupportTickets = hasPermission("support.tickets.create");
   const canViewNotificationMaintainer = hasPermission("admin.notifications.view");
   const canCreateNotifications = hasPermission("admin.notifications.create");
   const canUpdateNotifications = hasPermission("admin.notifications.update");
   const canDeleteNotifications = hasPermission("admin.notifications.delete");
+  const canViewTicketsMaintainer = hasPermission("admin.tickets.view");
+  const canUpdateTickets = hasPermission("admin.tickets.update");
   const canCreateTracker = hasPermission("tracker.create");
   const canUpdateTracker = hasPermission("tracker.update");
   const canDeleteTracker = hasPermission("tracker.delete");
@@ -429,6 +448,11 @@ export default function HomePage({
   }, []);
 
   const effectiveCardDensity = cardDensity === "table" && !isTableViewAvailable ? "compact" : cardDensity;
+  const sidebarActiveView = currentView === "supportTicketThread"
+    ? "supportTickets"
+    : currentView === "platformTicketThread"
+      ? "platformTickets"
+      : currentView;
 
   function setPreferredCardDensity(nextDensity) {
     const normalizedDensity = normalizeCardDensity(nextDensity);
@@ -1340,6 +1364,8 @@ export default function HomePage({
       news: "news.view",
       changelog: "changelog.view",
       notifications: "notifications.full.view",
+      supportTickets: "support.tickets.view",
+      supportTicketThread: "support.tickets.view",
       tracker: "tracker.view",
       trackerCalendar: "tracker.calendar.view",
       myList: "tracker.view",
@@ -1357,6 +1383,8 @@ export default function HomePage({
       platformUsers: "users.read",
       platformRoles: "roles.read",
       platformNotifications: "admin.notifications.view",
+      platformTickets: "admin.tickets.view",
+      platformTicketThread: "admin.tickets.view",
       spacedrum: "spacedrum.view",
     };
     const requiredPermission = viewPermissions[view];
@@ -1371,6 +1399,23 @@ export default function HomePage({
     window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
 
     setCurrentView(view);
+    window.scrollTo({ top: 0, behavior: "instant" });
+
+    if (window.matchMedia("(max-width: 900px)").matches) {
+      window.dispatchEvent(new CustomEvent("kala:sidebar:close"));
+    }
+  }
+
+  function selectSupportTicket(ticketId) {
+    if (!hasPermission("support.tickets.view")) {
+      toast.error("No tienes permiso para ver esa pantalla.");
+      return;
+    }
+
+    const nextPath = `/sugerencias-reclamos/${ticketId}`;
+    window.history.pushState(null, "", nextPath);
+    window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
+    setCurrentView("supportTicketThread");
     window.scrollTo({ top: 0, behavior: "instant" });
 
     if (window.matchMedia("(max-width: 900px)").matches) {
@@ -1406,10 +1451,11 @@ export default function HomePage({
       <AppSidebarShell>
         <AppSidebar
           id="main-sidebar"
-          activeView={currentView}
+          activeView={sidebarActiveView}
           isAdmin={isAdmin}
           canManageUsers={canManageUsers}
           canManageRoles={canManageRoles}
+          canManageTickets={canViewTicketsMaintainer}
           canManageTracker={canManageTracker}
           canManageTags={canViewTagsMaintainer}
           canManageSpaceDrum={canManageSpaceDrum}
@@ -1423,7 +1469,7 @@ export default function HomePage({
         <div className="content-shell">
           <header className="topbar" aria-label="Barra superior">
             <div className="topbar-title">
-              <span className="topbar-kicker">Archivo VODs</span>
+              <span className="topbar-kicker">{SUPPORT_VIEWS.has(currentView) ? "Soporte" : "Archivo VODs"}</span>
               <span className="topbar-page">{VIEW_LABELS[currentView]}</span>
             </div>
 
@@ -1470,6 +1516,14 @@ export default function HomePage({
             ) : null}
 
             {currentView === "notifications" && canViewAllNotifications ? <NotificationsPage initialResult={initialNotificationsResult} /> : null}
+
+            {currentView === "supportTickets" && canViewSupportTickets ? (
+              <SupportTicketsPage initialResult={initialSupportTicketsResult} canCreate={canCreateSupportTickets} onNavigateToTicket={selectSupportTicket} />
+            ) : null}
+
+            {currentView === "supportTicketThread" && canViewSupportTickets ? (
+              <SupportTicketThreadPage initialTicket={initialSupportTicket} currentUser={currentUser} onBack={() => selectView("supportTickets")} />
+            ) : null}
 
             {["tracker", "myList"].includes(currentView) ? (
               <>
@@ -1880,6 +1934,14 @@ export default function HomePage({
                 canUpdate={canUpdateNotifications}
                 canDelete={canDeleteNotifications}
               />
+            ) : null}
+
+            {currentView === "platformTickets" && canViewTicketsMaintainer ? (
+              <PlatformTicketsPage initialResult={initialAdminSupportTicketsResult} canUpdate={canUpdateTickets} />
+            ) : null}
+
+            {currentView === "platformTicketThread" && canViewTicketsMaintainer ? (
+              <SupportTicketThreadPage initialTicket={initialSupportTicket} currentUser={currentUser} admin canUpdate={canUpdateTickets} onBack={() => selectView("platformTickets")} />
             ) : null}
 
             {currentView === "platformTracker" && canManageTracker ? (
