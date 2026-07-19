@@ -112,7 +112,7 @@ npm run db:restore
 ```
 
 - La advertencia del primer comando no confirma un respaldo válido: si aparece, revisar el error y no asumir que existe un dump nuevo antes de restaurar.
-- Al restaurar una BD de producción en local, las sesiones/cookies del navegador pueden quedar desalineadas con `PlatformSession`. Si login queda tomado o el botón no responde, limpiar los datos del sitio en DevTools → Application (cookies, localStorage y sessionStorage) y volver a cargar `/login`.
+- Al restaurar una BD, `/login` y `/registro` validan la cookie mediante `/api/auth/session`; una sesión inexistente, expirada o inactiva limpia automáticamente la cookie obsoleta. Limpiar datos desde DevTools → Application queda solo como fallback de diagnóstico.
 - Los scripts `db:backup`/`db:restore` detectan PostgreSQL por servicio Compose, luego por el contenedor `lolweapon-resubidos-postgres` y finalmente por herramientas instaladas en el host. Esto cubre QA cuando el contenedor está sano pero pertenece a otro proyecto Compose.
 
 ## Arquitectura Y Código

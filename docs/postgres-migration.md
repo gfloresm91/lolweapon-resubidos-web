@@ -148,7 +148,7 @@ npm run db:restore
 
 Backup and restore detect PostgreSQL in this order: the configured Docker Compose service, the running container named `lolweapon-resubidos-postgres`, and finally host-installed `pg_dump`/`pg_restore`. This supports QA environments where the database container is running but was created by a different Compose project. Optional overrides are `POSTGRES_RUNTIME=compose|container|host` and `POSTGRES_CONTAINER=<name>`.
 
-When a production dump is restored into local development, existing browser cookies and storage can reference a session that no longer matches the restored `PlatformSession` data. If login appears stuck or clicking the login action does nothing, clear the local site's cookies, `localStorage`, and `sessionStorage` in DevTools → Application, then reload `/login`.
+When a database dump is restored, an existing browser cookie can reference a session that no longer matches `PlatformSession`. `/login` and `/registro` validate it through `/api/auth/session`; invalid or expired sessions clear the stale cookie automatically, while temporary database failures return 503 without deleting it. Clearing site data in DevTools remains a diagnostic fallback.
 
 `npm run db:reset-sequences` resets PostgreSQL autoincrement sequences to the next logical value for each table with an `id` column. It is useful after repeated imports or after fixing sequence drift. It does not renumber existing rows.
 

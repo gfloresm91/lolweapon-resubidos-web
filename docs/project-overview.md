@@ -291,6 +291,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/login` | POST | Login manual |
 | `/api/register` | POST | Registro |
 | `/api/logout` | POST | Cerrar sesión |
+| `/api/auth/session` | GET | Valida la cookie antes de mostrar login/registro; elimina automáticamente cookies huérfanas tras restores y conserva la cookie ante errores temporales de BD |
 | `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
 | `/api/admin/notifications` | GET/POST | Listado, creación, edición, programación, activación y eliminación lógica de notificaciones |
 | `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |

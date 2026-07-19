@@ -10,6 +10,7 @@ import { Toaster, toast } from "sonner";
 import { z } from "zod";
 
 import AuthBackButton from "@/components/AuthBackButton";
+import AuthSessionGuard from "@/components/AuthSessionGuard";
 import {
   ALIAS_MAX_LENGTH,
   ALIAS_RULES,
@@ -224,6 +225,7 @@ export default function RegisterPage() {
 
   return (
     <main className="auth-shell">
+      <AuthSessionGuard />
       <Toaster position="top-right" richColors closeButton />
       <section className="auth-card auth-card-wide" aria-labelledby="register-title">
         <div className="auth-header">
