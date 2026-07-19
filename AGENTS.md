@@ -102,6 +102,17 @@ npm run db:migrate:deploy
 - Formato de migración recomendado: `YYYYMMDDHHMMSS_descripcion_corta`.
 - Después de imports masivos en PostgreSQL, usar `npm run db:reset-sequences` para evitar IDs autoincrementales altos o inconsistentes.
 - No crear migraciones en producción/QA; solo aplicar migraciones ya versionadas.
+- Cuando el usuario vuelva a preguntar por el procedimiento rápido de respaldo y restauración de la BD, usar estos comandos operativos conocidos:
+
+```bash
+npm run db:backup || echo "Advertencia: backup de DB falló, continuando de todas formas..."
+
+BACKUP_FILE="$(ls -1t backups/postgres/*.dump | head -n 1)" \
+npm run db:restore
+```
+
+- La advertencia del primer comando no confirma un respaldo válido: si aparece, revisar el error y no asumir que existe un dump nuevo antes de restaurar.
+- Al restaurar una BD de producción en local, las sesiones/cookies del navegador pueden quedar desalineadas con `PlatformSession`. Si login queda tomado o el botón no responde, limpiar los datos del sitio en DevTools → Application (cookies, localStorage y sessionStorage) y volver a cargar `/login`.
 
 ## Arquitectura Y Código
 

@@ -135,6 +135,19 @@ Use `npm run db:migrate` only for local schema changes that should create a new 
 BACKUP_FILE=backups/postgres/lolweapon_resubidos_20260506T120000Z.dump npm run db:restore
 ```
 
+Quick operational commands used by the project owner:
+
+```bash
+npm run db:backup || echo "Advertencia: backup de DB falló, continuando de todas formas..."
+
+BACKUP_FILE="$(ls -1t backups/postgres/*.dump | head -n 1)" \
+npm run db:restore
+```
+
+`BACKUP_FILE` is a temporary environment variable for that command and does not need to exist in `.env`. If the backup warning appears, the backup must be treated as failed; verify the error and the timestamp/size of the latest dump before restoring.
+
+When a production dump is restored into local development, existing browser cookies and storage can reference a session that no longer matches the restored `PlatformSession` data. If login appears stuck or clicking the login action does nothing, clear the local site's cookies, `localStorage`, and `sessionStorage` in DevTools → Application, then reload `/login`.
+
 `npm run db:reset-sequences` resets PostgreSQL autoincrement sequences to the next logical value for each table with an `id` column. It is useful after repeated imports or after fixing sequence drift. It does not renumber existing rows.
 
 ## Current schema scope
@@ -418,6 +431,8 @@ Create a manual backup:
 ```bash
 COMPOSE_FILE=docker-compose.prod.yml npm run db:backup
 ```
+
+The backup script writes to a temporary `.partial` file, validates the custom dump with `pg_restore --list`, and only then publishes the final `.dump`. The backup directory must be writable by the deploy user; production GitHub Actions repairs its ownership before running the command and stops the deploy if backup validation fails.
 
 The backup and restore scripts load `.env` automatically when it exists. Use `ENV_FILE=/path/to/env` to point them elsewhere.
 
