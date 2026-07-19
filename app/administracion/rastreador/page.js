@@ -13,6 +13,8 @@ const TRACKER_MANAGEMENT_PERMISSIONS = [
   "tracker.create",
   "tracker.update",
   "tracker.delete",
+  "tracker.export",
+  "tracker.import",
 ];
 const TRACKER_SCREEN_PERMISSION = "admin.tracker.view";
 
