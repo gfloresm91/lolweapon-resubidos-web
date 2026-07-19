@@ -249,6 +249,13 @@ npm run db:migrate:deploy
 - Si un tag no tiene uso, se puede eliminar con confirmación.
 - Mantener categorías, iconos y keywords documentados.
 
+### Sincronización XLSX Del Rastreador
+
+- La exportación debe respetar todos los filtros y el orden activos, incluyendo todos los resultados y no solo la página visible.
+- `ID_BD` e `ID_INTERNO` se muestran bloqueados y deben validarse nuevamente en servidor al importar.
+- La importación actualiza registros existentes de forma integral, con previsualización campo a campo y control de versión contra cambios posteriores a la exportación.
+- Errores, conflictos o filas nuevas bloquean la operación completa. La creación de registros desde XLSX está diferida en `docs/backlog.md`.
+
 ## Git, Versionado Y Deploy
 
 - Regla de colaboración: el usuario ejecuta manualmente los comandos de Git relacionados con staging, commits, tags y pushes.

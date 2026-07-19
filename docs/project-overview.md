@@ -239,7 +239,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Plataforma: RTFM | `rtfm.view` |
 | Plataforma: Novedades | `news.view` |
 | Plataforma: Historial de cambios | `changelog.view` |
-| Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.lives.notify`, `tracker.form.full/compact` |
+| Archivo VOD: Rastreador | `tracker.view`, `tracker.create/update/delete`, `tracker.export/import`, `tracker.lives.notify`, `tracker.form.full/compact` |
 | Archivo VOD: Calendario | `tracker.calendar.view` |
 | Biblioteca de anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
 | Biblioteca de anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
@@ -307,6 +307,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/profile/avatar` | POST | Actualizar avatar |
 | `/api/lives` | GET | Lista de directos y estatuses |
 | `/api/lives/[id]/notify` | POST | Crea una notificación pública manual de resubido y registra `Live.notifiedAt`; requiere `tracker.lives.notify` o `admin.lives.notify`, responde 403 ante sesión sin permiso y bloquea reenvíos concurrentes durante 10 segundos |
+| `/api/admin/tracker/spreadsheet/export` | POST | Exporta a XLSX los registros filtrados y ordenados del mantenedor; requiere `tracker.export` |
+| `/api/admin/tracker/spreadsheet/import` | POST | Previsualiza o aplica una actualización masiva XLSX con control de versión, validación integral y auditoría; requiere `tracker.import` |
 | `/api/live-activity` | GET/POST | Actividad del usuario en directos |
 | `/api/anime-library` | GET/POST | Biblioteca de anime (CRUD) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |

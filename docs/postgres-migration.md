@@ -332,6 +332,21 @@ DATA_SOURCE=postgres npm run build
 
 The export should keep the same live IDs as the source JSON. Some status labels can be normalized by catalog casing, for example `Lost media` to `Lost Media`.
 
+### Administrative XLSX synchronization
+
+The Rastreador maintainer can export its complete filtered and sorted result to XLSX and import the same workbook to update existing records. The workbook exposes `ID_BD` and `ID_INTERNO` as locked identifiers and stores a hidden source fingerprint to detect stale exports.
+
+Import rules:
+
+- all functional columns in the workbook are editable;
+- `ID_BD` and `ID_INTERNO` must remain unchanged;
+- rows are compared field by field before applying;
+- errors, stale rows, identifier conflicts, or new rows block the complete import;
+- PostgreSQL updates run in one transaction and are recorded in `AuditLog`;
+- creating new records from XLSX is deferred and documented in `docs/backlog.md`.
+
+Deploy migration `20260718120000_add_tracker_spreadsheet_permissions` before using the UI so `tracker.export` and `tracker.import` are available to roles.
+
 Runtime smoke checks:
 
 ```bash

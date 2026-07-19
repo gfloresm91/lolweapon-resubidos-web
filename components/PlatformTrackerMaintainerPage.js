@@ -7,7 +7,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Bell, BellRing, Edit3, History, Plus, Power, Radio, Trash2, Zap } from "lucide-react";
+import { Bell, BellRing, Download, Edit3, History, Plus, Power, Radio, Trash2, Upload, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import AuditLogModal from "@/components/AuditLogModal";
@@ -20,9 +20,11 @@ import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
 import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
+import TrackerSpreadsheetImportModal from "@/components/TrackerSpreadsheetImportModal";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
 import { formatPlatformDateTime } from "@/lib/dateTime";
 import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
+import { buildLinkDiagnostics, hasTrackerLinkIssue } from "@/lib/trackerLinkDiagnostics";
 
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -125,6 +127,8 @@ export default function PlatformTrackerMaintainerPage({
   canUpdate = false,
   canDelete = false,
   canNotify = false,
+  canExport = false,
+  canImport = false,
   canUpdateTags = false,
   formVariant = "full",
   twitchLogin = "",
@@ -154,6 +158,8 @@ export default function PlatformTrackerMaintainerPage({
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(!initialLives.length);
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const yearOptions = useMemo(() => [
     { value: "all", label: "Todos" },
@@ -190,7 +196,13 @@ export default function PlatformTrackerMaintainerPage({
     { value: "okru", label: "OK.RU" },
     { value: "patreon", label: "Patreon" },
     { value: "piero", label: "Piero" },
+    { value: "missing-okru", label: "Sin OK.RU" },
+    { value: "missing-telegram", label: "Sin Telegram" },
+    { value: "duplicate-okru", label: "Duplicados OK.RU" },
+    { value: "duplicate-telegram", label: "Duplicados Telegram" },
+    { value: "duplicates", label: "Cualquier duplicado" },
   ], []);
+  const linkDiagnostics = useMemo(() => buildLinkDiagnostics(lives), [lives]);
   const tagCounts = useMemo(() => lives.reduce((counts, live) => {
     for (const tag of live.tags || []) {
       counts[tag] = (counts[tag] || 0) + 1;
@@ -230,10 +242,13 @@ export default function PlatformTrackerMaintainerPage({
       .filter((live) => {
         if (availabilityFilter === "with") return getLiveLinksCount(live) > 0;
         if (availabilityFilter === "without") return getLiveLinksCount(live) === 0;
+        if (["missing-okru", "missing-telegram", "duplicate-okru", "duplicate-telegram", "duplicates"].includes(availabilityFilter)) {
+          return hasTrackerLinkIssue(live, availabilityFilter, linkDiagnostics);
+        }
         if (availabilityFilter !== "all") return Boolean(live.links?.[availabilityFilter]?.length);
         return true;
       });
-  }, [availabilityFilter, lives, monthFilter, searchQuery, statusFilter, tagFilter, yearFilter]);
+  }, [availabilityFilter, linkDiagnostics, lives, monthFilter, searchQuery, statusFilter, tagFilter, yearFilter]);
   const tableColumns = useMemo(() => [
     { id: "id", accessorFn: (live) => getLiveRecordId(live) },
     { id: "title", accessorFn: (live) => getLiveTitle(live) },
@@ -259,6 +274,7 @@ export default function PlatformTrackerMaintainerPage({
     getPaginationRowModel: getPaginationRowModel(),
   });
   const paginatedLives = table.getRowModel().rows.map((row) => row.original);
+  const exportLives = table.getPrePaginationRowModel().rows.map((row) => row.original);
   const paginationFrom = filteredLives.length ? (pagination.pageIndex * pagination.pageSize) + 1 : 0;
   const paginationTo = Math.min((pagination.pageIndex + 1) * pagination.pageSize, filteredLives.length);
   const sortConfig = sorting[0]
@@ -362,6 +378,41 @@ export default function PlatformTrackerMaintainerPage({
     if (nextStatuses) {
       setStatuses(nextStatuses);
       onStatusesChange?.(nextStatuses);
+    }
+  }
+
+  async function exportSpreadsheet() {
+    if (!exportLives.length) {
+      toast.error("No hay registros para exportar con los filtros actuales.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const response = await fetch("/api/admin/tracker/spreadsheet/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: exportLives.map((live) => live.id) }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "No se pudo exportar el archivo.");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filename = disposition.match(/filename="([^"]+)"/)?.[1] || "rastreador.xlsx";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Se exportaron ${exportLives.length} registros.`);
+    } catch (error) {
+      toast.error(error.message || "No se pudo exportar el archivo.");
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -643,6 +694,18 @@ export default function PlatformTrackerMaintainerPage({
             <History size={17} />
             Historial
           </button>
+          {canExport ? (
+            <button type="button" className="tracker-action-secondary" onClick={exportSpreadsheet} disabled={isExporting || !exportLives.length}>
+              <Download size={17} />
+              {isExporting ? "Exportando..." : `Exportar Excel (${exportLives.length})`}
+            </button>
+          ) : null}
+          {canImport ? (
+            <button type="button" className="tracker-action-secondary" onClick={() => setIsImportOpen(true)}>
+              <Upload size={17} />
+              Importar Excel
+            </button>
+          ) : null}
           {canCreate && formVariant ? (
             <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
               <Plus size={18} />
@@ -939,6 +1002,11 @@ export default function PlatformTrackerMaintainerPage({
         subtitle="Últimas acciones realizadas en el mantenedor del rastreador."
         closeOnBackdrop={false}
         onClose={() => setIsAuditOpen(false)}
+      />
+      <TrackerSpreadsheetImportModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={(nextLives) => updateLives(nextLives)}
       />
     </>
   );

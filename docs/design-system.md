@@ -113,6 +113,11 @@ Usar primero estos componentes antes de crear algo nuevo:
 - Operaciones destructivas o irreversibles siempre usan confirmación.
 - Formularios largos deben agruparse en secciones con títulos cortos.
 - En mobile, el contenido debe apilarse y mantener acciones accesibles.
+- La importación XLSX del Rastreador usa un modal amplio de cuatro etapas: archivo, revisión, confirmación y resultado.
+  - La revisión debe mostrar cantidades de cambios, conflictos, errores, filas nuevas y advertencias.
+  - Cada cambio debe exponer valor actual y valor del Excel antes de habilitar la confirmación.
+  - Errores, conflictos o filas nuevas bloquean la operación completa; no aplicar actualizaciones parciales.
+  - En mobile, los pasos y resúmenes se apilan y las diferencias pasan a una sola columna.
 
 ## Formularios
 
