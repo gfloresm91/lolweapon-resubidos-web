@@ -146,6 +146,8 @@ npm run db:restore
 
 `BACKUP_FILE` is a temporary environment variable for that command and does not need to exist in `.env`. If the backup warning appears, the backup must be treated as failed; verify the error and the timestamp/size of the latest dump before restoring.
 
+Backup and restore detect PostgreSQL in this order: the configured Docker Compose service, the running container named `lolweapon-resubidos-postgres`, and finally host-installed `pg_dump`/`pg_restore`. This supports QA environments where the database container is running but was created by a different Compose project. Optional overrides are `POSTGRES_RUNTIME=compose|container|host` and `POSTGRES_CONTAINER=<name>`.
+
 When a production dump is restored into local development, existing browser cookies and storage can reference a session that no longer matches the restored `PlatformSession` data. If login appears stuck or clicking the login action does nothing, clear the local site's cookies, `localStorage`, and `sessionStorage` in DevTools → Application, then reload `/login`.
 
 `npm run db:reset-sequences` resets PostgreSQL autoincrement sequences to the next logical value for each table with an `id` column. It is useful after repeated imports or after fixing sequence drift. It does not renumber existing rows.
