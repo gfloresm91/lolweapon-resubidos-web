@@ -1,6 +1,6 @@
 {
   "name": "lolweapon-resubidos-web",
-  "version": "2.11.0",
+  "version": "2.11.1",
   "private": true,
   "type": "module",
   "description": "Web de resubidos para el streamer/youtuber Lolweapon",
