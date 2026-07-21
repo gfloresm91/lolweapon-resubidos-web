@@ -231,6 +231,7 @@ npm run db:migrate:deploy
 ### Twitch Player
 
 - `PersistentTwitchPlayer` es delicado.
+- `/api/twitch/status` comparte durante 30 segundos el estado público del canal y deduplica refrescos simultáneos. `lib/twitch.js` reutiliza únicamente el token de aplicación, con expiración anticipada, timeout y un reintento ante `401`; no mezclar esta caché con los tokens OAuth de usuarios ni con la sincronización de roles Twitch.
 - Twitch iframe es cross-origin y puede pausar por reglas del navegador/Twitch.
 - Cambios en full/mini player deben probar navegación, scroll, cambio de pestaña y estado offline.
 - Si no hay directo, el mini player debe ocultarse.
