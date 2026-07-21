@@ -314,7 +314,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/anime-library` | GET/POST | Biblioteca de anime (CRUD) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
-| `/api/twitch/status` | GET | Estado en vivo: stream, perfil, canal, juego |
+| `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. No participa en OAuth ni sincronización de membresías. |
 | `/api/twitch/eventsub` | POST | Webhook `stream.online` de Twitch |
 | `/api/twitch/eventsub/subscribe` | POST | Registrar suscripción EventSub |
 | `/api/youtube/videos` | GET | Últimos videos de YouTube; también sincroniza `YoutubeVideo` como respaldo al scheduler de `server.mjs` |

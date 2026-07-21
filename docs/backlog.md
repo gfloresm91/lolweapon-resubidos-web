@@ -330,8 +330,15 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 ### Doble polling de Twitch status
 
 - `HomeDashboard` y `PersistentTwitchPlayer` hacen fetch a `/api/twitch/status` de forma independiente cada 60 segundos.
-- Impacto: doble carga innecesaria al servidor de Twitch.
+- Impacto actual: duplica solicitudes HTTP internas, aunque la caché de 30 segundos y el refresco compartido evitan repetir llamadas externas a Twitch.
+- Pendiente: centralizar el estado en un proveedor común después de validar que no se afecten el dashboard ni el player persistente.
 - Approach sugerido: compartir el estado via React Context o subir el fetch al Server Component y pasarlo como prop inicial, dejando solo un poller activo.
+
+### Revalidación periódica de membresía Twitch
+
+- Actualmente Tier, moderación y VIP se vuelven a consultar cuando el usuario inicia sesión o conecta Twitch; una sesión persistente no dispara sincronización en segundo plano.
+- Diseñar por separado una política de revalidación basada en `twitchRoleSyncedAt`, sin mezclar tokens OAuth de usuarios con la caché pública de `/api/twitch/status`.
+- Opción preferida para analizar: solicitar una nueva autenticación Twitch cuando la sincronización supere el plazo definido, evitando almacenar refresh tokens de usuarios sin una estrategia de cifrado y rotación.
 
 ### Refactor de HomePage.js
 
