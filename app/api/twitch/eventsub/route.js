@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { createPlatformNotification } from "@/lib/repositories/notificationRepository";
+import { createPlatformNotificationOnce } from "@/lib/repositories/notificationRepository";
 import { upsertTwitchLive } from "@/lib/twitchArchive";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +75,11 @@ export async function POST(request) {
   }
 
   if (messageType === "revocation") {
+    console.warn(
+      `> Twitch EventSub revoked: type=${payload.subscription?.type || "unknown"}`,
+      `status=${payload.subscription?.status || "unknown"}`,
+      `id=${payload.subscription?.id || "unknown"}`,
+    );
     return NextResponse.json({ success: true, revoked: true });
   }
 
@@ -86,9 +91,11 @@ export async function POST(request) {
     return NextResponse.json({ success: true, ignored: true });
   }
 
-  const live = await upsertTwitchLive(payload.event || {});
+  const event = payload.event || {};
+  const live = await upsertTwitchLive(event, { trustedOnlineEvent: true });
   if (live) {
-    await createPlatformNotification({
+    await createPlatformNotificationOnce({
+      dedupeKey: `twitch:stream-online:${event.id || live.id}`,
       type: "alert",
       severity: "success",
       source: "twitch",
@@ -97,7 +104,7 @@ export async function POST(request) {
       href: "/inicio",
       icon: "Radio",
       audience: "all",
-      metadata: { liveId: live.id, twitchEventId: payload.event?.id || null },
+      metadata: { liveId: live.id, twitchEventId: event.id || null },
     });
   }
   return NextResponse.json({ success: true, live });

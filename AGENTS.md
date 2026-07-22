@@ -244,6 +244,8 @@ npm run db:restore
 
 - `PersistentTwitchPlayer` es delicado.
 - `/api/twitch/status` comparte durante 30 segundos el estado público del canal y deduplica refrescos simultáneos. `lib/twitch.js` reutiliza únicamente el token de aplicación, con expiración anticipada, timeout y un reintento ante `401`; no mezclar esta caché con los tokens OAuth de usuarios ni con la sincronización de roles Twitch.
+- El registro manual de EventSub lista `stream.online` usando un solo filtro permitido por Twitch, identifica localmente el broadcaster y reemplaza únicamente suscripciones coincidentes que no estén activas para el callback configurado. Las revocaciones deben registrar `type`, `status` e `id` sin incluir secretos.
+- Un `stream.online` con firma válida es evidencia suficiente para crear el card sin volver a depender inmediatamente de Helix; `TWITCH_REQUIRE_ACTIVE_STREAM` sigue aplicando a la creación manual. Las notificaciones EventSub se deduplican por ID del stream.
 - Twitch iframe es cross-origin y puede pausar por reglas del navegador/Twitch.
 - Cambios en full/mini player deben probar navegación, scroll, cambio de pestaña y estado offline.
 - Si no hay directo, el mini player debe ocultarse.
