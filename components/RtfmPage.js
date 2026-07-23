@@ -44,8 +44,8 @@ const archiveLinks = [
     title: "Excel",
     href: "https://1drv.ms/x/c/87dad8f5b07a6f01/IQABb3qw9djaIICHlm4AAAAAAYc3We7evL0vIGHpS_nUDf8",
     icon: Table,
-    description: "Documento base para centralizar la información de los directos.",
-    note: "En proceso, la idea es centralizar toda la información de los directos en este documento. Odio mi vida.",
+    description: "Documento histórico utilizado para la carga inicial de los directos.",
+    note: "La base de datos de la web es ahora la fuente operativa. Administración puede exportar desde el mantenedor del Rastreador los registros filtrados, completar el archivo y volver a importarlo para actualizar registros existentes de forma controlada.",
   },
   {
     title: "OneDrive",
