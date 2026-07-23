@@ -117,6 +117,14 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## Pendiente
 
+### Importación XLSX del Rastreador — creación de registros nuevos
+
+- **Qué es:** extender la importación XLSX del mantenedor Rastreador para que las filas que no correspondan a un directo existente puedan crear registros nuevos.
+- **Alcance diferido:** la primera etapa de la mejora XLSX solo actualizará registros existentes identificados por su `ID_INTERNO`; no creará directos desde el archivo.
+- **Decisiones pendientes:** definir cómo se genera y valida el identificador estable, qué campos son obligatorios, cómo se distinguen explícitamente las filas nuevas, cómo se gestionan imágenes y cómo se evita crear duplicados por título/fecha.
+- **Dependencias:** reutilizar el formato, parser, validaciones, previsualización de diferencias, permisos y auditoría de la importación XLSX de actualización.
+- **Motivo del diferimiento:** reducir el riesgo inicial de la carga masiva y validar primero el ciclo exportar, editar e importar sobre registros ya existentes.
+
 ### Player Twitch — pausa al abrir el centro de notificaciones
 
 - **Problema:** Al abrir el centro de notificaciones en `/inicio`, el video del player de Twitch se pausa brevemente y luego se reanuda solo. El chat no se pausa (usa un `<iframe>` independiente sin SDK).

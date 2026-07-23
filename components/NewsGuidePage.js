@@ -10,6 +10,7 @@ import {
   Check,
   Compass,
   Download,
+  FileSpreadsheet,
   History,
   Lock,
   LogIn,
@@ -64,6 +65,7 @@ const ICONS = {
   Check,
   Compass,
   Download,
+  FileSpreadsheet,
   History,
   LogIn,
   MessageCircle,
@@ -187,6 +189,14 @@ function resolveRestrictedCta({
   }
 
   if (cta.adminOnly && isAdminLike) {
+    if (!cta.href?.startsWith("/administracion/")) {
+      return {
+        label: cta.label,
+        href: cta.href,
+        muted: false,
+      };
+    }
+
     const directAccess = adminLinks.some((link) => link.href === cta.href);
     const fallback = adminLinks[0];
 

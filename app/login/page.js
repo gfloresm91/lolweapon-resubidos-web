@@ -10,6 +10,7 @@ import { z } from "zod";
 import { Eye, EyeOff } from "lucide-react";
 
 import AuthBackButton from "@/components/AuthBackButton";
+import AuthSessionGuard from "@/components/AuthSessionGuard";
 import { LOGIN_MAX_LENGTH, PASSWORD_MAX_LENGTH } from "@/lib/platformUserValidation";
 
 const loginSchema = z.object({
@@ -166,6 +167,7 @@ export default function LoginPage() {
 
   return (
     <main className="auth-shell">
+      <AuthSessionGuard />
       <Toaster position="top-right" richColors closeButton />
       <section className="auth-card" aria-labelledby="login-title">
         <div className="auth-header">

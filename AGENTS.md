@@ -102,6 +102,18 @@ npm run db:migrate:deploy
 - Formato de migración recomendado: `YYYYMMDDHHMMSS_descripcion_corta`.
 - Después de imports masivos en PostgreSQL, usar `npm run db:reset-sequences` para evitar IDs autoincrementales altos o inconsistentes.
 - No crear migraciones en producción/QA; solo aplicar migraciones ya versionadas.
+- Cuando el usuario vuelva a preguntar por el procedimiento rápido de respaldo y restauración de la BD, usar estos comandos operativos conocidos:
+
+```bash
+npm run db:backup || echo "Advertencia: backup de DB falló, continuando de todas formas..."
+
+BACKUP_FILE="$(ls -1t backups/postgres/*.dump | head -n 1)" \
+npm run db:restore
+```
+
+- La advertencia del primer comando no confirma un respaldo válido: si aparece, revisar el error y no asumir que existe un dump nuevo antes de restaurar.
+- Al restaurar una BD, `/login` y `/registro` validan la cookie mediante `/api/auth/session`; una sesión inexistente, expirada o inactiva limpia automáticamente la cookie obsoleta. Limpiar datos desde DevTools → Application queda solo como fallback de diagnóstico.
+- Los scripts `db:backup`/`db:restore` detectan PostgreSQL por servicio Compose, luego por el contenedor `lolweapon-resubidos-postgres` y finalmente por herramientas instaladas en el host. Esto cubre QA cuando el contenedor está sano pero pertenece a otro proyecto Compose.
 
 ## Arquitectura Y Código
 
@@ -251,6 +263,13 @@ npm run db:migrate:deploy
 - Tags se agrupan por reglas automáticas y overrides manuales.
 - Si un tag no tiene uso, se puede eliminar con confirmación.
 - Mantener categorías, iconos y keywords documentados.
+
+### Sincronización XLSX Del Rastreador
+
+- La exportación debe respetar todos los filtros y el orden activos, incluyendo todos los resultados y no solo la página visible.
+- `ID_BD` e `ID_INTERNO` se muestran bloqueados y deben validarse nuevamente en servidor al importar.
+- La importación actualiza registros existentes de forma integral, con previsualización campo a campo y control de versión contra cambios posteriores a la exportación.
+- Errores, conflictos o filas nuevas bloquean la operación completa. La creación de registros desde XLSX está diferida en `docs/backlog.md`.
 
 ## Git, Versionado Y Deploy
 

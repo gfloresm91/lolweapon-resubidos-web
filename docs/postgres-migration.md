@@ -135,6 +135,21 @@ Use `npm run db:migrate` only for local schema changes that should create a new 
 BACKUP_FILE=backups/postgres/lolweapon_resubidos_20260506T120000Z.dump npm run db:restore
 ```
 
+Quick operational commands used by the project owner:
+
+```bash
+npm run db:backup || echo "Advertencia: backup de DB falló, continuando de todas formas..."
+
+BACKUP_FILE="$(ls -1t backups/postgres/*.dump | head -n 1)" \
+npm run db:restore
+```
+
+`BACKUP_FILE` is a temporary environment variable for that command and does not need to exist in `.env`. If the backup warning appears, the backup must be treated as failed; verify the error and the timestamp/size of the latest dump before restoring.
+
+Backup and restore detect PostgreSQL in this order: the configured Docker Compose service, the running container named `lolweapon-resubidos-postgres`, and finally host-installed `pg_dump`/`pg_restore`. This supports QA environments where the database container is running but was created by a different Compose project. Optional overrides are `POSTGRES_RUNTIME=compose|container|host` and `POSTGRES_CONTAINER=<name>`.
+
+When a database dump is restored, an existing browser cookie can reference a session that no longer matches `PlatformSession`. `/login` and `/registro` validate it through `/api/auth/session`; invalid or expired sessions clear the stale cookie automatically, while temporary database failures return 503 without deleting it. Clearing site data in DevTools remains a diagnostic fallback.
+
 `npm run db:reset-sequences` resets PostgreSQL autoincrement sequences to the next logical value for each table with an `id` column. It is useful after repeated imports or after fixing sequence drift. It does not renumber existing rows.
 
 ## Current schema scope
@@ -332,6 +347,21 @@ DATA_SOURCE=postgres npm run build
 
 The export should keep the same live IDs as the source JSON. Some status labels can be normalized by catalog casing, for example `Lost media` to `Lost Media`.
 
+### Administrative XLSX synchronization
+
+The Rastreador maintainer can export its complete filtered and sorted result to XLSX and import the same workbook to update existing records. The workbook exposes `ID_BD` and `ID_INTERNO` as locked identifiers and stores a hidden source fingerprint to detect stale exports.
+
+Import rules:
+
+- all functional columns in the workbook are editable;
+- `ID_BD` and `ID_INTERNO` must remain unchanged;
+- rows are compared field by field before applying;
+- errors, stale rows, identifier conflicts, or new rows block the complete import;
+- PostgreSQL updates run in one transaction and are recorded in `AuditLog`;
+- creating new records from XLSX is deferred and documented in `docs/backlog.md`.
+
+Deploy migration `20260718120000_add_tracker_spreadsheet_permissions` before using the UI so `tracker.export` and `tracker.import` are available to roles.
+
 Runtime smoke checks:
 
 ```bash
@@ -403,6 +433,8 @@ Create a manual backup:
 ```bash
 COMPOSE_FILE=docker-compose.prod.yml npm run db:backup
 ```
+
+The backup script writes to a temporary `.partial` file, validates the custom dump with `pg_restore --list`, and only then publishes the final `.dump`. The backup directory must be writable by the deploy user; production GitHub Actions repairs its ownership before running the command and stops the deploy if backup validation fails.
 
 The backup and restore scripts load `.env` automatically when it exists. Use `ENV_FILE=/path/to/env` to point them elsewhere.
 

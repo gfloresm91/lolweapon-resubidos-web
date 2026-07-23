@@ -151,6 +151,9 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 
 ## Gotchas conocidos
 
+- **Importación XLSX del Rastreador** — `ID_BD` e `ID_INTERNO` son identificadores bloqueados y validados en servidor. La importación exige previsualización, rechaza archivos obsoletos mediante huella de origen y no crea filas nuevas en la primera etapa.
+- **Restore y sesión obsoleta** — `/login` y `/registro` consultan `/api/auth/session`: si la cookie ya no corresponde a `PlatformSession`, se elimina automáticamente; si la BD falla temporalmente, devuelve 503 sin borrar la cookie. DevTools → Application queda como fallback de diagnóstico.
+
 - **`npm run db:generate` es obligatorio después de `npm ci`** — sin esto, el build falla con `Cannot find module '.prisma/client/default'`. Ya está en los workflows de GitHub Actions, pero si se corre el build manualmente hay que hacerlo explícitamente.
 - **`unset DATABASE_URL` antes de migrar en el servidor QA** — si la variable está seteada en el shell (puede pasar al hacer `source .env` de producción), Prisma la usa y conecta a la BD de producción ignorando el `.env` local del directorio de QA.
 - **El deploy es exclusivamente vía GitHub Actions** — `scripts/deploy.sh` fue eliminado. Push a `dev` → QA, push a `main` → producción.

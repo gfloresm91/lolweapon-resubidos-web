@@ -128,6 +128,8 @@ mkdir -p backups/postgres
 COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env npm run db:backup
 ```
 
+El directorio `backups/postgres` debe pertenecer al usuario que ejecuta el deploy. El workflow de producción corrige su propiedad antes de respaldar, valida el dump con `pg_restore --list` y detiene el despliegue si el respaldo falla.
+
 Guarda una copia fuera del droplet si la data es importante:
 
 ```bash

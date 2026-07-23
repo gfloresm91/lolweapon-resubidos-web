@@ -332,6 +332,8 @@ export default function HomePage({
   const canCreateTracker = hasPermission("tracker.create");
   const canUpdateTracker = hasPermission("tracker.update");
   const canDeleteTracker = hasPermission("tracker.delete");
+  const canExportTracker = hasPermission("tracker.export");
+  const canImportTracker = hasPermission("tracker.import");
   const canNotifyTracker = hasPermission("tracker.lives.notify");
   const trackerFormVariant = hasPermission("tracker.form.full")
     ? "full"
@@ -339,7 +341,7 @@ export default function HomePage({
       ? "compact"
       : null;
   const canViewTrackerMaintainer = hasPermission("admin.tracker.view");
-  const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker);
+  const canManageTracker = canViewTrackerMaintainer && (canCreateTracker || canUpdateTracker || canDeleteTracker || canExportTracker || canImportTracker);
   const canViewTagsMaintainer = hasPermission("admin.tags.view");
   const canCreateTags = hasPermission("tags.create");
   const canUpdateTags = hasPermission("tags.update");
@@ -1952,6 +1954,8 @@ export default function HomePage({
                 canUpdate={canUpdateTracker && Boolean(trackerFormVariant)}
                 canDelete={canDeleteTracker}
                 canNotify={hasPermission("admin.lives.notify")}
+                canExport={canExportTracker}
+                canImport={canImportTracker}
                 canUpdateTags={canUpdateTags}
                 formVariant={trackerFormVariant || "compact"}
                 twitchLogin={twitchLogin}
