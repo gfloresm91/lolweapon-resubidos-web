@@ -41,8 +41,12 @@ jobs:
             npm ci --prefer-offline
             npm run db:generate
             npm run build
-            sudo install -d -o "$(id -u)" -g "$(id -g)" backups/postgres
-            sudo chown -R "$(id -u):$(id -g)" backups/postgres
+            mkdir -p backups/postgres
+            if [[ ! -w backups/postgres ]]; then
+              echo "El directorio backups/postgres no tiene permisos de escritura para $(id -un)." >&2
+              echo "Corrige una vez con: sudo chown -R $(id -u):$(id -g) backups/postgres" >&2
+              exit 1
+            fi
             COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env npm run db:backup
             npm run db:migrate:deploy
             sudo systemctl restart resubidos.service
