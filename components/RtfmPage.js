@@ -46,6 +46,10 @@ const archiveLinks = [
     icon: Table,
     description: "Documento histórico utilizado para la carga inicial de los directos.",
     note: "La base de datos de la web es ahora la fuente operativa. Administración puede exportar desde el mantenedor del Rastreador los registros filtrados, completar el archivo y volver a importarlo para actualizar registros existentes de forma controlada.",
+    details: [
+      "La revisión de importación muestra pasos, contadores, pestañas y diferencias antes de aplicar cualquier cambio.",
+      "La operación exige una confirmación final y se bloquea por completo si detecta errores, conflictos, identificadores alterados o filas nuevas.",
+    ],
   },
   {
     title: "OneDrive",
