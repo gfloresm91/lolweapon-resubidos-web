@@ -14,6 +14,7 @@ import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 
 const EMPTY_ROLE = {
   code: "",
@@ -40,10 +41,11 @@ const ROLE_CODE_MAX_LENGTH = 40;
 const ROLE_LABEL_MAX_LENGTH = 60;
 const PERMISSION_GROUP_ORDER = [
   "Plataforma: Inicio",
-  "Plataforma: Notificaciones",
   "Plataforma: RTFM",
   "Plataforma: Novedades",
   "Plataforma: Historial de cambios",
+  "Plataforma: Notificaciones",
+  "Plataforma: Sugerencias/Reclamos",
   "Archivo VOD: Rastreador",
   "Archivo VOD: Calendario",
   "Biblioteca de anime: Viendo",
@@ -53,6 +55,7 @@ const PERMISSION_GROUP_ORDER = [
   "Administración: Usuarios",
   "Administración: Roles",
   "Administración: Notificaciones",
+  "Administración: Tickets",
   "Administración: Rastreador",
   "Administración: Tags",
   "Administración: Anime Viendo",
@@ -591,7 +594,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   const [statusRole, setStatusRole] = useState(null);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(!initialRoles.length);
+  const [isLoading, setIsLoading] = useState(!initialRoles.length || !initialPermissions.length);
   const filteredRoles = useMemo(() => {
     const query = normalizeSearchValue(searchQuery.trim());
     return roles
@@ -639,7 +642,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   }, [totalPages]);
 
   useEffect(() => {
-    if (initialRoles.length) {
+    if (initialRoles.length && initialPermissions.length) {
       setIsLoading(false);
       return undefined;
     }
@@ -679,7 +682,7 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
     return () => {
       isMounted = false;
     };
-  }, [initialRoles.length]);
+  }, [initialPermissions.length, initialRoles.length]);
 
   async function persistRole(role) {
     setIsSaving(true);
@@ -755,10 +758,6 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           Roles de <span className="text-gradient">la plataforma</span>
         </h1>
@@ -854,24 +853,28 @@ export default function PlatformRolesPage({ initialRoles = [], initialPermission
                 {role.isActive ? "Activo" : "Inactivo"}
               </span>
               <div className="admin-user-actions">
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Editar rol"
-                  onClick={() => setEditingRole(normalizeRole(role))}
-                >
-                  <Edit3 size={17} />
-                </button>
-                {!PROTECTED_ROLE_CODES.has(role.code) ? (
+                <Tooltip label="Editar rol">
                   <button
                     type="button"
                     className="icon-tool-button"
-                    aria-label={role.isActive ? "Desactivar rol" : "Activar rol"}
-                    onClick={() => setStatusRole(role)}
-                    disabled={isSaving}
+                    aria-label="Editar rol"
+                    onClick={() => setEditingRole(normalizeRole(role))}
                   >
-                    <Power size={17} />
+                    <Edit3 size={17} />
                   </button>
+                </Tooltip>
+                {!PROTECTED_ROLE_CODES.has(role.code) ? (
+                  <Tooltip label={role.isActive ? "Desactivar rol" : "Activar rol"}>
+                    <button
+                      type="button"
+                      className="icon-tool-button"
+                      aria-label={role.isActive ? "Desactivar rol" : "Activar rol"}
+                      onClick={() => setStatusRole(role)}
+                      disabled={isSaving}
+                    >
+                      <Power size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>

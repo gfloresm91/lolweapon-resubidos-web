@@ -223,7 +223,7 @@ export default function HomeDashboard({
                     {isOnline && typeof currentStream.viewer_count === "number" ? (
                       <span>{currentStream.viewer_count} viewers</span>
                     ) : null}
-                    {!isOnline && !isTwitchLoading ? <span>Offline</span> : null}
+                    {!isOnline && !isTwitchLoading ? <span className="stream-offline-state">Offline</span> : null}
                   </div>
                   {currentCategory ? (
                     <div className="stream-category-line">

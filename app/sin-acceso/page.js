@@ -30,7 +30,6 @@ export default async function AccessDeniedPage({ searchParams }) {
           <div className="access-denied-icon" aria-hidden="true">
             <ShieldAlert size={24} />
           </div>
-          <span className="auth-eyebrow">Acceso restringido</span>
           <h1 id="access-denied-title" className="auth-title">No tienes acceso a esta pantalla</h1>
           <p className="auth-subtitle">
             Tu sesión está activa, pero tu rol actual no tiene el permiso necesario para entrar

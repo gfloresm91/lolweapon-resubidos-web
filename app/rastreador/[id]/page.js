@@ -14,8 +14,9 @@ import { SESSION_COOKIE } from "@/lib/auth";
 import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
-import { getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
+import { getLiveStatuses, getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
 import { getLiveActivityForLive } from "@/lib/repositories/liveActivityRepository";
+import { normalizeTag } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
 
@@ -74,9 +75,10 @@ export default async function LiveDetailPage({ params }) {
     redirect(`/login?next=/rastreador/${encodeURIComponent(decodedId)}`);
   }
 
-  const [{ live, previousLive, nextLive }, initialActivity] = await Promise.all([
+  const [{ live, previousLive, nextLive }, initialActivity, liveStatuses] = await Promise.all([
     getLiveWithNeighbors(decodedId),
     currentUser?.id ? getLiveActivityForLive(currentUser.id, decodedId) : Promise.resolve(null),
+    getLiveStatuses(),
   ]);
 
   if (!live) {
@@ -100,6 +102,12 @@ export default async function LiveDetailPage({ params }) {
   const canManageTracker = can(accessUser, "admin.tracker.view") && (
     can(accessUser, "tracker.create") || can(accessUser, "tracker.update") || can(accessUser, "tracker.delete")
   );
+  const trackerFormVariant = can(accessUser, "tracker.form.full")
+    ? "full"
+    : can(accessUser, "tracker.form.compact")
+      ? "compact"
+      : null;
+  const canEditTracker = can(accessUser, "tracker.update") && Boolean(trackerFormVariant);
   const canManageAnimeTracking = can(accessUser, "admin.anime.tracking.view") && (
     can(accessUser, "anime.tracking.create") || can(accessUser, "anime.tracking.update") || can(accessUser, "anime.tracking.delete")
   );
@@ -133,7 +141,7 @@ export default async function LiveDetailPage({ params }) {
         <div className="content-shell">
           <header className="topbar" aria-label="Barra superior">
             <div className="topbar-title">
-              <span className="topbar-kicker">Archivo VODs</span>
+              <span className="topbar-kicker">Archivo VOD</span>
               <span className="topbar-page">Resubido</span>
             </div>
 
@@ -190,10 +198,15 @@ export default async function LiveDetailPage({ params }) {
                     <div className="watch-title-row">
                       <h1 className="detail-title">{live.title || "Sin titulo"}</h1>
                       <DetailActivityButtons
+                        live={live}
                         liveId={live.id}
                         liveTitle={live.title || ""}
                         initialActivity={initialActivity}
                         isAuthenticated={isAuthenticated}
+                        canEdit={canEditTracker}
+                        canDelete={can(accessUser, "tracker.delete")}
+                        formVariant={trackerFormVariant}
+                        statuses={liveStatuses}
                       />
                     </div>
                     <div className="watch-meta-row">
@@ -205,7 +218,7 @@ export default async function LiveDetailPage({ params }) {
                     {tags.length ? (
                       <div className="tags-container detail-tags">
                         {tags.map((tag) => (
-                          <Link key={tag} href={`/rastreador?tag=${encodeURIComponent(tag)}`} className="tag-pill">
+                          <Link key={tag} href={`/rastreador?tag=${encodeURIComponent(normalizeTag(tag))}`} className="tag-pill">
                             {tag}
                           </Link>
                         ))}

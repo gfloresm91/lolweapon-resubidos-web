@@ -208,6 +208,23 @@ const ADMIN_TREE_ITEMS = [
   },
 ];
 
+function handleInternalNavigation(event, onSelect, view) {
+  if (
+    !onSelect
+    || event.defaultPrevented
+    || event.button !== 0
+    || event.metaKey
+    || event.ctrlKey
+    || event.shiftKey
+    || event.altKey
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  onSelect(view);
+}
+
 function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
   const Icon = item.icon;
   const className = [
@@ -225,16 +242,20 @@ function SidebarNavItem({ item, activeView, isSectionLink = false, onSelect }) {
     </>
   );
 
-  if (onSelect) {
+  if (!onSelect) {
     return (
-      <button type="button" className={className} onClick={() => onSelect(item.key)}>
+      <Link href={item.href} className={className}>
         {content}
-      </button>
+      </Link>
     );
   }
 
   return (
-    <Link href={item.href} className={className}>
+    <Link
+      href={item.href}
+      className={className}
+      onClick={(event) => handleInternalNavigation(event, onSelect, item.key)}
+    >
       {content}
     </Link>
   );
@@ -374,17 +395,17 @@ export default function AppSidebar({
   return (
     <aside id={id} className={sidebarClassName} aria-label="Menu principal">
       {onSelect ? (
-        <button
-          type="button"
+        <Link
+          href="/inicio"
           className="sidebar-brand sidebar-brand-button"
           aria-label="Ir al inicio"
-          onClick={() => onSelect("home")}
+          onClick={(event) => handleInternalNavigation(event, onSelect, "home")}
         >
           <span className="sidebar-brand-mark">
             <img src="/brand/lolweapon-logo.png" alt="" />
           </span>
           <span className="sidebar-brand-text">LOLWEAPON</span>
-        </button>
+        </Link>
       ) : (
         <Link href="/inicio" className="sidebar-brand sidebar-brand-button" aria-label="Ir al inicio">
           <span className="sidebar-brand-mark">

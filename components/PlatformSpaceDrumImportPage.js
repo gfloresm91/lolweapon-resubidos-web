@@ -82,10 +82,6 @@ export default function PlatformSpaceDrumImportPage({
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           SpaceDrum <span className="text-gradient">importación</span>
         </h1>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, ExternalLink, Eye, EyeOff, MessageSquare, Radio, RotateCcw, ShieldAlert, Sparkles, Trash2, Tv, Video } from "lucide-react";
 import { toast } from "sonner";
 
+import AppLink from "@/components/AppLink";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerStats from "@/components/MaintainerStats";
@@ -14,7 +15,13 @@ import { formatPlatformDateTime } from "@/lib/dateTime";
 
 const TYPE_OPTIONS = [{ value: "all", label: "Todos los tipos" }, { value: "alert", label: "Alertas" }, { value: "activity", label: "Actividad" }, { value: "system", label: "Sistema" }];
 const STATUS_OPTIONS = [{ value: "all", label: "Todos los estados" }, { value: "active", label: "Activas" }, { value: "unread", label: "No leídas" }, { value: "read", label: "Leídas" }, { value: "dismissed", label: "Descartadas" }];
-const COLUMNS = [{ key: "notification", label: "Notificación" }, { key: "type", label: "Tipo" }, { key: "published", label: "Fecha" }, { key: "state", label: "Estado" }, { key: "actions", label: "Operaciones" }];
+const COLUMNS = [
+  { key: "notification", label: "Notificación" },
+  { key: "type", label: "Tipo", sortable: true },
+  { key: "published", label: "Fecha", sortable: true },
+  { key: "state", label: "Estado", sortable: true },
+  { key: "actions", label: "Acciones" },
+];
 const ICONS = { Bell, BellRing, BookOpen, CheckCheck, CirclePlay, MessageSquare, Radio, ShieldAlert, Sparkles, Tv, Video };
 const TYPE_LABELS = { alert: "Alerta", activity: "Actividad", system: "Sistema" };
 
@@ -49,6 +56,22 @@ function getNotificationState(notification) {
   return { label: "No leída", className: "is-warning" };
 }
 
+function NotificationDestinationLink({ notification, children, ...props }) {
+  if (notification.type === "alert") {
+    return (
+      <a href={notification.href} target="_blank" rel="noreferrer" {...props}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <AppLink href={notification.href} {...props}>
+      {children}
+    </AppLink>
+  );
+}
+
 export default function NotificationsPage({ initialResult = null }) {
   const [result, setResult] = useState(initialResult || { notifications: [], total: 0, unreadCount: 0, dismissedCount: 0, page: 1, totalPages: 1 });
   const [search, setSearch] = useState("");
@@ -56,6 +79,7 @@ export default function NotificationsPage({ initialResult = null }) {
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [sortConfig, setSortConfig] = useState({ key: "published", direction: "desc" });
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [pendingDismiss, setPendingDismiss] = useState(null);
@@ -63,7 +87,15 @@ export default function NotificationsPage({ initialResult = null }) {
   const load = useCallback(async ({ showLoading = true } = {}) => {
     if (showLoading) setIsLoading(true);
     try {
-      const params = new URLSearchParams({ search, type, status, page: String(page), pageSize: String(pageSize) });
+      const params = new URLSearchParams({
+        search,
+        type,
+        status,
+        page: String(page),
+        pageSize: String(pageSize),
+        sort: sortConfig.key,
+        direction: sortConfig.direction,
+      });
       const response = await fetch(`/api/notifications?${params}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || "No se pudieron cargar las notificaciones.");
@@ -73,7 +105,7 @@ export default function NotificationsPage({ initialResult = null }) {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [page, pageSize, search, status, type]);
+  }, [page, pageSize, search, sortConfig, status, type]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { setPage(1); }, [search, status, type]);
@@ -118,6 +150,14 @@ export default function NotificationsPage({ initialResult = null }) {
     setPage(1);
   }
 
+  function toggleSort(key) {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+    setPage(1);
+  }
+
   async function runAction(action, id = null) {
     const scrollY = window.scrollY;
     setIsMutating(true);
@@ -140,7 +180,6 @@ export default function NotificationsPage({ initialResult = null }) {
   return (
     <section className="notifications-page">
       <header className="watching-header admin-users-header">
-        <div className="header-badge"><Bell size={16} /> CENTRO PERSONAL</div>
         <h1 className="title">Tus <span className="text-gradient">notificaciones</span></h1>
         <p className="subtitle">Consulta, organiza y recupera todos tus avisos desde un solo lugar.</p>
       </header>
@@ -151,7 +190,7 @@ export default function NotificationsPage({ initialResult = null }) {
       ]} />
       <section className="tracker-actions notification-page-actions">
         <div><span className="tracker-actions-label">Bandeja</span><p className="tracker-actions-copy">Los avisos descartados pueden restaurarse cuando quieras.</p></div>
-        <button type="button" className="tracker-action-secondary" onClick={() => runAction("mark-all-read")} disabled={isMutating}><CheckCheck size={17} /> Marcar todas como leídas</button>
+        <button type="button" className="tracker-action-secondary" onClick={() => runAction("mark-all-read")} disabled={isMutating || !result.unreadCount}><CheckCheck size={17} /> Marcar todas como leídas</button>
       </section>
       <MaintainerToolbar searchId="notification-search" searchValue={search} searchPlaceholder="Buscar por título o contenido..." onSearchChange={setSearch}>
         <FilterSelect id="notification-type" label="Tipo" value={type} options={TYPE_OPTIONS} onChange={setType} />
@@ -198,10 +237,10 @@ export default function NotificationsPage({ initialResult = null }) {
                 >
                   {notification.href ? (
                     <Tooltip label="Abrir contenido">
-                      <a className="notification-mobile-action" href={notification.href} target={notification.type === "alert" ? "_blank" : undefined} rel={notification.type === "alert" ? "noreferrer" : undefined} aria-label={`Abrir contenido de ${notification.title}`}>
+                      <NotificationDestinationLink notification={notification} className="notification-mobile-action" aria-label={`Abrir contenido de ${notification.title}`}>
                         <ExternalLink size={15} />
                         <span>Abrir</span>
-                      </a>
+                      </NotificationDestinationLink>
                     </Tooltip>
                   ) : null}
                   <Tooltip label={`Marcar como ${readLabel.toLowerCase()}`}>
@@ -236,7 +275,7 @@ export default function NotificationsPage({ initialResult = null }) {
           </div>
         </div>
       </section>
-      <MaintainerTable ariaLabel="Centro de notificaciones" columns={COLUMNS} isLoading={isLoading} loadingText="Cargando notificaciones..." isEmpty={!result.notifications?.length} emptyText="No hay notificaciones con estos filtros." className="notification-user-table" pagination={pagination}>
+      <MaintainerTable ariaLabel="Centro de notificaciones" columns={COLUMNS} sortConfig={sortConfig} onSort={toggleSort} isLoading={isLoading} loadingText="Cargando notificaciones..." isEmpty={!result.notifications?.length} emptyText="No hay notificaciones con estos filtros." className="notification-user-table" pagination={pagination}>
         {result.notifications?.map((notification) => {
           const Icon = getNotificationIcon(notification);
           const state = getNotificationState(notification);
@@ -260,9 +299,9 @@ export default function NotificationsPage({ initialResult = null }) {
               <div className="admin-user-actions notification-page-card-actions">
                 {notification.href ? (
                   <Tooltip label="Abrir contenido">
-                    <a className="icon-tool-button" href={notification.href} target={notification.type === "alert" ? "_blank" : undefined} rel={notification.type === "alert" ? "noreferrer" : undefined} aria-label={`Abrir contenido de ${notification.title}`}>
+                    <NotificationDestinationLink notification={notification} className="icon-tool-button" aria-label={`Abrir contenido de ${notification.title}`}>
                       <ExternalLink size={16} />
-                    </a>
+                    </NotificationDestinationLink>
                   </Tooltip>
                 ) : null}
                 <Tooltip label={readLabel}>

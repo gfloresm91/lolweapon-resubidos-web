@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -17,6 +16,8 @@ import {
   Video,
   X,
 } from "lucide-react";
+
+import AppLink from "@/components/AppLink";
 
 const TABS = [
   { key: "alert", label: "Alertas" },
@@ -154,6 +155,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
     [notification.type]: (counts[notification.type] || 0) + 1,
   }), {}), [notifications]);
   const badgeLabel = unreadCount > 99 ? "99+" : String(unreadCount);
+  const unreadLabel = unreadCount === 1 ? "1 nueva" : `${badgeLabel} nuevas`;
 
   async function loadNotifications({ showLoading = false } = {}) {
     if (isLoadingRef.current) {
@@ -374,7 +376,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
               <span>Centro</span>
               <strong>Notificaciones</strong>
             </div>
-            {unreadCount ? <span className="notification-count">{badgeLabel} nuevas</span> : null}
+            {unreadCount ? <span className="notification-count">{unreadLabel}</span> : null}
           </div>
 
           <div className="notification-tabs" role="tablist" aria-label="Tipos de notificación">
@@ -441,7 +443,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
                       {content}
                     </a>
                   ) : notification.href ? (
-                    <Link
+                    <AppLink
                       href={notification.href}
                       className="notification-item-main"
                       onClick={() => {
@@ -450,7 +452,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
                       }}
                     >
                       {content}
-                    </Link>
+                    </AppLink>
                   ) : (
                     <button
                       type="button"

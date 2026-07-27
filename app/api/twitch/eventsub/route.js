@@ -2,8 +2,9 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { createPlatformNotificationOnce } from "@/lib/repositories/notificationRepository";
-import { upsertTwitchLive } from "@/lib/twitchArchive";
+import { markCurrentTwitchLiveAsUploading, upsertTwitchLive } from "@/lib/twitchArchive";
 
 export const dynamic = "force-dynamic";
 
@@ -87,11 +88,39 @@ export async function POST(request) {
     return NextResponse.json({ success: true, ignored: true });
   }
 
-  if (payload.subscription?.type !== "stream.online") {
+  const subscriptionType = payload.subscription?.type;
+
+  if (!["stream.online", "stream.offline"].includes(subscriptionType)) {
     return NextResponse.json({ success: true, ignored: true });
   }
 
   const event = payload.event || {};
+
+  if (subscriptionType === "stream.offline") {
+    const result = await markCurrentTwitchLiveAsUploading();
+
+    if (result) {
+      await createAuditLog({
+        action: "twitch_stream_offline",
+        module: "admin.tracker",
+        entityType: "Live",
+        entityId: result.live.dbId || result.live.id,
+        entityLabel: result.live.title || result.live.id,
+        summary: "Cambió automáticamente el directo de En directo a Subiendo",
+        before: result.before,
+        after: result.live,
+        metadata: {
+          source: "twitch_eventsub",
+          twitchMessageId: request.headers.get(MESSAGE_ID),
+          broadcasterUserId: event.broadcaster_user_id || null,
+        },
+        request,
+      });
+    }
+
+    return NextResponse.json({ success: true, live: result?.live || null });
+  }
+
   const live = await upsertTwitchLive(event, { trustedOnlineEvent: true });
   if (live) {
     await createPlatformNotificationOnce({
@@ -105,6 +134,22 @@ export async function POST(request) {
       icon: "Radio",
       audience: "all",
       metadata: { liveId: live.id, twitchEventId: event.id || null },
+    });
+
+    await createAuditLog({
+      action: "twitch_stream_online",
+      module: "admin.tracker",
+      entityType: "Live",
+      entityId: live.dbId || live.id,
+      entityLabel: live.title || live.id,
+      summary: "Creó o actualizó un directo automáticamente desde Twitch EventSub",
+      after: live,
+      metadata: {
+        source: "twitch_eventsub",
+        twitchMessageId: request.headers.get(MESSAGE_ID),
+        twitchEventId: event.id || null,
+      },
+      request,
     });
   }
   return NextResponse.json({ success: true, live });

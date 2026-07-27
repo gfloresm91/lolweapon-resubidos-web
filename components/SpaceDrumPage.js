@@ -50,7 +50,6 @@ function getLibrary(data) {
 function getLanguageCopy(language) {
   if (language === "en-us") {
     return {
-      eyebrow: "Official manga",
       read: "Read",
       previous: "Previous",
       next: "Next",
@@ -81,7 +80,6 @@ function getLanguageCopy(language) {
   }
 
   return {
-    eyebrow: "Manga oficial",
     read: "Leer",
     previous: "Anterior",
     next: "Siguiente",
@@ -493,10 +491,6 @@ export default function SpaceDrumPage({ data, initialProgress = {}, isAuthentica
         ) : null}
         <div className="spacedrum-intro">
           <div className="spacedrum-copy">
-            <span className="spacedrum-status">
-              <BookOpenCheck aria-hidden="true" />
-              {copy.eyebrow}
-            </span>
             <div className="spacedrum-title-lockup">
               {languageData.coverImage ? (
                 <div className="spacedrum-cover">

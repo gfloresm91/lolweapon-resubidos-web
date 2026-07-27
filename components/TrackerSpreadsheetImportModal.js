@@ -89,10 +89,9 @@ export default function TrackerSpreadsheetImportModal({ isOpen, onClose, onImpor
 
   return (
     <MaintainerModal
-      className="admin-modal tracker-spreadsheet-modal"
+      className={`admin-modal tracker-spreadsheet-modal ${step === 1 ? "is-reviewing" : ""}`}
       title={step === 0 ? "Importar registros del Rastreador" : step === 1 ? "Revisar importación" : step === 2 ? "Confirmar actualización masiva" : "Importación completada"}
       subtitle={step === 0 ? "Actualiza registros existentes usando el mismo formato generado por la exportación." : file?.name || ""}
-      closeOnBackdrop={false}
       onClose={resetAndClose}
     >
       <div className="tracker-import-steps" aria-label={`Paso ${step + 1} de 4`}>
@@ -118,16 +117,18 @@ export default function TrackerSpreadsheetImportModal({ isOpen, onClose, onImpor
       ) : null}
 
       {step === 1 && analysis ? (
-        <>
-          <div className="tracker-import-summary">
-            <span><strong>{analysis.changes.length}</strong> con cambios</span>
-            <span><strong>{analysis.unchanged}</strong> sin cambios</span>
-            <span className={analysis.conflicts.length ? "is-danger" : ""}><strong>{analysis.conflicts.length}</strong> conflictos</span>
-            <span className={analysis.errors.length ? "is-danger" : ""}><strong>{analysis.errors.length}</strong> errores</span>
-            <span className={analysis.newRows.length ? "is-warning" : ""}><strong>{analysis.newRows.length}</strong> filas nuevas</span>
-          </div>
-          <div className="tracker-import-tabs">
-            {tabs.map((tab) => <button type="button" key={tab.key} className={activeTab === tab.key ? "is-active" : ""} onClick={() => setActiveTab(tab.key)}>{tab.label} ({tab.count})</button>)}
+        <div className="tracker-import-review-layout">
+          <div className="tracker-import-review-controls">
+            <div className="tracker-import-summary">
+              <span><strong>{analysis.changes.length}</strong> con cambios</span>
+              <span><strong>{analysis.unchanged}</strong> sin cambios</span>
+              <span className={analysis.conflicts.length ? "is-danger" : ""}><strong>{analysis.conflicts.length}</strong> conflictos</span>
+              <span className={analysis.errors.length ? "is-danger" : ""}><strong>{analysis.errors.length}</strong> errores</span>
+              <span className={analysis.newRows.length ? "is-warning" : ""}><strong>{analysis.newRows.length}</strong> filas nuevas</span>
+            </div>
+            <div className="tracker-import-tabs">
+              {tabs.map((tab) => <button type="button" key={tab.key} className={activeTab === tab.key ? "is-active" : ""} onClick={() => setActiveTab(tab.key)}>{tab.label} ({tab.count})</button>)}
+            </div>
           </div>
           <div className="tracker-import-review-list">
             {!activeItems.length ? <p className="tracker-import-empty">No hay elementos en esta categoría.</p> : null}
@@ -151,7 +152,7 @@ export default function TrackerSpreadsheetImportModal({ isOpen, onClose, onImpor
             <button type="button" className="btn-modal btn-modal-secondary" onClick={() => setStep(0)}>Volver</button>
             <button type="button" className="btn-modal btn-modal-primary" disabled={!analysis.canApply} onClick={() => setStep(2)}>Continuar con {analysis.changes.length} cambios</button>
           </div>
-        </>
+        </div>
       ) : null}
 
       {step === 2 && analysis ? (

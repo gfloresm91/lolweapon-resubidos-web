@@ -15,6 +15,7 @@ import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 import {
   ALIAS_MAX_LENGTH,
   ALIAS_RULES,
@@ -907,10 +908,6 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           Usuarios de <span className="text-gradient">la plataforma</span>
         </h1>
@@ -1048,45 +1045,53 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
               </span>
               <div className="admin-user-actions">
                 {canEditUser(user) ? (
-                  <button
-                    type="button"
-                    className="icon-tool-button"
-                    aria-label="Editar usuario"
-                    onClick={() => setEditingUser(normalizeDraft(user))}
-                  >
-                    <Edit3 size={17} />
-                  </button>
+                  <Tooltip label="Editar usuario">
+                    <button
+                      type="button"
+                      className="icon-tool-button"
+                      aria-label="Editar usuario"
+                      onClick={() => setEditingUser(normalizeDraft(user))}
+                    >
+                      <Edit3 size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
                 {canRunInternalOperations(user) ? (
-                  <button
-                    type="button"
-                    className="icon-tool-button"
-                    aria-label="Cambiar contraseña"
-                    onClick={() => setPasswordUser(normalizeDraft(user))}
-                  >
-                    <KeyRound size={17} />
-                  </button>
+                  <Tooltip label="Cambiar contraseña">
+                    <button
+                      type="button"
+                      className="icon-tool-button"
+                      aria-label="Cambiar contraseña"
+                      onClick={() => setPasswordUser(normalizeDraft(user))}
+                    >
+                      <KeyRound size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
                 {canRunInternalOperations(user) ? (
-                  <button
-                    type="button"
-                    className="icon-tool-button"
-                    aria-label={user.isActive ? "Desactivar usuario" : "Activar usuario"}
-                    onClick={() => setStatusUser(user)}
-                    disabled={isSaving}
-                  >
-                    <Power size={17} />
-                  </button>
+                  <Tooltip label={user.isActive ? "Desactivar usuario" : "Activar usuario"}>
+                    <button
+                      type="button"
+                      className="icon-tool-button"
+                      aria-label={user.isActive ? "Desactivar usuario" : "Activar usuario"}
+                      onClick={() => setStatusUser(user)}
+                      disabled={isSaving}
+                    >
+                      <Power size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
                 {canRunInternalOperations(user) ? (
-                  <button
-                    type="button"
-                    className="icon-tool-button danger"
-                    aria-label="Eliminar usuario"
-                    onClick={() => setPendingDelete(user)}
-                  >
-                    <Trash2 size={17} />
-                  </button>
+                  <Tooltip label="Eliminar usuario">
+                    <button
+                      type="button"
+                      className="icon-tool-button danger"
+                      aria-label="Eliminar usuario"
+                      onClick={() => setPendingDelete(user)}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>

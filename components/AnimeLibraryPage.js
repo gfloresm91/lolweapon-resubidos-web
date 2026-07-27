@@ -5,11 +5,14 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CheckCircle2, CirclePlay, Eye, ListPlus, Star, Edit3, X } from "lucide-react";
 import { toast } from "sonner";
 
+import AppLink from "@/components/AppLink";
 import AniListSearchModal from "@/components/AniListSearchModal";
+import AnimePosterImage, { AnimePosterPlaceholder, getAnimeInitials } from "@/components/AnimePosterImage";
 import ConfirmModal from "@/components/ConfirmModal";
 import FormSelect from "@/components/FormSelect";
 import TagCombobox from "@/components/TagCombobox";
 import Tooltip from "@/components/Tooltip";
+import { normalizeTag } from "@/lib/tags";
 
 const AnimeImageDropzone = dynamic(() => import("@/components/AnimeImageDropzone"), { ssr: false });
 
@@ -110,7 +113,6 @@ const COMPLETED_STATUS_OPTIONS = [
 
 const PAGE_CONFIG = {
   active: {
-    badge: "Biblioteca anime",
     titlePrefix: "Anime",
     titleHighlight: "Viendo",
     subtitle: "Animes que estás viendo, con compras parciales, temporada entera o pendientes de compra.",
@@ -120,7 +122,6 @@ const PAGE_CONFIG = {
     acceptsStatus: (status) => status === "purchased" || status === "watching",
   },
   completed: {
-    badge: "Biblioteca anime",
     titlePrefix: "Anime",
     titleHighlight: "Terminado",
     subtitle: "Animes terminados, pausados, pendientes o dropeados fuera del seguimiento activo.",
@@ -130,7 +131,6 @@ const PAGE_CONFIG = {
     acceptsStatus: (status) => ["completed", "paused", "pending", "dropped"].includes(status),
   },
   personal: {
-    badge: "Lista personal",
     titlePrefix: "Mi lista",
     titleHighlight: "Anime",
     subtitle: "Tus favoritos, pendientes, animes en curso y terminados en un solo lugar.",
@@ -146,44 +146,10 @@ export function getStatusLabel(status) {
 }
 
 export function getInitials(title) {
-  return String(title || "AN")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
+  return getAnimeInitials(title);
 }
 
-export function AnimePosterPlaceholder({ title, className = "" }) {
-  return (
-    <div className={["poster-placeholder anime-poster-placeholder", className].filter(Boolean).join(" ")}>
-      <span>{getInitials(title)}</span>
-    </div>
-  );
-}
-
-function AnimePosterImage({ src, title, className = "", decorative = false }) {
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [src]);
-
-  if (!src || hasError) {
-    return <AnimePosterPlaceholder title={title} />;
-  }
-
-  return (
-    <img
-      src={src}
-      alt={decorative ? "" : title}
-      className={className}
-      loading="lazy"
-      onError={() => setHasError(true)}
-    />
-  );
-}
+export { AnimePosterPlaceholder };
 
 const CHULOPUNTO_COLORS = ["", "#ef4444", "#ef4444", "#eab308", "#eab308", "#22d3ee", "#22d3ee", "#22c55e", "#22c55e"];
 const MIN_CHULOPUNTO = 1;
@@ -202,7 +168,7 @@ function getDefaultSortOption({ mode, personalOnly }) {
   return "purchased-desc";
 }
 
-function ChulopuntoGauge({ score }) {
+function ChulopuntoGauge({ score, calm = false }) {
   const reactId = useId();
   const id = `cpg-${reactId.replace(/:/g, "")}`;
   const numericScore = normalizeChulopunto(score);
@@ -218,7 +184,7 @@ function ChulopuntoGauge({ score }) {
 
   return (
     <div
-      className="chulopunto-gauge"
+      className={`chulopunto-gauge ${calm ? "is-calm" : ""}`}
       style={{ "--chulopunto-color": color }}
       aria-label={`Nota destacada por Kala: ${displayScore}/8`}
     >
@@ -247,8 +213,8 @@ function ChulopuntoGauge({ score }) {
             <feDropShadow dx="0" dy="7" stdDeviation="7" floodColor="rgba(0,0,0,0.75)" />
           </filter>
         </defs>
-        <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-core)`} filter={`url(#${id}-shadow)`} />
-        <circle cx={cx} cy={cy} r="52" fill="none" stroke={color} strokeWidth="3" opacity="0.85" filter={`url(#${id}-glow)`} />
+        <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-core)`} filter={calm ? undefined : `url(#${id}-shadow)`} />
+        <circle cx={cx} cy={cy} r="52" fill="none" stroke={color} strokeWidth="3" opacity={calm ? "0.62" : "0.85"} filter={calm ? undefined : `url(#${id}-glow)`} />
         <circle cx={cx} cy={cy} r="45" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="9" />
         <circle
           cx={cx}
@@ -260,10 +226,14 @@ function ChulopuntoGauge({ score }) {
           strokeDasharray={`${dash} ${circumference}`}
           strokeLinecap="round"
           transform={`rotate(-90 ${cx} ${cy})`}
-          filter={`url(#${id}-glow)`}
+          filter={calm ? undefined : `url(#${id}-glow)`}
         />
-        <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-shine)`} />
-        <ellipse cx="48" cy="37" rx="22" ry="10" fill="rgba(255,255,255,0.1)" />
+        {calm ? null : (
+          <>
+            <circle cx={cx} cy={cy} r="51" fill={`url(#${id}-shine)`} />
+            <ellipse cx="48" cy="37" rx="22" ry="10" fill="rgba(255,255,255,0.1)" />
+          </>
+        )}
       </svg>
       <div className="chulopunto-score-wrap">
         <span className="chulopunto-score">{displayScore}</span>
@@ -469,10 +439,10 @@ function getGeneratedTrackerUrl(form) {
   const title = String(form?.titleEs || form?.title || "").trim();
 
   if (tag) {
-    return `/rastreador?tag=${encodeURIComponent(tag)}`;
+    return `/rastreador?tag=${encodeURIComponent(normalizeTag(tag))}`;
   }
 
-  return title ? `/rastreador?search=${encodeURIComponent(title)}` : "/rastreador";
+  return title ? `/rastreador?search=${encodeURIComponent(title.toLocaleLowerCase("es"))}` : "/rastreador";
 }
 
 function getDuplicateAnimeError(form, existingAnimes = [], currentKey = "") {
@@ -901,11 +871,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
         <form className="modal-body" onSubmit={submit}>
           <div className="anime-library-modal-grid">
             <aside className="anime-library-modal-preview">
-              {previewImage ? (
-                <img src={previewImage} alt={form.title} />
-              ) : (
-                <AnimePosterPlaceholder title={form.title} />
-              )}
+              <AnimePosterImage src={previewImage} title={form.title} />
               <div className="anime-library-preview-details">
                 <strong>{form.titleEs || form.title || "Sin título"}</strong>
                 <span>{[form.year, form.format, form.status].filter(Boolean).join(" · ") || "Sin metadata"}</span>
@@ -1006,7 +972,7 @@ export function AnimeLibraryModal({ anime, existingAnimes = [], isOpen, isSaving
                   <label>URL personalizada de resubidos</label>
                   <input
                     className="modal-input"
-                    placeholder="/rastreador?tag=bleach&status=done"
+                    placeholder="/rastreador?tag=bleach&status=completo"
                     value={form.trackerUrl}
                     aria-invalid={Boolean(fieldErrors.trackerUrl)}
                     aria-describedby={fieldErrors.trackerUrl ? "anime-tracker-url-error" : undefined}
@@ -1956,10 +1922,6 @@ export default function AnimeLibraryPage({
   return (
     <>
       <header className="watching-header anime-library-header">
-        <div className="header-badge">
-          <span className="dot" />
-          {pageConfig.badge}
-        </div>
         <h1 className="title">
           {pageConfig.titlePrefix} <span className="text-gradient">{pageConfig.titleHighlight}</span>
         </h1>
@@ -1977,7 +1939,7 @@ export default function AnimeLibraryPage({
       </section>
 
       {canCreate ? (
-        <section className="tracker-actions" aria-label="Acciones de biblioteca anime">
+        <section className="tracker-actions anime-library-actions-panel" aria-label="Acciones de biblioteca anime">
           <div>
             <span className="tracker-actions-label">Gestión</span>
             <p className="tracker-actions-copy">
@@ -2091,7 +2053,6 @@ export default function AnimeLibraryPage({
               }`}>
                 {cardDensity === "table" ? (
                   <div className="anime-library-table-header" role="row" aria-hidden="true">
-                    <span>Poster</span>
                     <span>Anime</span>
                     <span>Progreso</span>
                     <span>Nota</span>
@@ -2491,9 +2452,9 @@ export default function AnimeLibraryPage({
               </p>
             ) : null}
             {personalOnly ? (
-              <a className="empty-state-action" href="/biblioteca-anime/viendo">
+              <AppLink className="empty-state-action" href="/biblioteca-anime/viendo">
                 Explorar biblioteca
-              </a>
+              </AppLink>
             ) : null}
           </div>
         )}
@@ -2586,7 +2547,7 @@ export default function AnimeLibraryPage({
                   </div>
                 ) : (
                   <>
-                    <ChulopuntoGauge score={selectedRating} />
+                    <ChulopuntoGauge score={selectedRating} calm />
                     <strong>{getChulopuntoTone(selectedRating)}</strong>
                   </>
                 )}

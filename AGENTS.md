@@ -144,6 +144,7 @@ npm run db:restore
 ## UI Y Diseño
 
 - Mantener la línea visual existente: oscuro, bordes sutiles, radios moderados, estados claros.
+- Ninguna pantalla debe mostrar badges, píldoras o etiquetas decorativas encima del título principal. Las cabeceras comienzan directamente con título y descripción; reservar badges para estados, conteos, categorías o información funcional dentro del contenido.
 - Antes de cambios visuales grandes o de homologación con trade-offs, explicar la opción en 2-3 líneas y esperar confirmación.
 - Ver `docs/design-system.md` para estándares concretos.
 - Confort visual en tema oscuro:
@@ -244,8 +245,8 @@ npm run db:restore
 
 - `PersistentTwitchPlayer` es delicado.
 - `/api/twitch/status` comparte durante 30 segundos el estado público del canal y deduplica refrescos simultáneos. `lib/twitch.js` reutiliza únicamente el token de aplicación, con expiración anticipada, timeout y un reintento ante `401`; no mezclar esta caché con los tokens OAuth de usuarios ni con la sincronización de roles Twitch.
-- El registro manual de EventSub lista `stream.online` usando un solo filtro permitido por Twitch, identifica localmente el broadcaster y reemplaza únicamente suscripciones coincidentes que no estén activas para el callback configurado. Las revocaciones deben registrar `type`, `status` e `id` sin incluir secretos.
-- Un `stream.online` con firma válida es evidencia suficiente para crear el card sin volver a depender inmediatamente de Helix; `TWITCH_REQUIRE_ACTIVE_STREAM` sigue aplicando a la creación manual. Las notificaciones EventSub se deduplican por ID del stream.
+- El registro manual de EventSub mantiene suscripciones `stream.online` y `stream.offline`. Para cada tipo lista usando el único filtro permitido por Twitch, identifica localmente el broadcaster y reemplaza únicamente suscripciones coincidentes que no estén activas para el callback configurado. Las revocaciones deben registrar `type`, `status` e `id` sin incluir secretos.
+- Un `stream.online` con firma válida es evidencia suficiente para crear el card sin volver a depender inmediatamente de Helix; `TWITCH_REQUIRE_ACTIVE_STREAM` sigue aplicando a la creación manual. Las notificaciones EventSub se deduplican por ID del stream. `stream.offline` cambia el registro Twitch más reciente que siga `En directo` a `Subiendo`.
 - Twitch iframe es cross-origin y puede pausar por reglas del navegador/Twitch.
 - Cambios en full/mini player deben probar navegación, scroll, cambio de pestaña y estado offline.
 - Si no hay directo, el mini player debe ocultarse.

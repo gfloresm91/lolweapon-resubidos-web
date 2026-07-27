@@ -344,7 +344,6 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
   return (
     <section className="platform-notifications-page">
       <header className="watching-header admin-users-header">
-        <div className="header-badge"><Bell size={16} /> ADMINISTRACIÓN</div>
         <h1 className="title">Mantenedor de <span className="text-gradient">notificaciones</span></h1>
         <p className="subtitle">Publica, programa y administra avisos manuales y automáticos.</p>
       </header>
@@ -417,7 +416,11 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
             <span className="admin-user-cell">{SEVERITY_LABELS[item.severity] || item.severity}</span>
             <span className="admin-user-cell">{TYPE_LABELS[item.type] || item.type}</span>
             <span className="admin-user-cell">{SOURCE_LABELS[item.source] || item.source}</span>
-            <span className="admin-user-cell admin-notification-audience">{formatAudience(item.audience)}</span>
+            <Tooltip label={formatAudience(item.audience)}>
+              <span className="admin-user-cell admin-notification-audience" tabIndex={0}>
+                {formatAudience(item.audience)}
+              </span>
+            </Tooltip>
             <span className="admin-user-cell">{formatPlatformDateTime(item.scheduledAt || item.publishedAt || item.createdAt)}</span>
             <span><span className={`admin-user-status ${getStatusClass(item)}`}>{getStatus(item)}</span></span>
             <span className="admin-user-actions admin-notification-actions">
@@ -453,7 +456,6 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
           title={editing.id ? "Editar notificación" : "Nueva notificación"}
           subtitle="Define contenido, audiencia y momento de publicación."
           className="admin-modal notification-editor-modal"
-          closeOnBackdrop={false}
           onClose={() => setEditing(null)}
           onSubmit={save}
           noValidate
@@ -464,87 +466,100 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
             </>
           )}
         >
-          <div className="form-row notification-publication-row">
-            <LabeledSelect id="notification-form-type" label="Tipo" value={form.type} options={TYPES} onChange={(value) => field("type", value)} />
-            <LabeledSelect id="notification-form-severity" label="Severidad" value={form.severity} options={SEVERITIES} onChange={(value) => field("severity", value)} />
-          </div>
-          <div className="form-row">
+          <section className="notification-editor-section" aria-labelledby="notification-classification-heading">
+            <h3 id="notification-classification-heading">Clasificación</h3>
+            <div className="form-row notification-publication-row">
+              <LabeledSelect id="notification-form-type" label="Tipo" value={form.type} options={TYPES} onChange={(value) => field("type", value)} />
+              <LabeledSelect id="notification-form-severity" label="Severidad" value={form.severity} options={SEVERITIES} onChange={(value) => field("severity", value)} />
+            </div>
             <LabeledSelect id="notification-form-source" label="Origen" value={form.source} options={SOURCES} onChange={(value) => field("source", value)} />
+          </section>
+
+          <section className="notification-editor-section" aria-labelledby="notification-audience-heading">
+            <h3 id="notification-audience-heading">Audiencia</h3>
             <LabeledSelect id="notification-form-audience" label="Audiencia" value={form.audienceType} options={AUDIENCES} onChange={updateAudienceType} />
-          </div>
-          {["permission", "user"].includes(form.audienceType) ? (
-            <div className="notification-form-field">
-              <label htmlFor="notification-form-audience-target">
-                {form.audienceType === "permission" ? "Permiso objetivo" : "Usuario objetivo"}
-              </label>
-              <FormSelect
-                id="notification-form-audience-target"
-                label={form.audienceType === "permission" ? "Permiso objetivo" : "Usuario objetivo"}
-                value={form.audienceTarget}
-                options={form.audienceType === "permission" ? targetOptions.permissions : targetOptions.users}
-                onChange={(value) => field("audienceTarget", value)}
-                disabled={form.audienceType === "permission" ? !targetOptions.permissions.length : !targetOptions.users.length}
-              />
-              <span className="field-help">
-                {form.audienceType === "permission"
-                  ? "Solo los usuarios con ese permiso verán la notificación."
-                  : "Solo el usuario seleccionado verá la notificación."}
-              </span>
-            </div>
-          ) : null}
-          <label className="form-group-modal">
-            <span>Título</span>
-            <input className="modal-input" value={form.title} maxLength={160} onChange={(event) => field("title", event.target.value)} />
-          </label>
-          <label className="form-group-modal">
-            <span>Contenido</span>
-            <textarea className="modal-input notification-editor-textarea" value={form.body || ""} maxLength={500} onChange={(event) => field("body", event.target.value)} />
-          </label>
-          <div className="form-row">
-            <label className="form-group-modal">
-              <span>Enlace</span>
-              <input className="modal-input" placeholder="/rastreador/..., /spacedrum o https://..." value={form.href || ""} onChange={(event) => field("href", event.target.value)} />
-              <span className="field-help">Opcional. Se abrirá desde el centro de notificaciones.</span>
-            </label>
-            <div className="notification-form-field">
-              <label htmlFor="notification-form-icon">Icono</label>
-              <FormSelect id="notification-form-icon" label="Icono" value={form.icon || ""} options={ICON_OPTIONS} onChange={(value) => field("icon", value)} />
-              <IconPreview icon={form.icon} type={form.type} severity={form.severity} />
-            </div>
-          </div>
-          <div className="form-row">
-            <LabeledSelect
-              id="notification-publish-mode"
-              label="Publicación"
-              value={form.publishMode}
-              options={[{ value: "now", label: "Inmediata" }, { value: "scheduled", label: "Programada" }]}
-              onChange={(value) => field("publishMode", value)}
-            />
-            {form.publishMode === "scheduled" ? (
-              <div className="notification-form-field notification-scheduled-date-field">
-                <label htmlFor="notification-scheduled-at">Fecha de publicación</label>
-                <DatePickerInput
-                  id="notification-scheduled-at"
-                  value={form.scheduledAt}
-                  onChange={(value) => field("scheduledAt", value)}
-                  className="modal-input notification-date-input"
-                  placeholder="Seleccionar fecha y hora"
-                  enableTime
+            {["permission", "user"].includes(form.audienceType) ? (
+              <div className="notification-form-field">
+                <label htmlFor="notification-form-audience-target">
+                  {form.audienceType === "permission" ? "Permiso objetivo" : "Usuario objetivo"}
+                </label>
+                <FormSelect
+                  id="notification-form-audience-target"
+                  label={form.audienceType === "permission" ? "Permiso objetivo" : "Usuario objetivo"}
+                  value={form.audienceTarget}
+                  options={form.audienceType === "permission" ? targetOptions.permissions : targetOptions.users}
+                  onChange={(value) => field("audienceTarget", value)}
+                  disabled={form.audienceType === "permission" ? !targetOptions.permissions.length : !targetOptions.users.length}
                 />
+                <span className="field-help">
+                  {form.audienceType === "permission"
+                    ? "Solo los usuarios con ese permiso verán la notificación."
+                    : "Solo el usuario seleccionado verá la notificación."}
+                </span>
               </div>
             ) : null}
-          </div>
-          <label className="form-group-modal">
-            <span>Fecha de expiración (opcional)</span>
-            <DatePickerInput
-              value={form.expiresAt}
-              onChange={(value) => field("expiresAt", value)}
-              className="modal-input notification-date-input"
-              placeholder="Seleccionar fecha y hora"
-              enableTime
-            />
-            <span className="field-help">Al expirar deja de mostrarse a usuarios finales.</span>
-          </label>
+          </section>
+
+          <section className="notification-editor-section" aria-labelledby="notification-content-heading">
+            <h3 id="notification-content-heading">Contenido</h3>
+            <label className="form-group-modal">
+              <span>Título</span>
+              <input className="modal-input" value={form.title} maxLength={160} onChange={(event) => field("title", event.target.value)} />
+            </label>
+            <label className="form-group-modal">
+              <span>Contenido</span>
+              <textarea className="modal-input notification-editor-textarea" value={form.body || ""} maxLength={500} onChange={(event) => field("body", event.target.value)} />
+            </label>
+            <div className="form-row notification-link-icon-row">
+              <label className="form-group-modal">
+                <span>Enlace</span>
+                <input className="modal-input" placeholder="/rastreador/..., /spacedrum o https://..." value={form.href || ""} onChange={(event) => field("href", event.target.value)} />
+                <span className="field-help">Opcional. Se abrirá desde el centro de notificaciones.</span>
+              </label>
+              <div className="notification-form-field">
+                <label htmlFor="notification-form-icon">Icono</label>
+                <FormSelect id="notification-form-icon" label="Icono" value={form.icon || ""} options={ICON_OPTIONS} onChange={(value) => field("icon", value)} />
+                <IconPreview icon={form.icon} type={form.type} severity={form.severity} />
+              </div>
+            </div>
+          </section>
+
+          <section className="notification-editor-section" aria-labelledby="notification-scheduling-heading">
+            <h3 id="notification-scheduling-heading">Programación</h3>
+            <div className="form-row">
+              <LabeledSelect
+                id="notification-publish-mode"
+                label="Publicación"
+                value={form.publishMode}
+                options={[{ value: "now", label: "Inmediata" }, { value: "scheduled", label: "Programada" }]}
+                onChange={(value) => field("publishMode", value)}
+              />
+              {form.publishMode === "scheduled" ? (
+                <div className="notification-form-field notification-scheduled-date-field">
+                  <label htmlFor="notification-scheduled-at">Fecha de publicación</label>
+                  <DatePickerInput
+                    id="notification-scheduled-at"
+                    value={form.scheduledAt}
+                    onChange={(value) => field("scheduledAt", value)}
+                    className="modal-input notification-date-input"
+                    placeholder="Seleccionar fecha y hora"
+                    enableTime
+                  />
+                </div>
+              ) : null}
+            </div>
+            <label className="form-group-modal">
+              <span>Fecha de expiración (opcional)</span>
+              <DatePickerInput
+                value={form.expiresAt}
+                onChange={(value) => field("expiresAt", value)}
+                className="modal-input notification-date-input"
+                placeholder="Seleccionar fecha y hora"
+                enableTime
+              />
+              <span className="field-help">Al expirar deja de mostrarse a usuarios finales.</span>
+            </label>
+          </section>
         </MaintainerModal>
       ) : null}
 
@@ -554,7 +569,7 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
           title={`${pendingAction.action === "delete" ? "Eliminar" : pendingAction.action === "restore" ? "Restaurar" : pendingAction.action === "activate" ? "Activar" : "Desactivar"} notificación`}
           description={`Se aplicará el cambio a “${pendingAction.item.title}”.`}
           confirmLabel={pendingAction.action === "delete" ? "Eliminar" : pendingAction.action === "restore" ? "Restaurar" : pendingAction.action === "activate" ? "Activar" : "Desactivar"}
-          tone={pendingAction.action === "delete" ? "danger" : "primary"}
+          tone={["delete", "deactivate"].includes(pendingAction.action) ? "danger" : "primary"}
           onConfirm={() => request(pendingAction.action, { id: pendingAction.item.id })}
           onCancel={() => setPendingAction(null)}
           isLoading={isSaving}
@@ -564,7 +579,6 @@ export default function PlatformNotificationsPage({ initialResult = null, canCre
         isOpen={isAuditOpen}
         module="admin.notifications"
         title="Historial de notificaciones"
-        closeOnBackdrop={false}
         onClose={() => setIsAuditOpen(false)}
       />
     </section>

@@ -9,7 +9,7 @@ export default function LiveDetailLoading() {
         <div className="content-shell">
           <header className="topbar" aria-hidden="true">
             <div className="topbar-title">
-              <span className="topbar-kicker">Archivo VODs</span>
+              <span className="topbar-kicker">Archivo VOD</span>
               <span className="topbar-page">Resubido</span>
             </div>
           </header>

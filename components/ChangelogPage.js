@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import AppLink from "@/components/AppLink";
 import { ArrowRight, Check, History, Search, Sparkles } from "lucide-react";
 
 import { FilterSelect } from "@/components/FiltersBar";
@@ -102,10 +102,6 @@ export default function ChangelogPage() {
   return (
     <main className="news-guide-page changelog-page">
       <section className="news-guide-hero changelog-hero">
-        <div className="header-badge news-guide-badge">
-          <History size={14} aria-hidden="true" />
-          Historial de cambios
-        </div>
         <h1>
           Historial de <span className="text-gradient">cambios</span>
         </h1>
@@ -114,14 +110,14 @@ export default function ChangelogPage() {
           correcciones y cambios de operación.
         </p>
         <div className="news-guide-actions">
-          <Link href="/novedades" className="news-guide-action news-guide-action-primary">
+          <AppLink href="/novedades" className="news-guide-action news-guide-action-primary">
             <Sparkles size={16} aria-hidden="true" />
             <span>Ver novedades y guía</span>
-          </Link>
-          <Link href="/inicio" className="news-guide-action news-guide-action-secondary">
+          </AppLink>
+          <AppLink href="/inicio" className="news-guide-action news-guide-action-secondary">
             <ArrowRight size={16} aria-hidden="true" />
             <span>Volver al inicio</span>
-          </Link>
+          </AppLink>
         </div>
         <div className="news-guide-session-note">
           <span>{latestRelease ? `Última versión ${latestRelease.version}` : "Historial activo"}</span>

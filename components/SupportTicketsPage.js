@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, MessageSquare, Plus, Send } from "lucide-react";
+import { ExternalLink, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { FilterSelect } from "@/components/FiltersBar";
@@ -162,7 +162,6 @@ export default function SupportTicketsPage({ initialResult = null, canCreate = f
   return (
     <section className="support-ticket-page">
       <header className="watching-header admin-users-header support-ticket-header">
-        <div className="header-badge"><MessageSquare size={16} /> SOPORTE</div>
         <h1 className="title">Sugerencias/<span className="text-gradient">Reclamos</span></h1>
         <p className="subtitle">Envía una solicitud y revisa las respuestas de administración desde una conversación simple.</p>
       </header>
@@ -227,7 +226,6 @@ export default function SupportTicketsPage({ initialResult = null, canCreate = f
           title="Nuevo ticket"
           subtitle="Describe el tema con claridad. La respuesta llegará a tu campana y quedará disponible como conversación."
           className="admin-modal support-ticket-create-modal"
-          closeOnBackdrop={false}
           onClose={closeCreateModal}
           onSubmit={submitTicket}
           noValidate

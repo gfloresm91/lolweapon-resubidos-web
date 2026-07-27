@@ -5,13 +5,15 @@ import { Edit3, History, Plus, Power, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import AniListSearchModal from "@/components/AniListSearchModal";
-import { AnimeLibraryModal, AnimePosterPlaceholder, editableFields, getStatusLabel } from "@/components/AnimeLibraryPage";
+import AnimePosterImage from "@/components/AnimePosterImage";
+import { AnimeLibraryModal, editableFields, getStatusLabel } from "@/components/AnimeLibraryPage";
 import AuditLogModal from "@/components/AuditLogModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -47,7 +49,7 @@ const MODE_CONFIG = {
     acceptsStatus: (status) => status === "watching" || status === "purchased",
   },
   completed: {
-    title: "Mantenedor de anime terminados",
+    title: "Mantenedor de animes terminados",
     subtitle: "Administra los animes terminados, pausados, pendientes o dropeados.",
     createLabel: "Nuevo anime terminado",
     emptyText: "No hay animes terminados que coincidan con la búsqueda.",
@@ -61,7 +63,7 @@ const ANIME_COLUMNS = [
   { key: "code", label: "Código", sortable: true },
   { key: "condition", label: "Seguimiento", sortable: true },
   { key: "watched", label: "Vistos", sortable: true },
-  { key: "purchased", label: "Comprado", sortable: true },
+  { key: "purchased", label: "Capítulos comprados", sortable: true },
   { key: "year", label: "Año", sortable: true },
   { key: "format", label: "Formato", sortable: true },
   { key: "publication", label: "Publicación", sortable: true },
@@ -504,13 +506,9 @@ export default function PlatformAnimeMaintainerPage({
 
   return (
     <>
-      <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
+      <header className="watching-header admin-users-header admin-anime-header">
         <h1 className="title">
-          {mode === "completed" ? "Anime" : "Anime en"} <span className="text-gradient">{mode === "completed" ? "terminados" : "seguimiento"}</span>
+          {mode === "completed" ? "Animes" : "Anime en"} <span className="text-gradient">{mode === "completed" ? "terminados" : "seguimiento"}</span>
         </h1>
         <p className="subtitle">{config.subtitle}</p>
       </header>
@@ -609,11 +607,12 @@ export default function PlatformAnimeMaintainerPage({
           <div className="maintainer-table-row admin-anime-row" role="row" key={anime.key}>
             <span className="admin-user-cell admin-record-id">{formatAnimeId(anime)}</span>
             <div className="admin-user-cell admin-anime-profile">
-              {anime.image ? (
-                <img src={anime.image} alt="" />
-              ) : (
-                <AnimePosterPlaceholder title={getAnimeTitle(anime)} className="admin-anime-placeholder" />
-              )}
+              <AnimePosterImage
+                src={anime.image}
+                title={getAnimeTitle(anime)}
+                className="admin-anime-placeholder"
+                decorative
+              />
               <strong title={getAnimeTitle(anime)}>{getAnimeTitle(anime)}</strong>
             </div>
             <span className="admin-user-cell admin-anime-code-cell">{getAnimeCode(anime)}</span>
@@ -630,36 +629,42 @@ export default function PlatformAnimeMaintainerPage({
             </span>
             <div className="admin-user-actions">
               {canUpdate ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Editar anime"
-                  onClick={() => setEditingAnime(anime)}
-                >
-                  <Edit3 size={17} />
-                </button>
+                <Tooltip label="Editar anime">
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label="Editar anime"
+                    onClick={() => setEditingAnime(anime)}
+                  >
+                    <Edit3 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdate ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label={anime.libraryEnabled === false ? "Mostrar anime" : "Ocultar anime"}
-                  onClick={() => setStatusAnime(anime)}
-                  disabled={isSaving}
-                >
-                  <Power size={17} />
-                </button>
+                <Tooltip label={anime.libraryEnabled === false ? "Mostrar anime" : "Ocultar anime"}>
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label={anime.libraryEnabled === false ? "Mostrar anime" : "Ocultar anime"}
+                    onClick={() => setStatusAnime(anime)}
+                    disabled={isSaving}
+                  >
+                    <Power size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
-                <button
-                  type="button"
-                  className="icon-tool-button danger"
-                  aria-label="Eliminar anime"
-                  onClick={() => setDeleteAnime(anime)}
-                  disabled={isSaving}
-                >
-                  <Trash2 size={17} />
-                </button>
+                <Tooltip label="Eliminar anime">
+                  <button
+                    type="button"
+                    className="icon-tool-button danger"
+                    aria-label="Eliminar anime"
+                    onClick={() => setDeleteAnime(anime)}
+                    disabled={isSaving}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>

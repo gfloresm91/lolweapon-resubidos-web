@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import AppLink from "@/components/AppLink";
 import {
   AlertTriangle,
   Archive,
@@ -323,7 +323,7 @@ function NavigationNode({ item, roles, permissionsByCode, canViewAdminDetails, c
           <span className="rtfm-nav-icon" aria-hidden="true"><Icon size={16} /></span>
           <div className="rtfm-nav-copy">
             <strong>{item.title}</strong>
-            {item.href && !isInformationalRoute ? <Link href={item.href}>{item.href}</Link> : null}
+            {item.href && !isInformationalRoute ? <AppLink href={item.href}>{item.href}</AppLink> : null}
             {item.href && isInformationalRoute ? <span className="rtfm-nav-route">{item.href}</span> : null}
           </div>
         </div>

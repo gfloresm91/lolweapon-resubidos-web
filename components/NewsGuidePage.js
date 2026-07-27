@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import AppLink from "@/components/AppLink";
 import {
   ArrowRight,
   BadgeCheck,
+  BellRing,
   BookmarkCheck,
   BookOpenCheck,
   Check,
@@ -47,6 +48,7 @@ function withReturnTo(href, returnTo) {
 const ADMIN_NAV_LINKS = [
   { code: "users.read", label: "Usuarios", href: "/administracion/usuarios", icon: UserRoundCog },
   { code: "roles.read", label: "Roles", href: "/administracion/roles", icon: ShieldCheck },
+  { code: "admin.notifications.view", label: "Notificaciones", href: "/administracion/notificaciones", icon: BellRing },
   { code: "admin.tickets.view", label: "Tickets", href: "/administracion/tickets", icon: MessageCircle },
   { code: "admin.tracker.view", label: "Rastreador", href: "/administracion/rastreador", icon: History },
   { code: "admin.tags.view", label: "Tags", href: "/administracion/tags", icon: BadgeCheck },
@@ -60,6 +62,7 @@ const ADMIN_NAV_LINKS = [
 
 const ICONS = {
   BadgeCheck,
+  BellRing,
   BookmarkCheck,
   BookOpenCheck,
   Check,
@@ -125,10 +128,10 @@ function getPrimaryActions({ isAuthenticated, isAdminLike, adminLanding, hasSpac
 function ActionLink({ action, returnTo = "" }) {
   const Icon = action.icon || ArrowRight;
   return (
-    <Link href={withReturnTo(action.href, returnTo)} className={`news-guide-action news-guide-action-${action.variant || "secondary"}`}>
+    <AppLink href={withReturnTo(action.href, returnTo)} className={`news-guide-action news-guide-action-${action.variant || "secondary"}`}>
       <Icon size={16} aria-hidden="true" />
       <span>{action.label}</span>
-    </Link>
+    </AppLink>
   );
 }
 
@@ -244,9 +247,9 @@ function RestrictedLink({ cta, className = "news-guide-card-link", returnTo = ""
   }
 
   return (
-    <Link href={withReturnTo(cta.href, returnTo)} className={`${className} ${cta.muted ? "is-muted" : ""}`}>
+    <AppLink href={withReturnTo(cta.href, returnTo)} className={`${className} ${cta.muted ? "is-muted" : ""}`}>
       {content}
-    </Link>
+    </AppLink>
   );
 }
 
@@ -466,6 +469,14 @@ function getAccessibleHighlights({ isAuthenticated, isAdminLike, permissions = [
       items.push("Roles");
     }
 
+    if (hasPermission({ permissions, role }, "admin.notifications.view")) {
+      items.push("Notificaciones");
+    }
+
+    if (hasPermission({ permissions, role }, "admin.tickets.view")) {
+      items.push("Tickets");
+    }
+
     if (hasPermission({ permissions, role }, "admin.tracker.view")) {
       items.push("Rastreador");
     }
@@ -491,7 +502,7 @@ function getAccessibleHighlights({ isAuthenticated, isAdminLike, permissions = [
 
     items.push("Auditoría");
 
-    return [...new Set(items)].slice(0, 6);
+    return [...new Set(items)];
   }
 
   if (!isAuthenticated) {
@@ -553,10 +564,6 @@ export default function NewsGuidePage({ currentUser = null, permissions = [] }) 
   return (
     <main className="news-guide-page">
       <section className="news-guide-hero">
-        <div className="header-badge news-guide-badge">
-          <Sparkles size={14} aria-hidden="true" />
-          Novedades y guía
-        </div>
         <h1>
           Novedades y <span className="text-gradient">guía de uso</span>
         </h1>
@@ -595,17 +602,13 @@ export default function NewsGuidePage({ currentUser = null, permissions = [] }) 
                 ? "Tu cuenta ya puede guardar progreso y personalizar experiencia."
                 : "Puedes explorar sin cuenta y desbloquear seguimiento al iniciar sesión."}
           </strong>
+          <p>Las funciones disponibles se adaptan a tu sesión, rol y permisos asignados.</p>
         </div>
         <div className="news-current-access-tags">
           {accessHighlights.map((item) => (
             <span key={item}>{item}</span>
           ))}
         </div>
-      </section>
-
-      <section className="news-access-strip" aria-label="Cómo funciona el acceso">
-        <strong>Funciones públicas y beneficios configurables.</strong>
-        <p>La página se adapta a tu sesión; algunos accesos dependen del rol y permisos asignados.</p>
       </section>
 
       <section id="beneficios" className="news-guide-section">
@@ -695,10 +698,10 @@ export default function NewsGuidePage({ currentUser = null, permissions = [] }) 
             <strong>Revisa toda la evolución</strong>
             <p>El changelog tiene su propia página para consultar versiones, mejoras y correcciones sin mezclarlo con la guía.</p>
           </div>
-          <Link href="/changelog" className="news-guide-card-link">
+          <AppLink href="/changelog" className="news-guide-card-link">
             <span>Ver historial de cambios</span>
             <ArrowRight size={14} aria-hidden="true" />
-          </Link>
+          </AppLink>
         </div>
       </section>
 
@@ -742,14 +745,14 @@ export default function NewsGuidePage({ currentUser = null, permissions = [] }) 
           <History size={18} aria-hidden="true" />
           <div>
             <strong>Administración auditada</strong>
-            <p>Las acciones en mantenedores quedan registradas para facilitar trazabilidad y revisión de cambios.</p>
+            <p>Los mantenedores auditados registran sus cambios para facilitar trazabilidad y revisión.</p>
           </div>
           <div className="news-guide-admin-actions">
             {adminLinks.slice(0, 3).map((link) => (
-              <Link key={link.href} href={link.href} className="news-guide-inline-link">
+              <AppLink key={link.href} href={link.href} className="news-guide-inline-link">
                 <span>{link.label}</span>
                 <ArrowRight size={14} aria-hidden="true" />
-              </Link>
+              </AppLink>
             ))}
           </div>
         </section>

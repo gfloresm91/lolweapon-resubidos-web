@@ -8,6 +8,7 @@ Estándares visuales y de interacción para mantener la UI homogénea.
 - Mantener una estética oscura, limpia, con contraste suficiente y acentos morado/verde/cian solo donde ayuden a entender estado o acción.
 - No crear variantes visuales nuevas si ya existe un componente o patrón equivalente.
 - Evitar tarjetas dentro de tarjetas. Usar cards solo para items repetidos, modales y herramientas realmente enmarcadas.
+- No usar badges, píldoras ni etiquetas decorativas encima del título principal de ninguna pantalla. La cabecera debe comenzar directamente con el título y su descripción; los badges se reservan para estados, conteos, categorías o información funcional dentro del contenido.
 - En cambios visuales con trade-offs, explicar la decisión y confirmar antes de aplicar.
 
 ## Componentes Reutilizables
@@ -24,6 +25,67 @@ Usar primero estos componentes antes de crear algo nuevo:
 - `Tooltip`: tooltips personalizados.
 - `AvatarUploader`: subida de imagen/avatar.
 - `AniListSearchModal`: búsqueda AniList.
+
+## Barra Superior
+
+- La línea superior pequeña identifica el módulo o contexto; la línea inferior identifica la pantalla activa.
+- El módulo debe corresponder a la familia real de navegación y no usar un valor genérico heredado:
+  - `Plataforma`: Inicio, Novedades e Historial de cambios.
+  - `Ayuda`: RTFM.
+  - `Centro personal`: Notificaciones.
+  - `Soporte`: Sugerencias/Reclamos y detalle de ticket.
+  - `Archivo VOD`: Rastreador, Calendario y Mi lista.
+  - `Biblioteca de anime`: Viendo, Terminados y Mi lista anime.
+  - `Lecturas`: SpaceDrum y futuras lecturas.
+  - `Administración`: todos los mantenedores y sus detalles.
+  - `Cuenta`: perfil y configuración personal.
+- No repetir el nombre de la pantalla como nombre del módulo cuando exista un contexto superior más claro.
+
+## Cabeceras De Página
+
+Todas las variantes comparten esta base:
+
+- Título principal en blanco suavizado `#dce3ed`.
+- Palabra destacada en lavanda uniforme `#c4b5fd`, sin degradado.
+- Descripción con contraste medio-alto `#aab7ca` o `#b6c2d2`.
+- No usar badges, píldoras ni etiquetas decorativas encima del título.
+- En pantallas largas, mantenedores y configuración, desactivar orbes ambientales y preferir superficies sólidas.
+- Los acentos intensos se reservan para estados, métricas y acciones funcionales.
+
+Elegir la variante según la función de la pantalla:
+
+1. **Centrada sin contenedor** (`watching-header` o `main-header`):
+   - Para consulta, listados, resúmenes y mantenedores.
+   - Ejemplos: Rastreador, Mi lista, Biblioteca de anime, Calendario, Notificaciones, Sugerencias/Reclamos y Administración.
+2. **Compacta alineada a la izquierda**:
+   - Para configuración y formularios donde el recorrido debe comenzar rápidamente.
+   - Ejemplo: Perfil.
+3. **Hero editorial enmarcado** (`news-guide-hero`):
+   - Para introducciones, guías o contenido explicativo.
+   - Debe usar superficie sólida en tema oscuro, especialmente si la página es larga.
+   - Ejemplos: RTFM, Novedades e Historial de cambios.
+4. **Detalle con acción de regreso**:
+   - Para conversaciones o registros secundarios.
+   - Alineación izquierda, acción `Volver` antes del título y metadata breve debajo.
+   - Ejemplos: detalle de ticket de usuario y administrativo.
+5. **Título integrado en contenido multimedia**:
+   - Cuando el reproductor o medio es el contenido principal y debe aparecer primero.
+   - El título se presenta junto a estado, fecha, tags y acciones.
+   - Ejemplo: detalle de resubido.
+6. **Hero inmersivo de contenido**:
+   - Para experiencias editoriales donde portada o imagen ambiental forman parte del contenido.
+   - Debe seguir respetando contraste, movimiento reducido y legibilidad.
+   - Ejemplo: SpaceDrum.
+7. **Cabecera de autenticación**:
+   - Para flujos breves fuera del shell principal.
+   - Centrada dentro de la tarjeta de autenticación, con logo o contexto cuando corresponda.
+   - Ejemplos: Login, Registro y Sin acceso.
+
+Excepciones documentadas:
+
+- Inicio puede comenzar directamente con Twitch porque su primer bloque es funcional.
+- La barra superior `Módulo / Pantalla` es navegación contextual global y no reemplaza la cabecera de página.
+- No crear una nueva variante si una de estas siete cubre el objetivo de la pantalla.
 
 ## Tablas De Administración
 
@@ -104,10 +166,20 @@ Usar primero estos componentes antes de crear algo nuevo:
   - Probar indicadores de orden y cambio de cantidad de filas, incluyendo `Todos`.
   - Cuando una tabla requiera scroll horizontal, medir con Playwright que `.maintainer-table-scroll.scrollWidth > .clientWidth`, que `overflow-x` sea `auto` o `scroll`, que `document.documentElement` no tenga overflow global y que las acciones sean visibles al desplazar al extremo derecho.
 
+## Módulos Y Permisos
+
+- En el mantenedor de Roles, los grupos de permisos deben seguir el mismo orden visual de los módulos y pantallas del menú principal.
+- El orden de los módulos públicos es: Plataforma (`Inicio`, `RTFM`, `Novedades`, `Historial de cambios`), Archivo VOD, Biblioteca de anime y Lecturas.
+- Los accesos personales que no forman parte del menú lateral, como `Notificaciones` y `Sugerencias/Reclamos`, se ubican después de las pantallas de Plataforma y antes de Archivo VOD.
+- Dentro de Administración se respeta exactamente el orden del menú lateral: `Usuarios`, `Roles`, `Notificaciones`, `Tickets`, `Rastreador`, `Tags`, Biblioteca de anime (`Viendo`, `Terminados`) y `SpaceDrum`.
+- Al agregar, mover o eliminar un módulo del menú, la misma implementación debe actualizar el orden del catálogo de permisos y comprobar que ningún grupo nuevo quede relegado al final por carecer de una posición explícita.
+- Dentro de cada grupo, los permisos deben conservar el orden operativo de su pantalla: ver, crear, editar, eliminar y luego las acciones especializadas.
+
 ## Modales
 
 - Fondo sólido estándar; no usar transparencia que mezcle el contenido del fondo.
 - Botón cerrar visible arriba a la derecha.
+- Los modales de mantenedores no se cierran al hacer clic en el fondo exterior. Solo pueden cerrarse mediante controles explícitos como `Cerrar`, la X superior o `Cancelar`, para evitar perder formularios o contexto por un clic accidental.
 - Espacio superior e inferior equilibrado respecto al viewport y footer persistente.
 - Footer del modal fijo solo cuando el contenido sea largo y no debe solapar campos.
 - Operaciones destructivas o irreversibles siempre usan confirmación.
@@ -286,6 +358,6 @@ Usar primero estos componentes antes de crear algo nuevo:
 ## Accesibilidad
 
 - Botones de icono: `aria-label`.
-- Modales: cierre visible y click fuera cuando aplique.
+- Modales: cierre visible y controles explícitos accesibles; en mantenedores, el fondo exterior nunca cierra el modal.
 - Tooltips: no deben reemplazar texto crítico para usuarios de teclado.
 - Estados activos deben comunicarse visualmente y con `aria-pressed` cuando corresponda.
