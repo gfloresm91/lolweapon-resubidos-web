@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { FilterSelect } from "@/components/FiltersBar";
 import { LIVE_STATUS_LEGEND_ITEMS, getLiveStatusMeta } from "@/lib/liveStatusStyles";
@@ -504,9 +504,6 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
   return (
     <section className="tracker-calendar-page" aria-label="Calendario de directos">
       <header className="main-header tracker-calendar-header">
-        <div className="header-badge">
-          <CalendarDays size={16} aria-hidden="true" /> ARCHIVO HISTORICO
-        </div>
         <h1 className="title">
           Calendario de <span className="text-gradient">directos</span>
         </h1>
@@ -523,7 +520,7 @@ export default function TrackerCalendarPage({ lives = [], onOpenDetail }) {
           <strong>{calendarView === "year" ? yearDateItems.length : monthDateItems.length}</strong>
         </div>
         <div>
-          <span>Mes destacado</span>
+          <span>Mes con más directos</span>
           <strong>{busiestMonth?.count ? busiestMonth.label : "Sin datos"}</strong>
         </div>
       </section>

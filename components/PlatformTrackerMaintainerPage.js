@@ -19,6 +19,7 @@ import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
 import TagPanel from "@/components/TagPanel";
+import Tooltip from "@/components/Tooltip";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import TrackerSpreadsheetImportModal from "@/components/TrackerSpreadsheetImportModal";
 import { DEFAULT_LIVE_STATUS_LABEL, LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
@@ -129,7 +130,6 @@ export default function PlatformTrackerMaintainerPage({
   canNotify = false,
   canExport = false,
   canImport = false,
-  canUpdateTags = false,
   formVariant = "full",
   twitchLogin = "",
   onLivesChange,
@@ -666,10 +666,6 @@ export default function PlatformTrackerMaintainerPage({
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           Mantenedor <span className="text-gradient">Rastreador</span>
         </h1>
@@ -679,51 +675,55 @@ export default function PlatformTrackerMaintainerPage({
       <MaintainerStats
         items={[
           { label: "Directos", value: stats.total, color: "purple" },
-          { label: "Con enlaces", value: stats.withLinks, color: "blue" },
-          { label: "Sin enlaces", value: stats.withoutLinks, color: "green" },
+          { label: "Con enlaces", value: stats.withLinks, color: "green" },
+          { label: "Sin enlaces", value: stats.withoutLinks, color: "orange" },
         ]}
       />
 
-      <section className="tracker-actions" aria-label="Acciones del rastreador">
+      <section className="tracker-actions admin-tracker-actions" aria-label="Acciones del rastreador">
         <div>
           <span className="tracker-actions-label">Rastreador</span>
           <p className="tracker-actions-copy">Gestiona los registros del archivo histórico.</p>
         </div>
         <div className="tracker-actions-buttons">
-          <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
-            <History size={17} />
-            Historial
-          </button>
-          {canExport ? (
-            <button type="button" className="tracker-action-secondary" onClick={exportSpreadsheet} disabled={isExporting || !exportLives.length}>
-              <Download size={17} />
-              {isExporting ? "Exportando..." : `Exportar Excel (${exportLives.length})`}
+          <div className="tracker-action-row" aria-label="Historial y sincronización con Excel">
+            <button type="button" className="tracker-action-secondary tracker-action-history" onClick={() => setIsAuditOpen(true)}>
+              <History size={17} />
+              Historial
             </button>
-          ) : null}
-          {canImport ? (
-            <button type="button" className="tracker-action-secondary" onClick={() => setIsImportOpen(true)}>
-              <Upload size={17} />
-              Importar Excel
-            </button>
-          ) : null}
-          {canCreate && formVariant ? (
-            <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
-              <Plus size={18} />
-              Nuevo directo
-            </button>
-          ) : null}
-          {canCreate ? (
-            <button type="button" className="tracker-action-secondary" onClick={() => setIsArchiveConfirmOpen(true)} disabled={isTwitchActionLoading}>
-              <Radio size={17} />
-              Crear desde Twitch
-            </button>
-          ) : null}
-          {canUpdate ? (
-            <button type="button" className="tracker-action-secondary" onClick={() => setIsEventSubConfirmOpen(true)} disabled={isTwitchActionLoading}>
-              <Zap size={17} />
-              Registrar EventSub
-            </button>
-          ) : null}
+            {canExport ? (
+              <button type="button" className="tracker-action-secondary" onClick={exportSpreadsheet} disabled={isExporting || !exportLives.length}>
+                <Download size={17} />
+                {isExporting ? "Exportando..." : `Exportar Excel (${exportLives.length})`}
+              </button>
+            ) : null}
+            {canImport ? (
+              <button type="button" className="tracker-action-secondary" onClick={() => setIsImportOpen(true)}>
+                <Upload size={17} />
+                Importar Excel
+              </button>
+            ) : null}
+          </div>
+          <div className="tracker-action-row" aria-label="Creación y automatización">
+            {canCreate && formVariant ? (
+              <button type="button" className="tracker-action-primary" onClick={() => setEditingLive({})}>
+                <Plus size={18} />
+                Nuevo directo
+              </button>
+            ) : null}
+            {canCreate ? (
+              <button type="button" className="tracker-action-secondary" onClick={() => setIsArchiveConfirmOpen(true)} disabled={isTwitchActionLoading}>
+                <Radio size={17} />
+                Crear desde Twitch
+              </button>
+            ) : null}
+            {canUpdate ? (
+              <button type="button" className="tracker-action-secondary" onClick={() => setIsEventSubConfirmOpen(true)} disabled={isTwitchActionLoading}>
+                <Zap size={17} />
+                Registrar EventSub
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -835,52 +835,59 @@ export default function PlatformTrackerMaintainerPage({
             <span className="admin-user-cell admin-tracker-notified-cell">
               {live.notifiedAt
                 ? formatPlatformDateTime(live.notifiedAt)
-                : <span className="is-empty">—</span>}
+                : <span className="is-empty">No</span>}
             </span>
             <div className="admin-user-actions">
               {canNotify ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
-                  title={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
-                  onClick={() => setPendingNotifyLive(live)}
-                  disabled={isNotifying}
-                >
-                  {live.notifiedAt ? <Bell size={17} /> : <BellRing size={17} />}
-                </button>
+                <Tooltip label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}>
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}
+                    onClick={() => setPendingNotifyLive(live)}
+                    disabled={isNotifying}
+                  >
+                    {live.notifiedAt ? <Bell size={17} /> : <BellRing size={17} />}
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdate && formVariant ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Editar directo"
-                  onClick={() => setEditingLive(live)}
-                >
-                  <Edit3 size={17} />
-                </button>
+                <Tooltip label="Editar directo">
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label="Editar directo"
+                    onClick={() => setEditingLive(live)}
+                  >
+                    <Edit3 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdate ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Cambiar estado"
-                  onClick={() => openStatusChange(live)}
-                  disabled={isSaving}
-                >
-                  <Power size={17} />
-                </button>
+                <Tooltip label="Cambiar estado">
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label="Cambiar estado"
+                    onClick={() => openStatusChange(live)}
+                    disabled={isSaving}
+                  >
+                    <Power size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
-                <button
-                  type="button"
-                  className="icon-tool-button danger"
-                  aria-label="Eliminar directo"
-                  onClick={() => setDeleteLive(live)}
-                  disabled={isSaving}
-                >
-                  <Trash2 size={17} />
-                </button>
+                <Tooltip label="Eliminar directo">
+                  <button
+                    type="button"
+                    className="icon-tool-button danger"
+                    aria-label="Eliminar directo"
+                    onClick={() => setDeleteLive(live)}
+                    disabled={isSaving}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>
@@ -909,7 +916,6 @@ export default function PlatformTrackerMaintainerPage({
           setTagFilter(tag || "all");
           setIsTagPanelOpen(false);
         }}
-        isAdmin={canUpdateTags}
       />
 
       {statusLive ? (
@@ -917,7 +923,6 @@ export default function PlatformTrackerMaintainerPage({
           className="admin-modal tracker-status-modal"
           title="Cambiar estado"
           subtitle={getLiveTitle(statusLive)}
-          closeOnBackdrop={false}
           onClose={() => setStatusLive(null)}
           actions={(
             <>
@@ -974,7 +979,7 @@ export default function PlatformTrackerMaintainerPage({
       <ConfirmModal
         isOpen={isArchiveConfirmOpen}
         title="Crear desde Twitch"
-        description="Se creará o actualizará el directo actual usando la información disponible desde Twitch."
+        description="Se consultará el directo actual de Twitch y se creará o actualizará su registro en el Rastreador. Los tags y la miniatura quedarán vacíos en registros nuevos."
         confirmLabel="Crear desde Twitch"
         cancelLabel="Cancelar"
         tone="default"
@@ -986,8 +991,8 @@ export default function PlatformTrackerMaintainerPage({
       <ConfirmModal
         isOpen={isEventSubConfirmOpen}
         title="Registrar EventSub"
-        description={`Se registrará la suscripción para que Twitch notifique el próximo directo${twitchLogin ? ` del canal ${twitchLogin}` : " del canal configurado"}.`}
-        confirmLabel="Registrar"
+        description={`Se verificarán las suscripciones de inicio y término del directo${twitchLogin ? ` para el canal ${twitchLogin}` : " para el canal configurado"}. Las suscripciones activas se conservarán y solo se crearán o reemplazarán las que falten o estén inactivas.`}
+        confirmLabel="Registrar EventSub"
         cancelLabel="Cancelar"
         tone="default"
         isLoading={isTwitchActionLoading}
@@ -1000,7 +1005,6 @@ export default function PlatformTrackerMaintainerPage({
         module="admin.tracker"
         title="Historial del rastreador"
         subtitle="Últimas acciones realizadas en el mantenedor del rastreador."
-        closeOnBackdrop={false}
         onClose={() => setIsAuditOpen(false)}
       />
       <TrackerSpreadsheetImportModal

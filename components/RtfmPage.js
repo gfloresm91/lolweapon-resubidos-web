@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import AppLink from "@/components/AppLink";
 import {
   AlertTriangle,
   Archive,
@@ -46,6 +46,10 @@ const archiveLinks = [
     icon: Table,
     description: "Documento histórico utilizado para la carga inicial de los directos.",
     note: "La base de datos de la web es ahora la fuente operativa. Administración puede exportar desde el mantenedor del Rastreador los registros filtrados, completar el archivo y volver a importarlo para actualizar registros existentes de forma controlada.",
+    details: [
+      "La revisión de importación muestra pasos, contadores, pestañas y diferencias antes de aplicar cualquier cambio.",
+      "La operación exige una confirmación final y se bloquea por completo si detecta errores, conflictos, identificadores alterados o filas nuevas.",
+    ],
   },
   {
     title: "OneDrive",
@@ -323,7 +327,7 @@ function NavigationNode({ item, roles, permissionsByCode, canViewAdminDetails, c
           <span className="rtfm-nav-icon" aria-hidden="true"><Icon size={16} /></span>
           <div className="rtfm-nav-copy">
             <strong>{item.title}</strong>
-            {item.href && !isInformationalRoute ? <Link href={item.href}>{item.href}</Link> : null}
+            {item.href && !isInformationalRoute ? <AppLink href={item.href}>{item.href}</AppLink> : null}
             {item.href && isInformationalRoute ? <span className="rtfm-nav-route">{item.href}</span> : null}
           </div>
         </div>

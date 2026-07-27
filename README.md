@@ -480,24 +480,24 @@ Menu lateral y footer:
 
 ### Query params del rastreador
 
-La ruta `/rastreador` acepta filtros iniciales en la URL:
+La ruta `/rastreador` acepta filtros en la URL y los mantiene sincronizados con los controles:
 
 ```text
-/rastreador?search=World%20Trigger
-/rastreador?q=World%20Trigger
+/rastreador?search=world%20trigger
+/rastreador?q=world%20trigger
 /rastreador?year=2026
 /rastreador?month=04
-/rastreador?status=Completo
-/rastreador?tag=WorldTrigger
+/rastreador?status=completo
+/rastreador?tag=worldtrigger
 ```
 
 Tambien se pueden combinar:
 
 ```text
-/rastreador?search=anime&year=2026&month=04&status=Completo&tag=WorldTrigger
+/rastreador?search=anime&year=2026&month=04&status=completo&tag=worldtrigger
 ```
 
-Estos parametros se aplican en cliente al cargar la pagina.
+`status` usa el codigo estable del estado y `tag` usa el slug estable del tag, ambos en minusculas. `q` se conserva como alias de lectura por compatibilidad, pero la app escribe siempre `search`. Los valores vacios, `all` o invalidos se omiten de la URL canonica. Busqueda, año, mes, estado y tag se restauran al recargar o compartir el enlace; la densidad visual, el scroll y los modales no forman parte de la URL.
 
 ### Query params del detalle de resubido
 
@@ -820,7 +820,7 @@ Cada ficha de `data/anime-metadata.json` usa como clave el tag normalizado y sig
     "provider": "anilist",
     "providerId": 20729,
     "providerUrl": "https://anilist.co/anime/20729",
-    "trackerUrl": "/rastreador?tag=WorldTrigger",
+    "trackerUrl": "/rastreador?tag=worldtrigger",
     "year": 2014,
     "episodes": 73,
     "currentEpisode": "71",

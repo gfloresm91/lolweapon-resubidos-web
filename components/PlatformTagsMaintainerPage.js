@@ -11,6 +11,7 @@ import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 import { FilterSelect } from "@/components/FiltersBar";
 import { normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
 
@@ -130,6 +131,7 @@ export default function PlatformTagsMaintainerPage({
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [editingTag, setEditingTag] = useState(null);
+  const [restoringTag, setRestoringTag] = useState(null);
   const [deletingTag, setDeletingTag] = useState(null);
   const [nextCategory, setNextCategory] = useState("auto");
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -302,18 +304,19 @@ export default function PlatformTagsMaintainerPage({
     }
   }
 
-  async function restoreAutomaticCategory(tag) {
-    if (!canUpdate) {
+  async function confirmRestoreAutomaticCategory() {
+    if (!restoringTag || !canUpdate) {
       return;
     }
 
     const saved = await persistTagSettings({
       action: "update-tag",
-      tag: tag.name,
+      tag: restoringTag.name,
       categoryKey: "auto",
     });
 
     if (saved) {
+      setRestoringTag(null);
       toast.success("Categoría por regla restaurada.");
     }
   }
@@ -453,11 +456,7 @@ export default function PlatformTagsMaintainerPage({
 
   return (
     <>
-      <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
+      <header className="watching-header admin-users-header admin-tags-header">
         <h1 className="title">
           Mantenedor <span className="text-gradient">Tags</span>
         </h1>
@@ -505,14 +504,18 @@ export default function PlatformTagsMaintainerPage({
               </div>
               <div className="admin-user-actions">
                 {canUpdate ? (
-                  <button type="button" className="icon-tool-button" aria-label="Editar categoría" onClick={() => openEditCategory(category)}>
-                    <Edit3 size={17} />
-                  </button>
+                  <Tooltip label="Editar categoría">
+                    <button type="button" className="icon-tool-button" aria-label="Editar categoría" onClick={() => openEditCategory(category)}>
+                      <Edit3 size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
                 {canDelete && category.custom ? (
-                  <button type="button" className="icon-tool-button danger" aria-label="Eliminar categoría" onClick={() => setDeletingCategory(category)}>
-                    <Trash2 size={17} />
-                  </button>
+                  <Tooltip label="Eliminar categoría">
+                    <button type="button" className="icon-tool-button danger" aria-label="Eliminar categoría" onClick={() => setDeletingCategory(category)}>
+                      <Trash2 size={17} />
+                    </button>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>
@@ -590,33 +593,37 @@ export default function PlatformTagsMaintainerPage({
             <span className="admin-user-cell admin-tags-rule-cell" title={getRuleDescription(tag)}>{getRuleDescription(tag)}</span>
             <div className="admin-user-actions">
               {canUpdate ? (
-                <button type="button" className="icon-tool-button" aria-label="Editar tag" onClick={() => openEditTag(tag)}>
-                  <Edit3 size={17} />
-                </button>
+                <Tooltip label="Editar tag">
+                  <button type="button" className="icon-tool-button" aria-label="Editar tag" onClick={() => openEditTag(tag)}>
+                    <Edit3 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdate && tag.isManual ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Usar categoría por regla"
-                  title={`Usar categoría por regla: ${tag.automaticCategoryLabel || "categoría calculada"}`}
-                  onClick={() => restoreAutomaticCategory(tag)}
-                  disabled={isSaving}
-                >
-                  <RotateCcw size={17} />
-                </button>
+                <Tooltip label={`Restaurar por regla: ${tag.automaticCategoryLabel || "categoría calculada"}`}>
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label="Usar categoría por regla"
+                    onClick={() => setRestoringTag(tag)}
+                    disabled={isSaving}
+                  >
+                    <RotateCcw size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
-                <button
-                  type="button"
-                  className="icon-tool-button danger"
-                  aria-label="Eliminar tag"
-                  title={(tag.liveCount || 0) + (tag.animeCount || 0) > 0 ? "No se puede eliminar un tag con uso" : "Eliminar tag"}
-                  onClick={() => setDeletingTag(tag)}
-                  disabled={isSaving || ((tag.liveCount || 0) + (tag.animeCount || 0) > 0)}
-                >
-                  <Trash2 size={17} />
-                </button>
+                <Tooltip label={(tag.liveCount || 0) + (tag.animeCount || 0) > 0 ? "No se puede eliminar: el tag tiene registros asociados" : "Eliminar tag"}>
+                  <button
+                    type="button"
+                    className="icon-tool-button danger"
+                    aria-label="Eliminar tag"
+                    onClick={() => setDeletingTag(tag)}
+                    disabled={isSaving || ((tag.liveCount || 0) + (tag.animeCount || 0) > 0)}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>
@@ -710,7 +717,7 @@ export default function PlatformTagsMaintainerPage({
                 onChange={(event) => setCategoryDraft((current) => ({ ...current, exactText: event.target.value }))}
                 placeholder="dragonballz&#10;worldtrigger"
               />
-              <p className="field-hint">Una por línea o separadas por coma. Deben coincidir con el tag normalizado completo.</p>
+              <p className="field-hint">Una por línea o separadas por coma. Coincidencia completa con el tag normalizado.</p>
             </div>
             <div className="form-group-modal">
               <label>Keywords</label>
@@ -720,7 +727,7 @@ export default function PlatformTagsMaintainerPage({
                 onChange={(event) => setCategoryDraft((current) => ({ ...current, keywordsText: event.target.value }))}
                 placeholder="bleach&#10;naruto&#10;frieren"
               />
-              <p className="field-hint">Una por línea o separadas por coma. Se usan si el tag contiene esa palabra.</p>
+              <p className="field-hint">Una por línea o separadas por coma. Se aplican cuando el tag contiene la palabra.</p>
             </div>
           </div>
           {categoryError ? <p className="tag-category-error">{categoryError}</p> : null}
@@ -728,10 +735,22 @@ export default function PlatformTagsMaintainerPage({
       ) : null}
 
       <ConfirmModal
+        isOpen={Boolean(restoringTag)}
+        title="Restaurar asignación por regla"
+        description={`${restoringTag?.name || "Este tag"} dejará de usar la categoría manual “${restoringTag?.categoryLabel || "actual"}” y volverá a “${restoringTag?.automaticCategoryLabel || "la categoría calculada"}”. Los cambios futuros en las reglas podrán modificar su categoría automáticamente.`}
+        confirmLabel="Restaurar por regla"
+        cancelLabel="Cancelar"
+        tone="primary"
+        isLoading={isSaving}
+        onCancel={() => setRestoringTag(null)}
+        onConfirm={confirmRestoreAutomaticCategory}
+      />
+
+      <ConfirmModal
         isOpen={Boolean(deletingTag)}
         title="Eliminar tag"
-        description={`${deletingTag?.name || "Este tag"} no tiene registros asociados y se eliminará definitivamente.`}
-        confirmLabel="Eliminar"
+        description={`${deletingTag?.name || "Este tag"} no tiene directos ni animes asociados. Se eliminará definitivamente y esta acción no se puede deshacer.`}
+        confirmLabel="Sí, eliminar"
         cancelLabel="Cancelar"
         tone="danger"
         isLoading={isSaving}

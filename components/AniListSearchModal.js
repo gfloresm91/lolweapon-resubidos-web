@@ -4,18 +4,10 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 
+import AnimePosterImage from "@/components/AnimePosterImage";
+
 function normalizeComparable(value) {
   return String(value || "").trim().toLowerCase();
-}
-
-function getInitials(title) {
-  return String(title || "AN")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }
 
 async function readJsonResponse(response) {
@@ -115,7 +107,7 @@ export default function AniListSearchModal({
   }
 
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop anime-create-backdrop">
       <div className="modal-content anime-create-start-modal" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={onClose}>
           <X size={18} />
@@ -156,7 +148,12 @@ export default function AniListSearchModal({
                     onSelectMetadata(metadata);
                   }}
                 >
-                  {metadata.image ? <img src={metadata.image} alt="" /> : <span className="admin-user-avatar">{getInitials(metadata.title)}</span>}
+                  <AnimePosterImage
+                    src={metadata.image}
+                    title={metadata.title}
+                    className="admin-user-avatar"
+                    decorative
+                  />
                   <span>
                     <strong>{metadata.title}</strong>
                     <small>{[metadata.year, metadata.format, metadata.status].filter(Boolean).join(" · ") || "Sin metadata"}</small>

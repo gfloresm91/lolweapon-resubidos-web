@@ -2,38 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
-import { buildTagGroups, normalizeTag, TAG_CATEGORIES } from "@/lib/tags";
+import { buildTagGroups, TAG_CATEGORIES } from "@/lib/tags";
 
-const DEFAULT_CATEGORY_ICON = "🏷️";
 const TAGS_PREVIEW_LIMIT = 16;
-
-function normalizeCategorySlug(label) {
-  return String(label || "")
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function buildCustomCategoryKey(label, existingCategories) {
-  const baseKey = normalizeCategorySlug(label);
-  const safeBaseKey = baseKey || "categoria";
-  const existingKeys = new Set(existingCategories.map((category) => category.key));
-
-  let key = `custom-${safeBaseKey}`;
-  let index = 2;
-
-  while (existingKeys.has(key)) {
-    key = `custom-${safeBaseKey}-${index}`;
-    index += 1;
-  }
-
-  return key;
-}
 
 export default function TagPanel({
   isOpen,
@@ -42,19 +15,13 @@ export default function TagPanel({
   selectedTag,
   onClose,
   onSelectTag,
-  isAdmin,
 }) {
   const [search, setSearch] = useState("");
   const [overrides, setOverrides] = useState({});
   const [customCategories, setCustomCategories] = useState([]);
   const [collapsed, setCollapsed] = useState({});
   const [expandedGroups, setExpandedGroups] = useState({});
-  const [moveDialog, setMoveDialog] = useState(null);
-  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
-  const [categoryDraft, setCategoryDraft] = useState({ label: "", icon: DEFAULT_CATEGORY_ICON });
-  const [categoryError, setCategoryError] = useState("");
   const [settingsError, setSettingsError] = useState("");
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -91,8 +58,6 @@ export default function TagPanel({
 
   useEffect(() => {
     if (!isOpen) {
-      setMoveDialog(null);
-      setCategoryDialogOpen(false);
       setSearch("");
       setExpandedGroups({});
     }
@@ -105,16 +70,6 @@ export default function TagPanel({
 
     function handleKeyDown(event) {
       if (event.key === "Escape") {
-        if (categoryDialogOpen) {
-          setCategoryDialogOpen(false);
-          return;
-        }
-
-        if (moveDialog) {
-          setMoveDialog(null);
-          return;
-        }
-
         onClose();
       }
     }
@@ -124,7 +79,22 @@ export default function TagPanel({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [categoryDialogOpen, isOpen, moveDialog, onClose]);
+  }, [isOpen, onClose]);
+
+  const availableTags = useMemo(() => {
+    const uniqueTags = new Map();
+
+    tags.forEach((tag) => {
+      const trimmedTag = String(tag || "").trim();
+      const normalizedTag = trimmedTag.toLocaleLowerCase("es");
+
+      if (trimmedTag && !uniqueTags.has(normalizedTag)) {
+        uniqueTags.set(normalizedTag, trimmedTag);
+      }
+    });
+
+    return [...uniqueTags.values()];
+  }, [tags]);
 
   const categories = useMemo(() => {
     const baseCategories = TAG_CATEGORIES.filter((category) => category.key !== "other");
@@ -133,111 +103,16 @@ export default function TagPanel({
   }, [customCategories]);
 
   const groups = useMemo(() => {
-    const filteredTags = tags.filter((tag) => tag.toLowerCase().includes(search.toLowerCase()));
+    const normalizedSearch = search.trim().toLocaleLowerCase("es");
+    const filteredTags = availableTags.filter((tag) => tag.toLocaleLowerCase("es").includes(normalizedSearch));
     return buildTagGroups(filteredTags, overrides, categories);
-  }, [categories, overrides, search, tags]);
+  }, [availableTags, categories, overrides, search]);
   const popularTags = useMemo(() => {
-    return [...tags]
+    return [...availableTags]
       .sort((left, right) => (tagCounts[right] || 0) - (tagCounts[left] || 0) || left.localeCompare(right))
       .slice(0, 10);
-  }, [tagCounts, tags]);
+  }, [availableTags, tagCounts]);
   const visibleTagCount = groups.reduce((total, group) => total + group.tags.length, 0);
-
-  async function persistTagSettings(nextSettings) {
-    const nextCategories = nextSettings.categories ?? customCategories;
-    const nextOverrides = nextSettings.overrides ?? overrides;
-    const previousCategories = customCategories;
-    const previousOverrides = overrides;
-
-    setCustomCategories(nextCategories);
-    setOverrides(nextOverrides);
-    setIsSavingSettings(true);
-    setSettingsError("");
-
-    try {
-      const response = await fetch("/api/tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categories: nextCategories,
-          overrides: nextOverrides,
-        }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "No se pudieron guardar las categorias.");
-      }
-
-      setCustomCategories(Array.isArray(data.categories) ? data.categories : nextCategories);
-      setOverrides(data.overrides && typeof data.overrides === "object" ? data.overrides : nextOverrides);
-      return true;
-    } catch (error) {
-      setCustomCategories(previousCategories);
-      setOverrides(previousOverrides);
-      setSettingsError(error.message || "No se pudieron guardar las categorias.");
-      return false;
-    } finally {
-      setIsSavingSettings(false);
-    }
-  }
-
-  function openCategoryDialog() {
-    setCategoryDraft({ label: "", icon: DEFAULT_CATEGORY_ICON });
-    setCategoryError("");
-    setCategoryDialogOpen(true);
-  }
-
-  async function createCategory(event) {
-    event.preventDefault();
-
-    const label = categoryDraft.label.trim();
-    const icon = categoryDraft.icon.trim() || DEFAULT_CATEGORY_ICON;
-
-    if (!label) {
-      setCategoryError("Escribe un nombre para la categoria.");
-      return;
-    }
-
-    const normalizedLabel = normalizeCategorySlug(label);
-    const alreadyExists = categories.some((category) => normalizeCategorySlug(category.label) === normalizedLabel);
-
-    if (alreadyExists) {
-      setCategoryError("Ya existe una categoria con ese nombre.");
-      return;
-    }
-
-    const nextCategory = {
-      key: buildCustomCategoryKey(label, categories),
-      label,
-      icon,
-      keywords: [],
-      custom: true,
-    };
-
-    const saved = await persistTagSettings({ categories: [...customCategories, nextCategory] });
-
-    if (saved) {
-      setCategoryDialogOpen(false);
-    }
-  }
-
-  async function moveTag(tag, categoryKey) {
-    const normalized = normalizeTag(tag);
-    const nextOverrides = { ...overrides };
-
-    if (categoryKey === "auto") {
-      delete nextOverrides[normalized];
-    } else {
-      nextOverrides[normalized] = categoryKey;
-    }
-
-    const saved = await persistTagSettings({ overrides: nextOverrides });
-
-    if (saved) {
-      setMoveDialog(null);
-    }
-  }
 
   if (!isOpen) {
     return null;
@@ -258,8 +133,14 @@ export default function TagPanel({
             <span className="tag-panel-kicker">Filtro avanzado</span>
             <h2 className="tag-panel-title" id="tag-panel-title">Explorar tags</h2>
           </div>
-          <button type="button" id="btn-close-tag-panel" className="tag-panel-close" onClick={onClose}>
-            ✕
+          <button
+            type="button"
+            id="btn-close-tag-panel"
+            className="tag-panel-close"
+            aria-label="Cerrar panel de tags"
+            onClick={onClose}
+          >
+            <X size={19} aria-hidden="true" />
           </button>
         </div>
         <div className="tag-panel-summary">
@@ -276,11 +157,12 @@ export default function TagPanel({
           ) : (
             <div className="tag-panel-empty-selection">
               <span>Sin tag activo</span>
-              <strong>{tags.length} tags disponibles</strong>
+              <strong>{availableTags.length} tags disponibles</strong>
             </div>
           )}
         </div>
         <div className="tag-panel-search-wrapper">
+          <Search className="tag-panel-search-icon" size={18} aria-hidden="true" />
           <input
             type="search"
             id="tag-panel-search"
@@ -289,6 +171,16 @@ export default function TagPanel({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          {search ? (
+            <button
+              type="button"
+              className="tag-panel-search-clear"
+              aria-label="Limpiar búsqueda"
+              onClick={() => setSearch("")}
+            >
+              <X size={17} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
         <div id="tag-panel-body" className="tag-panel-body">
           {settingsError ? <p className="tag-settings-error">{settingsError}</p> : null}
@@ -296,8 +188,8 @@ export default function TagPanel({
           {!search && popularTags.length ? (
             <section className="tag-popular-section">
               <div className="tag-popular-heading">
-                <span>Más usados</span>
-                <small>Accesos rápidos</small>
+                <span>Tags con más directos</span>
+                <small>Según registros del archivo</small>
               </div>
               <div className="tag-popular-list">
                 {popularTags.map((tag) => (
@@ -350,7 +242,7 @@ export default function TagPanel({
                   return (
                     <div
                       key={tag}
-                      className={`tag-pill-sidebar ${isActive ? "active-tag" : ""} ${isAdmin ? "admin-mode" : ""}`}
+                      className={`tag-pill-sidebar ${isActive ? "active-tag" : ""}`}
                     >
                       <button
                         type="button"
@@ -364,21 +256,6 @@ export default function TagPanel({
                         <span>{tagCounts[tag] || 0}</span>
                       </button>
 
-                      {isAdmin ? (
-                        <>
-                          <button
-                            type="button"
-                            className="tag-move-btn"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setMoveDialog({ tag, currentCategoryKey: group.key });
-                            }}
-                            aria-label={`Cambiar categoria de ${tag}`}
-                          >
-                            ↕
-                          </button>
-                        </>
-                      ) : null}
                     </div>
                   );
                 })}
@@ -410,133 +287,8 @@ export default function TagPanel({
             </div>
           ) : null}
 
-          {isAdmin ? (
-            <div className="tag-admin-actions">
-              <button type="button" className="tag-admin-action" onClick={openCategoryDialog}>
-                Crear categoria
-              </button>
-            </div>
-          ) : null}
         </div>
       </aside>
-
-      {moveDialog ? (
-        <div className="modal-backdrop tag-move-backdrop" onClick={() => setMoveDialog(null)}>
-          <div className="modal-content tag-move-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="tag-move-modal-header">
-              <div>
-                <p className="tag-move-kicker">Cambiar categoria</p>
-                <h2 className="modal-title tag-move-modal-title">{moveDialog.tag}</h2>
-              </div>
-              <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={() => setMoveDialog(null)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="tag-move-category-grid">
-              {categories.map((category) => {
-                const isCurrent = category.key === moveDialog.currentCategoryKey;
-
-                return (
-                  <button
-                    type="button"
-                    key={category.key}
-                    className={`tag-move-category-option ${isCurrent ? "is-current" : ""}`}
-                    onClick={() => moveTag(moveDialog.tag, category.key)}
-                    disabled={isCurrent || isSavingSettings}
-                  >
-                    <span className="tag-move-category-icon">{category.icon}</span>
-                    <span>
-                      <strong>{category.label}</strong>
-                      {isCurrent ? <small>Categoria actual</small> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="modal-actions tag-move-actions">
-              <button
-                type="button"
-                className="btn-modal btn-modal-secondary"
-                onClick={() => setMoveDialog(null)}
-                disabled={isSavingSettings}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn-modal btn-modal-primary"
-                onClick={() => moveTag(moveDialog.tag, "auto")}
-                disabled={isSavingSettings}
-              >
-                Usar categoria automatica
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {categoryDialogOpen ? (
-        <div className="modal-backdrop tag-move-backdrop" onClick={() => setCategoryDialogOpen(false)}>
-          <form className="modal-content tag-move-modal tag-category-create-modal" onSubmit={createCategory} onClick={(event) => event.stopPropagation()}>
-            <div className="tag-move-modal-header">
-              <div>
-                <p className="tag-move-kicker">Nueva categoria</p>
-                <h2 className="modal-title tag-move-modal-title">Crear categoria de tags</h2>
-              </div>
-              <button type="button" className="modal-close-button" aria-label="Cerrar modal" onClick={() => setCategoryDialogOpen(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group-modal">
-                <label htmlFor="tag-category-name">Nombre</label>
-                <input
-                  id="tag-category-name"
-                  type="text"
-                  className="modal-input"
-                  value={categoryDraft.label}
-                  onChange={(event) => {
-                    setCategoryDraft((current) => ({ ...current, label: event.target.value }));
-                    setCategoryError("");
-                  }}
-                  autoFocus
-                />
-              </div>
-
-              <div className="form-group-modal">
-                <label htmlFor="tag-category-icon">Icono</label>
-                <input
-                  id="tag-category-icon"
-                  type="text"
-                  className="modal-input"
-                  value={categoryDraft.icon}
-                  onChange={(event) => setCategoryDraft((current) => ({ ...current, icon: event.target.value }))}
-                  maxLength={4}
-                />
-              </div>
-            </div>
-
-            {categoryError ? <p className="tag-category-error">{categoryError}</p> : null}
-
-            <div className="modal-actions tag-move-actions">
-              <button
-                type="button"
-                className="btn-modal btn-modal-secondary"
-                onClick={() => setCategoryDialogOpen(false)}
-                disabled={isSavingSettings}
-              >
-                Cancelar
-              </button>
-              <button type="submit" className="btn-modal btn-modal-primary" disabled={isSavingSettings}>
-                Crear categoria
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
     </>,
     document.body
   );

@@ -9,12 +9,11 @@ export default function MaintainerModal({
   children,
   actions = null,
   className = "admin-modal",
-  closeOnBackdrop = true,
   onClose,
   ...props
 }) {
   return (
-    <div className="modal-backdrop" onClick={closeOnBackdrop ? onClose : undefined}>
+    <div className="modal-backdrop">
       <Component
         className={`modal-content ${className}`.trim()}
         onClick={(event) => event.stopPropagation()}

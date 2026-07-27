@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, LogOut, MessageSquare, Settings, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import AppLink from "@/components/AppLink";
 import UserAvatar from "@/components/UserAvatar";
 
 export default function AccountMenu({ user }) {
@@ -85,10 +86,10 @@ export default function AccountMenu({ user }) {
             Configurar perfil
           </Link>
           {user.permissions?.includes("support.tickets.view") || user.role === "dios" ? (
-            <Link href="/sugerencias-reclamos" className="account-menu-item" role="menuitem" onClick={() => setIsOpen(false)}>
+            <AppLink href="/sugerencias-reclamos" className="account-menu-item" role="menuitem" onClick={() => setIsOpen(false)}>
               <MessageSquare size={16} aria-hidden="true" />
               Sugerencias/Reclamos
-            </Link>
+            </AppLink>
           ) : null}
           <button type="button" className="account-menu-item danger" role="menuitem" onClick={logout}>
             <LogOut size={16} aria-hidden="true" />

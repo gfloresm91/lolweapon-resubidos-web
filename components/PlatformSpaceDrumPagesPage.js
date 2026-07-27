@@ -12,6 +12,7 @@ import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_FORM = {
@@ -239,10 +240,6 @@ export default function PlatformSpaceDrumPagesPage({
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           SpaceDrum <span className="text-gradient">páginas</span>
         </h1>
@@ -341,14 +338,18 @@ export default function PlatformSpaceDrumPagesPage({
             <span className="admin-user-cell">Página {Number(page.position || 0) + 1}</span>
             <div className="admin-user-actions">
               {canUpdate ? (
-                <button type="button" className="icon-tool-button" aria-label="Editar página" onClick={() => setEditingPage(buildForm(page, availableChapters))}>
-                  <Edit3 size={17} />
-                </button>
+                <Tooltip label="Editar página">
+                  <button type="button" className="icon-tool-button" aria-label="Editar página" onClick={() => setEditingPage(buildForm(page, availableChapters))}>
+                    <Edit3 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
-                <button type="button" className="icon-tool-button danger" aria-label="Eliminar página" onClick={() => setDeletePage(page)} disabled={isSaving}>
-                  <Trash2 size={17} />
-                </button>
+                <Tooltip label="Eliminar página">
+                  <button type="button" className="icon-tool-button danger" aria-label="Eliminar página" onClick={() => setDeletePage(page)} disabled={isSaving}>
+                    <Trash2 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>

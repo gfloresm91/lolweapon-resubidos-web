@@ -43,7 +43,6 @@ export default function AuditLogModal({
   module,
   title = "Historial",
   subtitle = "Últimas acciones registradas.",
-  closeOnBackdrop = true,
   onClose,
 }) {
   const [logs, setLogs] = useState([]);
@@ -102,7 +101,7 @@ export default function AuditLogModal({
   }
 
   return (
-    <div className="modal-backdrop confirm-backdrop" onClick={closeOnBackdrop ? onClose : undefined}>
+    <div className="modal-backdrop confirm-backdrop">
       <section className="modal-content audit-modal" aria-modal="true" role="dialog" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close-button" aria-label="Cerrar historial" onClick={onClose}>
           <X size={18} />

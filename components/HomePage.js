@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
-import { Plus, Radio, Zap } from "lucide-react";
+import { BookOpen, Plus, Radio, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
 import AccountMenu from "@/components/AccountMenu";
@@ -14,7 +14,6 @@ import ConfirmModal from "@/components/ConfirmModal";
 import FiltersBar from "@/components/FiltersBar";
 import HomeDashboard from "@/components/HomeDashboard";
 import LiveCard from "@/components/LiveCard";
-import LoreModal from "@/components/LoreModal";
 import NewsGuidePage from "@/components/NewsGuidePage";
 import NotificationCenter from "@/components/NotificationCenter";
 import NotificationsPage from "@/components/NotificationsPage";
@@ -37,8 +36,9 @@ import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import TrackerCalendarPage from "@/components/TrackerCalendarPage";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
-import { LIVE_STATUS_OPTIONS } from "@/lib/animeDbMapping";
+import { LIVE_STATUS_OPTIONS, normalizeCatalogCode } from "@/lib/animeDbMapping";
 import { formatPlatformDateTime } from "@/lib/dateTime";
+import { normalizeTag } from "@/lib/tags";
 
 const CARD_DENSITY_STORAGE_KEY = "kala_card_density";
 const CARD_DENSITY_VERSION_KEY = "kala_card_density_version";
@@ -120,7 +120,7 @@ const VIEW_LABELS = {
   myList: "Mi lista",
   myAnimeList: "Mi lista anime",
   animeLibraryTracking: "Viendo",
-  animeLibraryCompleted: "Anime terminados",
+  animeLibraryCompleted: "Animes terminados",
   platformTracker: "Mantenedor Rastreador",
   platformTags: "Mantenedor Tags",
   platformSpaceDrumChapters: "Mantenedor SpaceDrum",
@@ -128,13 +128,43 @@ const VIEW_LABELS = {
   platformSpaceDrumSettings: "Configuración SpaceDrum",
   platformSpaceDrumImport: "Importación SpaceDrum",
   platformAnimeTracking: "Mantenedor Viendo",
-  platformAnimeCompleted: "Mantenedor Terminados",
+  platformAnimeCompleted: "Mantenedor de animes terminados",
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   platformNotifications: "Mantenedor Notificaciones",
   platformTickets: "Tickets",
   platformTicketThread: "Ticket administrativo",
   spacedrum: "SpaceDrum",
+};
+
+const VIEW_SECTIONS = {
+  home: "Plataforma",
+  rtfm: "Ayuda",
+  news: "Plataforma",
+  changelog: "Plataforma",
+  notifications: "Centro personal",
+  supportTickets: "Soporte",
+  supportTicketThread: "Soporte",
+  tracker: "Archivo VOD",
+  trackerCalendar: "Archivo VOD",
+  myList: "Archivo VOD",
+  myAnimeList: "Biblioteca de anime",
+  animeLibraryTracking: "Biblioteca de anime",
+  animeLibraryCompleted: "Biblioteca de anime",
+  spacedrum: "Lecturas",
+  platformUsers: "Administración",
+  platformRoles: "Administración",
+  platformNotifications: "Administración",
+  platformTickets: "Administración",
+  platformTicketThread: "Administración",
+  platformTracker: "Administración",
+  platformTags: "Administración",
+  platformSpaceDrumChapters: "Administración",
+  platformSpaceDrumPages: "Administración",
+  platformSpaceDrumSettings: "Administración",
+  platformSpaceDrumImport: "Administración",
+  platformAnimeTracking: "Administración",
+  platformAnimeCompleted: "Administración",
 };
 
 const VIEW_PATHS = {
@@ -164,10 +194,7 @@ const VIEW_PATHS = {
   platformTickets: "/administracion/tickets",
   spacedrum: "/spacedrum",
 };
-const SUPPORT_VIEWS = new Set(["supportTickets", "supportTicketThread"]);
 const TRACKER_RETURN_STATE_KEY = "kala_tracker_return_state";
-const COMMUNITY_SPREADSHEET_URL = process.env.NEXT_PUBLIC_COMMUNITY_SPREADSHEET_URL
-  || "https://onedrive.live.com/:x:/g/personal/87dad8f5b07a6f01/IQABb3qw9djaIICHlm4AAAAAAYc3We7evL0vIGHpS_nUDf8?rtime=ut4s6g6U3kg&redeem=aHR0cHM6Ly8xZHJ2Lm1zL3gvYy84N2RhZDhmNWIwN2E2ZjAxL0lRQUJiM3F3OWRqYUlJQ0hsbTRBQUFBQUFZYzNXZTdldkwwdklHSHBTX25VRGY4";
 const DEFAULT_TRACKER_FILTERS = { search: "", year: "all", month: "all", status: "all" };
 const DEFAULT_TRACKER_STATE = {
   filters: DEFAULT_TRACKER_FILTERS,
@@ -181,16 +208,47 @@ function getViewFromPath(pathname) {
   return Object.entries(VIEW_PATHS).find(([, path]) => path === pathname)?.[0] || "home";
 }
 
-function getTrackerStateFromSearchParams(searchParams) {
+function getTrackerStateFromSearchParams(searchParams, lives = []) {
+  const years = getAllYears(lives);
+  const statuses = getAllStatuses(lives);
+  const tags = getAllTags(lives);
+  const requestedYear = searchParams.get("year") || "";
+  const requestedMonth = searchParams.get("month") || "";
+  const requestedStatus = searchParams.get("status") || "";
+  const requestedTag = searchParams.get("tag") || "";
+  const year = years.includes(requestedYear) ? requestedYear : "all";
+  const availableMonths = getAvailableMonths(lives, year);
+  const normalizedMonth = requestedMonth.padStart(2, "0");
+  const month = availableMonths.includes(normalizedMonth) ? normalizedMonth : "all";
+  const normalizedStatus = normalizeCatalogCode(requestedStatus);
+  const status = statuses.find((item) => normalizeCatalogCode(item) === normalizedStatus) || "all";
+  const normalizedTag = normalizeTag(requestedTag);
+  const selectedTag = tags.find((item) => normalizeTag(item) === normalizedTag) || "";
+
   return {
     filters: {
       search: searchParams.get("search") || searchParams.get("q") || "",
-      year: searchParams.get("year") || "all",
-      month: searchParams.get("month") || "all",
-      status: searchParams.get("status") || "all",
+      year,
+      month,
+      status,
     },
-    selectedTag: searchParams.get("tag") || "",
+    selectedTag,
   };
+}
+
+function getTrackerSearchParams(filters, selectedTag, currentSearch = "") {
+  const params = new URLSearchParams(currentSearch);
+
+  ["search", "q", "year", "month", "status", "tag"].forEach((key) => params.delete(key));
+
+  const normalizedSearch = String(filters.search || "").trim().toLocaleLowerCase("es");
+  if (normalizedSearch) params.set("search", normalizedSearch);
+  if (filters.year && filters.year !== "all") params.set("year", filters.year);
+  if (filters.month && filters.month !== "all") params.set("month", filters.month);
+  if (filters.status && filters.status !== "all") params.set("status", normalizeCatalogCode(filters.status));
+  if (selectedTag) params.set("tag", normalizeTag(selectedTag));
+
+  return params;
 }
 
 function areTrackerFiltersEqual(left, right) {
@@ -400,7 +458,7 @@ export default function HomePage({
   const [spaceDrumAdminImportSummary, setSpaceDrumAdminImportSummary] = useState(initialSpaceDrumImportSummary);
   const [currentView, setCurrentView] = useState(activeView);
   const [trackerViewStates, setTrackerViewStates] = useState(() => {
-    const queryState = activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams) : null;
+    const queryState = activeView === "tracker" ? getTrackerStateFromSearchParams(searchParams, initialLives) : null;
     return {
       tracker: queryState
         ? { ...DEFAULT_TRACKER_STATE, filters: queryState.filters, selectedTag: queryState.selectedTag }
@@ -416,10 +474,11 @@ export default function HomePage({
   const [personalFilter, setPersonalFilter] = useState(activeView === "myList" ? "saved" : "all");
   const [liveActivity, setLiveActivity] = useState(initialLiveActivity || {});
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
-  const [isLoreOpen, setIsLoreOpen] = useState(false);
   const [editingLive, setEditingLive] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isTwitchActionLoading, setIsTwitchActionLoading] = useState(false);
+  const [isArchiveConfirmOpen, setIsArchiveConfirmOpen] = useState(false);
+  const [isEventSubConfirmOpen, setIsEventSubConfirmOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [pendingNotifyLive, setPendingNotifyLive] = useState(null);
   const [isNotifying, setIsNotifying] = useState(false);
@@ -807,17 +866,36 @@ export default function HomePage({
   }, []);
 
   useEffect(() => {
-    if (currentView !== "tracker") {
+    if (currentView !== "tracker" || !lives.length) {
       return;
     }
 
-    const queryState = getTrackerStateFromSearchParams(searchParams);
+    const queryState = getTrackerStateFromSearchParams(searchParams, lives);
 
     updateTrackerViewState("tracker", (previous) => ({
       filters: areTrackerFiltersEqual(previous.filters, queryState.filters) ? previous.filters : queryState.filters,
       selectedTag: previous.selectedTag === queryState.selectedTag ? previous.selectedTag : queryState.selectedTag,
     }));
-  }, [currentView, searchParams]);
+  }, [currentView, lives, searchParams]);
+
+  useEffect(() => {
+    if (currentView !== "tracker" || !lives.length || window.location.pathname !== VIEW_PATHS.tracker) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const nextParams = getTrackerSearchParams(filters, selectedTag, window.location.search);
+      const nextSearch = nextParams.toString();
+      const nextPath = `${VIEW_PATHS.tracker}${nextSearch ? `?${nextSearch}` : ""}`;
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+
+      if (nextPath !== currentPath) {
+        window.history.replaceState(window.history.state, "", nextPath);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [currentView, filters.month, filters.search, filters.status, filters.year, lives.length, selectedTag]);
 
   useEffect(() => {
     if (currentView !== "tracker" || didRestoreTrackerRef.current) {
@@ -1322,6 +1400,7 @@ export default function HomePage({
         await refreshLivesFromServer();
       }
 
+      setIsArchiveConfirmOpen(false);
       toast.success("Card de Twitch creado o actualizado.");
     } catch (error) {
       toast.error(error.message || "No se pudo crear el card desde Twitch.");
@@ -1351,6 +1430,7 @@ export default function HomePage({
         throw new Error(data.error || "No se pudo registrar EventSub");
       }
 
+      setIsEventSubConfirmOpen(false);
       toast.success(data.alreadyActive ? "EventSub ya estaba activo para este canal." : "EventSub registrado. Twitch notificará el próximo directo.");
     } catch (error) {
       toast.error(error.message || "No se pudo registrar EventSub.");
@@ -1359,7 +1439,7 @@ export default function HomePage({
     }
   }
 
-  function selectView(view) {
+  function selectView(view, requestedPath = "") {
     const viewPermissions = {
       home: "home.view",
       rtfm: "rtfm.view",
@@ -1396,7 +1476,11 @@ export default function HomePage({
       return;
     }
 
-    const nextPath = VIEW_PATHS[view] || "/inicio";
+    const defaultPath = VIEW_PATHS[view] || "/inicio";
+    const requestedUrl = requestedPath ? new URL(requestedPath, window.location.origin) : null;
+    const nextPath = requestedUrl?.pathname === defaultPath
+      ? `${requestedUrl.pathname}${requestedUrl.search}`
+      : defaultPath;
     window.history.pushState(null, "", nextPath);
     window.dispatchEvent(new CustomEvent("kala:navigation", { detail: { path: nextPath } }));
 
@@ -1424,6 +1508,31 @@ export default function HomePage({
       window.dispatchEvent(new CustomEvent("kala:sidebar:close"));
     }
   }
+
+  useEffect(() => {
+    function handleNavigationRequest(event) {
+      const requestedPath = event.detail?.path;
+      if (typeof requestedPath !== "string") return;
+
+      const url = new URL(requestedPath, window.location.origin);
+      const supportTicketMatch = url.pathname.match(/^\/sugerencias-reclamos\/(\d+)\/?$/);
+
+      if (supportTicketMatch) {
+        event.preventDefault();
+        selectSupportTicket(supportTicketMatch[1]);
+        return;
+      }
+
+      const matchingView = Object.entries(VIEW_PATHS).find(([, path]) => path === url.pathname)?.[0];
+      if (!matchingView) return;
+
+      event.preventDefault();
+      selectView(matchingView, `${url.pathname}${url.search}`);
+    }
+
+    window.addEventListener("kala:navigation-request", handleNavigationRequest);
+    return () => window.removeEventListener("kala:navigation-request", handleNavigationRequest);
+  });
 
   function saveTrackerReturnState(liveId) {
     try {
@@ -1471,17 +1580,17 @@ export default function HomePage({
         <div className="content-shell">
           <header className="topbar" aria-label="Barra superior">
             <div className="topbar-title">
-              <span className="topbar-kicker">{SUPPORT_VIEWS.has(currentView) ? "Soporte" : "Archivo VODs"}</span>
+              <span className="topbar-kicker">{VIEW_SECTIONS[currentView] || "Plataforma"}</span>
               <span className="topbar-page">{VIEW_LABELS[currentView]}</span>
             </div>
 
             <div className="topbar-actions">
               {canViewNotifications ? <NotificationCenter user={currentUser} canViewAll={canViewAllNotifications} onViewAll={() => selectView("notifications")} /> : null}
-              <AccountMenu user={currentUser} canManageUsers={canManageUsers} />
+              <AccountMenu user={currentUser} />
             </div>
           </header>
 
-          <div className="app-wrapper">
+          <div className={`app-wrapper ${currentView.startsWith("platform") ? "is-maintainer-view" : ""}`}>
             {currentView === "home" ? (
               <HomeDashboard
                 lives={lives}
@@ -1530,13 +1639,6 @@ export default function HomePage({
             {["tracker", "myList"].includes(currentView) ? (
               <>
         <header id="inicio" className="main-header">
-          {currentView === "tracker" ? (
-            <button type="button" className="header-badge" onClick={() => setIsLoreOpen(true)}>
-              <span aria-hidden="true">🚀</span> ARCHIVO HISTORICO
-            </button>
-          ) : (
-            <div className="header-badge"><span aria-hidden="true">⭐</span> LISTA PERSONAL</div>
-          )}
           <h1 className="title">
             {currentView === "tracker" ? (
               <>Rastreador de <span className="text-gradient">Directos</span></>
@@ -1551,24 +1653,22 @@ export default function HomePage({
           </p>
         </header>
 
-        {currentView === "tracker" ? (
-          <div className="site-notice-container">
-          <div className="site-notice-card">
-            <span className="notice-badge">INFO</span>
-            <p className="notice-text">
-              Se utiliza el archivo base de la comunidad. Leer la hoja <strong>RTFM</strong>.
-              Creditos a Piero y Redbreake.
-            </p>
-            <a
-              href={COMMUNITY_SPREADSHEET_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="notice-link"
-            >
-              <span className="link-icon" aria-hidden="true">📂</span> OneDrive
-            </a>
-          </div>
-        </div>
+	        {currentView === "tracker" ? (
+	          <div className="site-notice-container">
+	          <div className="site-notice-card">
+	            <span className="notice-icon" aria-hidden="true">
+	              <BookOpen size={18} />
+	            </span>
+	            <p className="notice-text">
+	              Consulta las fuentes, el contexto y el estado del archivo VOD en RTFM.{" "}
+	              <strong>Créditos a Piero y Redbreake.</strong>
+	            </p>
+	            <button type="button" className="notice-link notice-link-button" onClick={() => selectView("rtfm")}>
+	              <BookOpen size={16} aria-hidden="true" />
+	              Abrir RTFM
+	            </button>
+	          </div>
+	        </div>
         ) : null}
 
         {currentView === "tracker" ? <StatsBar stats={stats} /> : null}
@@ -1590,7 +1690,7 @@ export default function HomePage({
                 <button
                   type="button"
                   className="tracker-action-secondary"
-                  onClick={archiveCurrentTwitchLive}
+                  onClick={() => setIsArchiveConfirmOpen(true)}
                   disabled={isTwitchActionLoading}
                 >
                   <Radio size={17} />
@@ -1601,7 +1701,7 @@ export default function HomePage({
                 <button
                   type="button"
                   className="tracker-action-secondary"
-                  onClick={registerTwitchEventSub}
+                  onClick={() => setIsEventSubConfirmOpen(true)}
                   disabled={isTwitchActionLoading}
                 >
                   <Zap size={17} />
@@ -1956,7 +2056,6 @@ export default function HomePage({
                 canNotify={hasPermission("admin.lives.notify")}
                 canExport={canExportTracker}
                 canImport={canImportTracker}
-                canUpdateTags={canUpdateTags}
                 formVariant={trackerFormVariant || "compact"}
                 twitchLogin={twitchLogin}
                 onLivesChange={setLives}
@@ -2058,6 +2157,30 @@ export default function HomePage({
       />
 
       <ConfirmModal
+        isOpen={isArchiveConfirmOpen}
+        title="Crear desde Twitch"
+        description="Se consultará el directo actual de Twitch y se creará o actualizará su registro en el Rastreador. Los tags y la miniatura quedarán vacíos en registros nuevos."
+        confirmLabel="Crear desde Twitch"
+        cancelLabel="Cancelar"
+        tone="default"
+        isLoading={isTwitchActionLoading}
+        onCancel={() => setIsArchiveConfirmOpen(false)}
+        onConfirm={archiveCurrentTwitchLive}
+      />
+
+      <ConfirmModal
+        isOpen={isEventSubConfirmOpen}
+        title="Registrar EventSub"
+        description={`Se verificarán las suscripciones de inicio y término del directo${twitchLogin ? ` para el canal ${twitchLogin}` : " para el canal configurado"}. Las suscripciones activas se conservarán y solo se crearán o reemplazarán las que falten o estén inactivas.`}
+        confirmLabel="Registrar EventSub"
+        cancelLabel="Cancelar"
+        tone="default"
+        isLoading={isTwitchActionLoading}
+        onCancel={() => setIsEventSubConfirmOpen(false)}
+        onConfirm={registerTwitchEventSub}
+      />
+
+      <ConfirmModal
         isOpen={Boolean(pendingDeleteId)}
         title="Borrar directo"
         description="Esta acción eliminará el registro del archivo histórico. Puedes volver a crearlo después, pero este cambio se guardará inmediatamente."
@@ -2068,8 +2191,6 @@ export default function HomePage({
         onCancel={() => setPendingDeleteId(null)}
         onConfirm={() => deleteLive(pendingDeleteId)}
       />
-
-      <LoreModal isOpen={isLoreOpen} onClose={() => setIsLoreOpen(false)} />
 
       <TrackerMaintainerModal
         live={editingLive && editingLive.id ? editingLive : null}
@@ -2082,7 +2203,6 @@ export default function HomePage({
         tagCounts={tagCounts}
         formVariant={trackerFormVariant || "compact"}
         onDelete={canDeleteTracker ? (id) => {
-          setEditingLive(null);
           setPendingDeleteId(id);
         } : null}
       />
@@ -2094,7 +2214,6 @@ export default function HomePage({
         selectedTag={selectedTag}
         onClose={() => setIsTagPanelOpen(false)}
         onSelectTag={setCurrentSelectedTag}
-        isAdmin={canUpdateTags}
       />
     </>
   );

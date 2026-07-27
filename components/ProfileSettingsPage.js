@@ -351,10 +351,6 @@ export default function ProfileSettingsPage({ currentUser }) {
 
           <main className="app-wrapper profile-settings-page">
             <header className="watching-header admin-users-header profile-page-header">
-              <div className="header-badge">
-                <span className="dot" />
-                PERFIL
-              </div>
               <h1 className="title">
                 Configurar <span className="text-gradient">perfil</span>
               </h1>

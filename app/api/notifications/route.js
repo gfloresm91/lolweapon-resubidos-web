@@ -34,6 +34,7 @@ export async function GET(request) {
   const result = isFullPage ? await listUserNotifications({
     user, search: searchParams.get("search") || "", type: searchParams.get("type") || "all",
     status: searchParams.get("status") || "all", page: searchParams.get("page") || 1, pageSize: searchParams.get("pageSize") || 10,
+    sort: searchParams.get("sort") || "published", direction: searchParams.get("direction") || "desc",
   }) : await listNotifications({ user: user || accessUser, limit: searchParams.get("limit") || 20 });
 
   return NextResponse.json({ success: true, ...result });

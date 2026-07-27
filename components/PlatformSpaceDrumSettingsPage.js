@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import AuditLogModal from "@/components/AuditLogModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import MaintainerStats from "@/components/MaintainerStats";
+import Tooltip from "@/components/Tooltip";
 
 const LANGUAGE_OPTIONS = [
   { value: "es-es", label: "Español" },
@@ -130,10 +131,6 @@ export default function PlatformSpaceDrumSettingsPage({
   return (
     <>
       <header className="watching-header admin-users-header spacedrum-settings-page-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           SpaceDrum <span className="text-gradient">configuración</span>
         </h1>
@@ -286,9 +283,11 @@ export default function PlatformSpaceDrumSettingsPage({
                   disabled={!canUpdate}
                 />
                 {canUpdate ? (
-                  <button type="button" className="icon-tool-button danger" aria-label="Quitar link" onClick={() => removeCollectionItem("links", index)}>
-                    <Trash2 size={16} />
-                  </button>
+                  <Tooltip label="Quitar enlace">
+                    <button type="button" className="icon-tool-button danger" aria-label="Quitar enlace" onClick={() => removeCollectionItem("links", index)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </Tooltip>
                 ) : null}
               </div>
             ))}
@@ -326,9 +325,11 @@ export default function PlatformSpaceDrumSettingsPage({
                   disabled={!canUpdate}
                 />
                 {canUpdate ? (
-                  <button type="button" className="icon-tool-button danger" aria-label="Quitar dato" onClick={() => removeCollectionItem("meta", index)}>
-                    <Trash2 size={16} />
-                  </button>
+                  <Tooltip label="Quitar dato">
+                    <button type="button" className="icon-tool-button danger" aria-label="Quitar dato" onClick={() => removeCollectionItem("meta", index)}>
+                      <Trash2 size={16} />
+                    </button>
+                  </Tooltip>
                 ) : null}
               </div>
             ))}

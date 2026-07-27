@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, History, MessageSquare } from "lucide-react";
+import { ExternalLink, History } from "lucide-react";
 import { toast } from "sonner";
 
 import AuditLogModal from "@/components/AuditLogModal";
@@ -115,7 +115,6 @@ export default function PlatformTicketsPage({ initialResult = null, canUpdate = 
   return (
     <section className="support-ticket-page platform-ticket-page">
       <header className="watching-header admin-users-header support-ticket-header">
-        <div className="header-badge"><MessageSquare size={16} /> ADMINISTRACIÓN</div>
         <h1 className="title">Mantenedor de <span className="text-gradient">tickets</span></h1>
         <p className="subtitle">Gestiona sugerencias y reclamos enviados por usuarios registrados.</p>
       </header>
@@ -182,7 +181,6 @@ export default function PlatformTicketsPage({ initialResult = null, canUpdate = 
         onClose={() => setIsAuditOpen(false)}
         module="admin.tickets"
         title="Historial de tickets"
-        closeOnBackdrop={false}
       />
     </section>
   );

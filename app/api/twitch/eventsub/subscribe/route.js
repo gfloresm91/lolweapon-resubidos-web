@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
-import { ensureStreamOnlineSubscription } from "@/lib/twitch";
+import { ensureStreamSubscriptions } from "@/lib/twitch";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +14,13 @@ export async function POST(request) {
   }
 
   try {
-    const result = await ensureStreamOnlineSubscription();
+    const result = await ensureStreamSubscriptions();
 
     if (result.alreadyActive) {
       return NextResponse.json({
         success: true,
         alreadyActive: true,
-        subscription: result.subscription,
+        subscriptions: result.subscriptions,
       });
     }
 
@@ -29,18 +29,18 @@ export async function POST(request) {
       action: "eventsub_subscribe",
       module: "admin.tracker",
       entityType: "TwitchEventSub",
-      entityId: result.subscription?.id || process.env.TWITCH_BROADCASTER_LOGIN || "stream.online",
-      entityLabel: process.env.TWITCH_BROADCASTER_LOGIN || "stream.online",
+      entityId: result.subscriptions?.online?.id || process.env.TWITCH_BROADCASTER_LOGIN || "stream.online",
+      entityLabel: process.env.TWITCH_BROADCASTER_LOGIN || "stream.online/offline",
       summary: result.removed
         ? "Reemplazó una suscripción EventSub inactiva de Twitch"
         : "Registró EventSub de Twitch",
-      after: { subscription: result.subscription, removedInactiveSubscriptions: result.removed },
+      after: { subscriptions: result.subscriptions, removedInactiveSubscriptions: result.removed },
       request,
     });
 
     return NextResponse.json({
       success: true,
-      subscription: result.subscription,
+      subscriptions: result.subscriptions,
       replacedInactive: result.removed,
     });
   } catch (error) {

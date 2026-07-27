@@ -12,6 +12,7 @@ import MaintainerModal from "@/components/MaintainerModal";
 import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
+import Tooltip from "@/components/Tooltip";
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_FORM = {
@@ -273,10 +274,6 @@ export default function PlatformSpaceDrumChaptersPage({
   return (
     <>
       <header className="watching-header admin-users-header">
-        <div className="header-badge">
-          <span className="dot" />
-          ADMINISTRACIÓN
-        </div>
         <h1 className="title">
           SpaceDrum <span className="text-gradient">capítulos</span>
         </h1>
@@ -379,35 +376,43 @@ export default function PlatformSpaceDrumChaptersPage({
             </span>
             <div className="admin-user-actions">
               {canUpdate ? (
-                <button type="button" className="icon-tool-button" aria-label="Editar capítulo" onClick={() => setEditingChapter(buildForm(chapter))}>
-                  <Edit3 size={17} />
-                </button>
+                <Tooltip label="Editar capítulo">
+                  <button type="button" className="icon-tool-button" aria-label="Editar capítulo" onClick={() => setEditingChapter(buildForm(chapter))}>
+                    <Edit3 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdatePages ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label="Administrar páginas"
-                  onClick={onOpenPages}
-                >
-                  <FileImage size={17} />
-                </button>
+                <Tooltip label="Administrar páginas">
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label="Administrar páginas"
+                    onClick={onOpenPages}
+                  >
+                    <FileImage size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canUpdate ? (
-                <button
-                  type="button"
-                  className="icon-tool-button"
-                  aria-label={chapter.status === "published" ? "Ocultar capítulo" : "Publicar capítulo"}
-                  onClick={() => setStatusChapter(chapter)}
-                  disabled={isSaving}
-                >
-                  <Power size={17} />
-                </button>
+                <Tooltip label={chapter.status === "published" ? "Ocultar capítulo" : "Publicar capítulo"}>
+                  <button
+                    type="button"
+                    className="icon-tool-button"
+                    aria-label={chapter.status === "published" ? "Ocultar capítulo" : "Publicar capítulo"}
+                    onClick={() => setStatusChapter(chapter)}
+                    disabled={isSaving}
+                  >
+                    <Power size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
-                <button type="button" className="icon-tool-button danger" aria-label="Eliminar capítulo" onClick={() => setDeleteChapter(chapter)} disabled={isSaving}>
-                  <Trash2 size={17} />
-                </button>
+                <Tooltip label="Eliminar capítulo">
+                  <button type="button" className="icon-tool-button danger" aria-label="Eliminar capítulo" onClick={() => setDeleteChapter(chapter)} disabled={isSaving}>
+                    <Trash2 size={17} />
+                  </button>
+                </Tooltip>
               ) : null}
             </div>
           </div>

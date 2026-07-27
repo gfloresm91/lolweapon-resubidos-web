@@ -250,7 +250,6 @@ export default function TrackerMaintainerModal({
       className="admin-modal tracker-maintainer-modal"
       title={live ? "Editar directo" : "Nuevo directo"}
       subtitle={live?.title || "Completa los datos del registro del rastreador."}
-      closeOnBackdrop={false}
       onClose={onClose}
       noValidate
       onSubmit={handleSubmit(onSubmit)}
