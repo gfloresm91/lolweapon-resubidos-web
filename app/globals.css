@@ -6572,6 +6572,38 @@ body:has(.notifications-page) .bg-orb {
   padding: 0.35rem;
 }
 
+.filter-select-search {
+  position: sticky;
+  top: -0.35rem;
+  z-index: 1;
+  margin: -0.35rem -0.35rem 0.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: #0c0d14;
+  padding: 0.55rem;
+}
+
+.filter-select-search input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: #111620;
+  color: #eef4fb;
+  padding: 0 0.7rem;
+}
+
+.filter-select-search input:focus {
+  border-color: rgba(167, 139, 250, 0.56);
+}
+
+.filter-select-empty {
+  color: #aab7ca;
+  font-size: 0.8rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
 .filter-select-option {
   width: 100%;
   min-height: 40px;
@@ -13287,6 +13319,7 @@ a.empty-state-action {
   max-width: 620px;
 }
 
+.admin-modal .field-hint,
 .tag-category-create-modal .field-hint {
   margin: 0.45rem 0 0;
   color: #aab7ca;
@@ -19207,6 +19240,883 @@ body:has(.support-ticket-create-modal) .persistent-footer {
     max-width: calc(100vw - 2.25rem);
     white-space: normal;
     line-height: 1.25;
+  }
+}
+
+/* Calendario de temporada */
+body:has(.season-calendar-page) .bg-orb {
+  display: none;
+}
+
+body:has(.season-calendar-page)::before {
+  opacity: 0.08;
+}
+
+.season-calendar-page,
+.season-calendar-admin {
+  min-width: 0;
+}
+
+.season-calendar-page {
+  isolation: isolate;
+}
+
+.season-calendar-page .watching-header {
+  padding: 2rem 0 1.5rem;
+}
+
+.season-calendar-toolbar,
+.season-sync-panel,
+.season-admin-seasons,
+.season-admin-content {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: #10151d;
+}
+
+.season-calendar-toolbar {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  border: 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 1.25rem;
+}
+
+.season-calendar-week-nav,
+.season-calendar-filters,
+.season-calendar-preferences,
+.season-sync-controls,
+.season-admin-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.season-calendar-preferences {
+  min-width: 0;
+}
+
+.season-calendar-toggles {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.season-calendar-week-nav strong {
+  color: #dbe5f3;
+  font-size: 0.9rem;
+}
+
+.season-calendar-week-nav {
+  padding-bottom: 0.1rem;
+}
+
+.season-calendar-filters {
+  display: grid;
+  grid-template-columns: minmax(190px, 260px) minmax(220px, 1fr);
+  gap: 0.8rem;
+}
+
+.season-calendar-search,
+.season-calendar-season-field {
+  display: grid;
+  gap: 0.35rem;
+  color: #b6c2d2;
+  font-size: 0.78rem;
+}
+
+.season-calendar-search input {
+  min-height: 42px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 10px;
+  background: #0b1017;
+  color: #eef4fb;
+  padding: 0 0.75rem;
+}
+
+.season-calendar-season-field .filter-select-label {
+  display: none;
+}
+
+.season-calendar-season-field .filter-select-button {
+  min-height: 42px;
+}
+
+.season-calendar-timezone {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 300px);
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  color: #aab7ca;
+}
+
+.season-calendar-timezone .filter-select {
+  min-width: 0;
+}
+
+.season-calendar-timezone .filter-select-button {
+  min-height: 42px;
+  background: #0b1017;
+}
+
+.season-calendar-timezone .filter-select-menu {
+  min-width: min(360px, calc(100vw - 2rem));
+}
+
+.season-calendar-toggle {
+  min-height: 38px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 9px;
+  background: #0c1118;
+  color: #b6c2d2;
+  padding: 0 0.85rem;
+  cursor: pointer;
+}
+
+.season-calendar-toggle.is-active {
+  border-color: rgba(139, 92, 246, 0.65);
+  background: rgba(124, 58, 237, 0.18);
+  color: #f2edff;
+}
+
+.season-calendar-week {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.season-calendar-day {
+  min-width: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  padding-left: 0.9rem;
+}
+
+.season-calendar-day.is-today {
+  border-left-color: #a78bfa;
+  box-shadow: none;
+}
+
+.season-calendar-day > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: transparent;
+  color: #e7edf7;
+  padding: 0 0 0.65rem;
+}
+
+.season-calendar-day > header > div {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.season-calendar-day > header span {
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.season-calendar-day > header small {
+  color: #c4b5fd;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.season-calendar-day > header strong {
+  color: #aebbd0;
+  font-size: 0.78rem;
+}
+
+.season-calendar-day-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  padding: 0.8rem 0 0;
+}
+
+.season-airing-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  min-height: 168px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: #121923;
+  padding: 0.9rem;
+}
+
+
+.season-airing-poster-button {
+  all: unset;
+  position: relative;
+  display: block;
+  cursor: pointer;
+  border-radius: 9px;
+}
+
+.season-airing-poster-button:focus-visible {
+  outline: 2px solid rgba(167, 139, 250, 0.6);
+  outline-offset: 2px;
+}
+
+.season-airing-poster-button:hover img {
+  filter: brightness(0.82);
+}
+
+.season-airing-poster-hint {
+  position: absolute;
+  bottom: 0.4rem;
+  right: 0.4rem;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(8, 11, 16, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.season-airing-poster-button:hover .season-airing-poster-hint,
+.season-airing-poster-button:focus-visible .season-airing-poster-hint {
+  background: rgba(124, 58, 237, 0.85);
+  border-color: rgba(196, 181, 253, 0.7);
+}
+
+.season-airing-favorite {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(11, 16, 23, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #eef4fb;
+  cursor: pointer;
+}
+
+.season-airing-favorite svg {
+  width: 18px;
+  height: 18px;
+}
+
+.season-airing-favorite:hover,
+.season-airing-favorite:focus-visible {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: rgba(167, 139, 250, 0.22);
+  outline: none;
+}
+
+.season-airing-favorite.is-active {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #fff;
+}
+
+.season-airing-favorite.is-active svg {
+  fill: currentColor;
+}
+
+.season-airing-card img,
+.season-airing-placeholder {
+  width: auto;
+  height: 100%;
+  max-width: 168px;
+  aspect-ratio: 2 / 3;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #1a2230;
+}
+
+.season-airing-placeholder {
+  display: grid;
+  place-items: center;
+  color: #8c9bb1;
+}
+
+.season-airing-card-body {
+  display: grid;
+  align-content: start;
+  gap: 0.32rem;
+  min-width: 0;
+  padding-right: 2.6rem;
+}
+
+.season-airing-card time {
+  color: #b99cff;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.season-airing-card strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #f0f4fa;
+  font-size: 1.06rem;
+  line-height: 1.32;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.season-airing-card span,
+.season-calendar-empty-day {
+  color: #aab7ca;
+  font-size: 0.88rem;
+}
+
+.season-airing-card .season-airing-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  width: max-content;
+  color: #aab7ca;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.season-airing-status-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #94a3b8;
+  flex: none;
+}
+
+.season-airing-card .season-airing-status.is-retrasado .season-airing-status-dot,
+.season-airing-card .season-airing-status.is-cancelado .season-airing-status-dot {
+  background: #fdba74;
+}
+
+.season-airing-card .season-airing-status.is-en-emisión .season-airing-status-dot {
+  background: #6ee7b7;
+}
+
+.season-airing-card .season-airing-status.is-próximo .season-airing-status-dot {
+  background: #fcd34d;
+}
+
+.season-airing-card .season-airing-status.is-emitido .season-airing-status-dot {
+  background: #67e8f9;
+}
+
+.season-airing-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.1rem;
+}
+
+/* Especificidad duplicada a propósito: estos chips se usan tanto dentro de `.season-airing-card`
+   como en `SeasonalAnimeDetailModal` (fuera de la card), y deben ganarle a `.season-airing-card span`
+   sin depender de en qué contenedor estén. */
+.season-airing-platform.season-airing-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.36rem;
+  color: var(--platform-color, #cdd6e3);
+  border: 1px solid color-mix(in srgb, var(--platform-color, #94a3b8) 50%, rgba(148, 163, 184, 0.22));
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem 0.32rem 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--platform-color, #94a3b8) 16%, transparent);
+}
+
+a.season-airing-platform.season-airing-platform:hover {
+  border-color: color-mix(in srgb, var(--platform-color, #94a3b8) 75%, transparent);
+  background: color-mix(in srgb, var(--platform-color, #94a3b8) 24%, transparent);
+}
+
+.season-airing-platform-badge.season-airing-platform-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--platform-color, #94a3b8);
+  color: var(--platform-foreground, #0b1017);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  flex: none;
+}
+
+.season-airing-platform-badge.season-airing-platform-badge svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+.season-airing-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.35rem;
+}
+
+.season-calendar-summary {
+  flex: 1 1 100%;
+  margin-left: 0;
+  color: #aab7ca;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.season-calendar-empty-day {
+  grid-column: 1 / -1;
+  border: 1px dashed rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  padding: 1rem;
+  text-align: center;
+}
+
+.season-calendar-summary strong {
+  color: #e4eaf2;
+}
+
+.season-calendar-view-switch-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.season-calendar-week-empty {
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  min-height: 220px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: #0f141c;
+  color: #aab7ca;
+  padding: 2rem;
+  text-align: center;
+}
+
+.season-calendar-week-empty strong {
+  color: #dce3ed;
+}
+
+.season-calendar-week-empty > div {
+  display: flex;
+  justify-content: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.season-sync-panel,
+.season-admin-seasons,
+.season-admin-content {
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.season-sync-controls > .filter-select {
+  min-width: 180px;
+}
+
+.season-sync-preview {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(90px, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.season-sync-preview > div {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  background: #0b1017;
+  padding: 0.7rem;
+}
+
+.season-sync-preview span,
+.season-admin-seasons small,
+.season-admin-heading p,
+.season-admin-anime-info span {
+  color: #aab7ca;
+  font-size: 0.76rem;
+}
+
+.season-sync-preview strong {
+  color: #f0f4fa;
+  font-size: 1.1rem;
+}
+
+.season-sync-preview > button {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.season-admin-seasons > div {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.season-admin-season {
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: #0b1017;
+  color: #dce5f1;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+}
+
+.season-admin-season.is-selected {
+  border-color: rgba(139, 92, 246, 0.64);
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.season-admin-heading {
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.season-admin-heading h2,
+.season-admin-heading p {
+  margin: 0;
+}
+
+.season-admin-anime-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.season-admin-anime {
+  display: grid;
+  grid-template-columns: 52px minmax(180px, 1fr) auto minmax(260px, 1.5fr);
+  gap: 0.75rem;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 11px;
+  background: #0d131b;
+  padding: 0.65rem;
+}
+
+.season-admin-anime > img {
+  width: 52px;
+  height: 70px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.season-admin-anime-info {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.season-admin-anime-info strong {
+  color: #eef3fa;
+}
+
+.season-admin-anime-info small {
+  display: inline-block;
+  margin-right: 0.35rem;
+  border-radius: 999px;
+  background: #202938;
+  color: #c5d0df;
+  padding: 0.15rem 0.45rem;
+}
+
+.season-admin-airings {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding-bottom: 0.2rem;
+}
+
+.season-admin-airings button {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.15rem 0.4rem;
+  flex: 0 0 auto;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: #151c27;
+  color: #dce5f1;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+}
+
+.season-admin-airings time {
+  grid-column: 1 / -1;
+  color: #9eacc0;
+  font-size: 0.68rem;
+}
+
+.season-anime-detail-modal .modal-close-button {
+  background: rgba(8, 11, 16, 0.75);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #ffffff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+}
+
+.season-anime-detail-modal .modal-close-button:hover,
+.season-anime-detail-modal .modal-close-button:focus-visible {
+  background: rgba(124, 58, 237, 0.85);
+  border-color: rgba(196, 181, 253, 0.7);
+  color: #ffffff;
+}
+
+.season-anime-detail-modal {
+  background: #0f131b;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 640px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 0;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.46);
+}
+
+.season-anime-detail-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #05070c;
+}
+
+.season-anime-detail-hero iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.season-anime-detail-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.season-anime-detail-no-trailer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: linear-gradient(180deg, rgba(5, 7, 12, 0.4), rgba(5, 7, 12, 0.88));
+  color: #eef4fb;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.season-anime-detail-body {
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.4rem 1.6rem 1.7rem;
+}
+
+.season-anime-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-right: 2.4rem;
+}
+
+.season-anime-detail-heading h2 {
+  margin: 0;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1.3rem;
+  line-height: 1.28;
+  color: #f0f4fa;
+}
+
+.season-anime-detail-heading .season-airing-favorite {
+  position: static;
+  flex: none;
+}
+
+.season-anime-detail-meta {
+  margin: 0;
+  color: #aab7ca;
+  font-size: 0.86rem;
+}
+
+.season-anime-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.season-anime-detail-tag {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #cdd6e3;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.7rem;
+}
+
+.season-anime-detail-description {
+  margin: 0;
+  color: #b6c2d2;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.season-anime-detail-description.is-clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.season-anime-detail-description-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--purple-light);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 0.35rem;
+  padding: 0;
+}
+
+.season-anime-detail-description-toggle:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.season-anime-detail-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+@media (max-width: 600px) {
+  .season-anime-detail-body {
+    padding: 1.1rem 1.15rem 1.4rem;
+  }
+
+  .season-anime-detail-heading h2 {
+    font-size: 1.14rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .season-calendar-day-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .season-calendar-filters,
+  .season-sync-preview {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .season-admin-anime {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+  }
+
+  .season-admin-airings {
+    grid-column: 1 / -1;
+  }
+
+  .season-calendar-toggles {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .season-calendar-filters,
+  .season-sync-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .season-calendar-week-nav > strong,
+  .season-calendar-timezone {
+    width: 100%;
+  }
+
+  .season-calendar-page .watching-header {
+    padding: 1.5rem 0 1.25rem;
+  }
+
+  .season-calendar-week-nav > button {
+    flex: 1;
+  }
+
+  .season-calendar-timezone {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .season-calendar-timezone .filter-select {
+    width: 100%;
+  }
+
+  .season-calendar-toggle,
+  .season-sync-controls > *,
+  .season-sync-preview > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .season-calendar-summary {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+
+  .season-calendar-day {
+    padding-left: 0.6rem;
+  }
+
+  .season-airing-card {
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
+    min-height: 0;
+    padding: 0.75rem;
+  }
+
+  .season-airing-card img,
+  .season-airing-placeholder {
+    width: 100%;
+    height: 170px;
+    max-width: none;
+    aspect-ratio: auto;
+    object-position: center 22%;
+  }
+
+  .season-airing-card-body {
+    padding-right: 0;
+  }
+
+  .season-calendar-week-empty > div {
+    width: 100%;
+  }
+
+  .season-calendar-week-empty button {
+    width: 100%;
+    justify-content: center;
   }
 }
 

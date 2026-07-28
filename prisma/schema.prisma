@@ -400,6 +400,7 @@ model PlatformUser {
   supportTicketMessages SupportTicketMessage[]
   authIdentities PlatformAuthIdentity[]
   identityLinkAttempts PlatformIdentityLinkAttempt[]
+  seasonalAnimeFavorites PlatformUserSeasonalAnimeFavorite[]
 
   @@index([roleId])
   @@index([isActive])
@@ -634,6 +635,115 @@ model AnimeRating {
   @@unique([userId, animeId])
   @@index([userId])
   @@index([animeId])
+}
+
+model AnimeSeason {
+  id             Int               @id @default(autoincrement())
+  year           Int
+  season         String
+  status         String            @default("draft")
+  lastSyncedAt   DateTime?
+  lastSyncStatus String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  animes         SeasonalAnime[]
+  syncs          SeasonalAnimeSync[]
+
+  @@unique([year, season])
+  @@index([status])
+  @@index([year, season])
+}
+
+model SeasonalAnime {
+  id                    Int                    @id @default(autoincrement())
+  seasonId              Int
+  aniListId             Int
+  animeScheduleRoute    String?
+  titleRomaji           String
+  titleEnglish          String?
+  titleNative           String?
+  description           String?
+  imageUrl              String?
+  format                String?
+  episodes              Int?
+  status                String?
+  aniListUrl            String?
+  trailerSite           String?
+  trailerId             String?
+  tags                  Json?
+  isAdult               Boolean                @default(false)
+  isDonghua             Boolean                @default(false)
+  sourceVisible         Boolean                @default(true)
+  manualTitle           String?
+  manualVisible         Boolean?
+  sourceUpdatedAt       DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  season                AnimeSeason            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  airings               SeasonalAnimeAiring[]
+
+  @@unique([seasonId, aniListId])
+  @@index([seasonId])
+  @@index([aniListId])
+  @@index([isAdult])
+  @@index([isDonghua])
+}
+
+model SeasonalAnimeAiring {
+  id                    Int             @id @default(autoincrement())
+  seasonalAnimeId       Int
+  sourceKey             String
+  episode               Int
+  sourceAiringAt        DateTime
+  sourceStatus          String          @default("scheduled")
+  sourcePlatforms       Json?
+  manualAiringAt        DateTime?
+  manualEpisode         Int?
+  manualStatus          String?
+  manualPlatform        String?
+  manualStreamingUrl    String?
+  manualVisible         Boolean?
+  sourceUpdatedAt       DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  anime                 SeasonalAnime   @relation(fields: [seasonalAnimeId], references: [id], onDelete: Cascade)
+
+  @@unique([seasonalAnimeId, sourceKey])
+  @@index([seasonalAnimeId])
+  @@index([sourceAiringAt])
+  @@index([sourceStatus])
+}
+
+model SeasonalAnimeSync {
+  id             Int         @id @default(autoincrement())
+  seasonId       Int
+  status         String
+  source         String      @default("animeschedule+anilist")
+  startedAt      DateTime    @default(now())
+  completedAt    DateTime?
+  summary        Json?
+  errorMessage   String?
+
+  season         AnimeSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@index([seasonId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model PlatformUserSeasonalAnimeFavorite {
+  id        Int          @id @default(autoincrement())
+  userId    Int
+  aniListId Int
+  createdAt DateTime     @default(now())
+
+  user      PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, aniListId])
+  @@index([userId])
 }
 
 model AuditLog {

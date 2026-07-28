@@ -63,6 +63,13 @@ const AUTH_ITEMS = [
 
 const ANIME_ITEMS = [
   {
+    key: "animeSeasonCalendar",
+    href: "/biblioteca-anime/calendario",
+    label: "Calendario de temporada",
+    icon: CalendarDays,
+    permission: "anime.calendar.view",
+  },
+  {
     key: "animeLibraryTracking",
     href: "/biblioteca-anime/viendo",
     label: "Viendo",
@@ -152,6 +159,14 @@ const ADMIN_TREE_ITEMS = [
     label: "Biblioteca de anime",
     icon: Library,
     children: [
+      {
+        key: "platformAnimeSeasonCalendar",
+        href: "/administracion/biblioteca-anime/calendario",
+        label: "Calendario de temporada",
+        icon: CalendarDays,
+        permission: "admin.anime.calendar.view",
+        manageFlag: "animeCalendar",
+      },
       {
         key: "platformAnimeTracking",
         href: "/administracion/biblioteca-anime/viendo",
@@ -344,6 +359,7 @@ export default function AppSidebar({
   canManageSpaceDrum = false,
   canManageAnimeTracking = false,
   canManageAnimeCompleted = false,
+  canManageAnimeCalendar = false,
   isAuthenticated = false,
   canAccess = () => true,
   onSelect,
@@ -357,6 +373,7 @@ export default function AppSidebar({
   const readingItems = READING_ITEMS.filter((item) => !item.isFuture && canAccess(item.permission));
   const adminItems = filterTreeItems(ADMIN_TREE_ITEMS, canAccess, {
     animeCompleted: canManageAnimeCompleted,
+    animeCalendar: canManageAnimeCalendar,
     animeTracking: canManageAnimeTracking,
     roles: canManageRoles,
     spaceDrum: canManageSpaceDrum,

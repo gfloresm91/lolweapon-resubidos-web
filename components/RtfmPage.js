@@ -141,6 +141,7 @@ const navigationTree = [
     title: "Biblioteca de anime",
     icon: Library,
     children: [
+      { title: "Calendario de temporada", href: "/biblioteca-anime/calendario", permission: "anime.calendar.view", icon: CalendarDays },
       { title: "Viendo", href: "/biblioteca-anime/viendo", permission: "anime.tracking.view", icon: CircleDot },
       { title: "Terminados", href: "/biblioteca-anime/terminados", permission: "anime.completed.view", icon: CheckCircle2 },
       { title: "Mi lista anime", href: "/mi-lista/anime", permission: "anime.tracking.view", authRequired: true, icon: Bookmark },
@@ -169,6 +170,7 @@ const navigationTree = [
         icon: Library,
         adminArea: true,
         children: [
+          { title: "Calendario de temporada", href: "/administracion/biblioteca-anime/calendario", permission: "admin.anime.calendar.view", adminArea: true, icon: CalendarDays },
           { title: "Viendo", href: "/administracion/biblioteca-anime/viendo", permission: "admin.anime.tracking.view", adminArea: true, icon: CircleDot },
           { title: "Terminados", href: "/administracion/biblioteca-anime/terminados", permission: "admin.anime.completed.view", adminArea: true, icon: Library },
         ],

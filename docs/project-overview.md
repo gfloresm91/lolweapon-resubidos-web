@@ -79,6 +79,27 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 
 **Datos obtenidos:** título (romaji, english, native), descripción, formato (TV/Movie/OVA…), estado de emisión, episodios, año, imagen de portada, URL de AniList.
 
+### Calendario de temporada
+
+El calendario semanal combina dos fuentes:
+
+- AnimeSchedule v3 entrega emisiones subtituladas concretas, retrasos, plataformas y enlaces.
+- AniList completa títulos, portada, descripción, formato, episodios, contenido adulto, país de origen, trailer y tags (filtrados de spoilers, top 8 por rank).
+
+La sincronización se ejecuta manualmente desde Administración, muestra una previsualización antes de aplicar y conserva los overrides editoriales. Los horarios se almacenan en UTC y el navegador los presenta en la zona horaria detectada o elegida por el usuario.
+
+Cada card de emisión tiene un botón de favorito (marcador) en la esquina superior derecha. Requiere sesión (toast con acción "Iniciar sesión" para invitados, sin redirección inmediata) y persiste en `PlatformUserSeasonalAnimeFavorite` por `aniListId`. La vista de filtro "todos / solo favoritos" queda pendiente en `docs/backlog.md`.
+
+El poster de cada card abre `SeasonalAnimeDetailModal`: trailer embebido de YouTube/Dailymotion (o el poster con "Sin trailer disponible" si no hay), título, formato/episodios/estado, tags, sinopsis con "Ver más", plataformas de streaming, link a AniList y el botón de favorito. Los chips de plataforma/AniList se comparten entre la card y el modal vía `components/SeasonalAnimePlatformChip.js` y `lib/animeCalendarPlatforms.js`.
+
+Variables:
+
+```env
+ANIME_SCHEDULE_API_TOKEN=
+ANIME_SCHEDULE_API_BASE_URL=https://animeschedule.net/api/v3
+NEXT_PUBLIC_ANIME_CALENDAR_DEFAULT_TIME_ZONE=America/Santiago
+```
+
 ---
 
 ## Modelos de datos (Prisma)
@@ -94,6 +115,11 @@ YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS
 | `AnimeFormat` | TV, Movie, OVA, etc. |
 | `AnimeReleaseStatus` | Finished, Airing, etc. |
 | `AnimeWatchStatus` | pending, tracking, completed, paused, purchased, dropped |
+| `AnimeSeason` | Temporada importada, estado activo/borrador/archivado y última sincronización |
+| `SeasonalAnime` | Snapshot de metadata AniList por temporada (incluye trailer y tags) y overrides editoriales |
+| `SeasonalAnimeAiring` | Emisión subtitulada concreta, horario UTC, plataforma y overrides |
+| `SeasonalAnimeSync` | Historial técnico de sincronizaciones remotas |
+| `PlatformUserSeasonalAnimeFavorite` | Animes de temporada marcados como favoritos por usuario, referenciados por `aniListId` (estable entre temporadas) |
 
 ### Directos
 
@@ -244,6 +270,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Biblioteca de anime: Viendo | `anime.tracking.view/create/update/delete`, `anime.tracking.form.full/compact` |
 | Biblioteca de anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
 | Biblioteca de anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
+| Biblioteca de anime: Calendario | `anime.calendar.view` |
 | Lecturas: SpaceDrum | `spacedrum.view` |
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
@@ -253,6 +280,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
 | Administración: Anime Viendo | `admin.anime.tracking.view` |
 | Administración: Anime Terminados | `admin.anime.completed.view` |
+| Administración: Calendario de anime | `admin.anime.calendar.view/sync/update` |
 
 ---
 
@@ -273,6 +301,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/rastreador/calendario` | Calendario histórico de directos por año, mes y día. Controlado por permiso `tracker.calendar.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación y administración. |
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
+| `/biblioteca-anime/calendario` | Calendario semanal de emisiones subtituladas en la zona horaria del usuario |
 | `/biblioteca-anime/terminados` | Anime terminado, pausado, pendiente o dropeado |
 | `/mi-lista` | Lista personal del usuario (guardados, vistos, favoritos) |
 | `/spacedrum` | Lector bilingüe de SpaceDrum, controlado por permiso `spacedrum.view` |
@@ -280,6 +309,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/registro` | Registro de usuario |
 | `/perfil` | Perfil del usuario (avatar, datos) |
 | `/administracion/...` | Panel de administración |
+| `/administracion/biblioteca-anime/calendario` | Sincronización y overrides del Calendario de temporada |
 | `/administracion/notificaciones` | Mantenedor de notificaciones manuales y automáticas, protegido por permisos `admin.notifications.*` |
 | `/administracion/tickets` | Mantenedor administrativo de sugerencias/reclamos, protegido por `admin.tickets.view` |
 | `/administracion/tickets/[id]` | Conversación administrativa del ticket, permite responder con `admin.tickets.update` |
@@ -312,6 +342,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/admin/tracker/spreadsheet/import` | POST | Previsualiza o aplica una actualización masiva XLSX con control de versión, validación integral y auditoría; requiere `tracker.import` |
 | `/api/live-activity` | GET/POST | Actividad del usuario en directos |
 | `/api/anime-library` | GET/POST | Biblioteca de anime (CRUD) |
+| `/api/anime-calendar` | GET/POST | Temporadas y emisiones visibles (incluye favoritos del usuario si hay sesión); requiere `anime.calendar.view`. `POST` con `action: "toggle-favorite"` marca/desmarca un anime como favorito, requiere sesión |
+| `/api/admin/anime-calendar` | GET/POST | Previsualización, sincronización, activación y overrides del calendario |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
 | `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. No participa en OAuth ni sincronización de membresías. |
