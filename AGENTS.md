@@ -259,6 +259,14 @@ npm run db:restore
 - La esfera destacada del card muestra la nota del rol con permiso `anime.rating.streamer`.
 - Usuarios sin permiso de calificar pueden ver la nota destacada si existe.
 
+### Calendario De Temporada
+
+- `/biblioteca-anime/calendario` muestra emisiones subtituladas concretas con permiso `anime.calendar.view`.
+- AnimeSchedule es fuente de horarios/plataformas y AniList completa metadata; no mezclar estos snapshots con `Anime`/`AnimeLibraryEntry`.
+- Guardar horarios en UTC y renderizarlos en la zona IANA detectada o elegida por el usuario.
+- Contenido adulto y donghua quedan ocultos por defecto mediante preferencias independientes.
+- La sincronización administrativa previsualiza cambios, conserva overrides, registra `AuditLog` y no elimina registros por una respuesta remota incompleta.
+
 ### Tags
 
 - Tags se agrupan por reglas automáticas y overrides manuales.

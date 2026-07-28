@@ -4,6 +4,17 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
+### ~~Calendario de temporada — vista "Todos / Solo favoritos"~~
+
+- Completado (2026-07-28). Botón de marcador por anime (esquina superior derecha de la card), `PlatformUserSeasonalAnimeFavorite` referenciado por `aniListId`, API `POST /api/anime-calendar` con `action: "toggle-favorite"`, y switch de vista "Temporada" / "Favoritos (N)" reutilizando el pill `tracker-calendar-view-toggle` ya existente. Los toggles Mostrar estándar/adulto/donghua y la búsqueda quedan escopados a la vista activa.
+- Pendiente evaluar si el mantenedor de administración necesita un filtro equivalente (no se pidió).
+
+### Calendario de temporada — modal de detalle (trailer, sinopsis, tags)
+
+- **Qué es:** al hacer click en el poster de una card se abre `SeasonalAnimeDetailModal` con trailer embebido (YouTube/Dailymotion), título, formato/episodios/estado, tags, sinopsis con "Ver más", plataformas de streaming, link a AniList y el botón de favorito. Si no hay trailer, se muestra el poster con overlay "Sin trailer disponible" en el mismo espacio, para que el modal no cambie de forma.
+- **Estado:** implementado (2026-07-28). Schema (`SeasonalAnime.trailerSite`, `trailerId`, `tags`), migración `20260728020000_add_seasonal_anime_trailer_and_tags`, query AniList extendida (`trailer`, `tags` filtrados de spoilers y limitados a 8 por rank).
+- **Pendiente operativo:** los animes ya sincronizados no tienen trailer ni tags todavía — hay que correr "Aplicar sincronización" de nuevo desde `/administracion/biblioteca-anime/calendario` para backfillear la temporada activa.
+
 ### Feature: Google/YouTube y cuentas conectadas
 
 - **Estado:** implementada en `feature/auth-identities` (2026-07-04); pendiente configuración OAuth, migración y pruebas reales en QA.

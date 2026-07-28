@@ -23,6 +23,7 @@ import RtfmPage from "@/components/RtfmPage";
 import PlatformNotificationsPage from "@/components/PlatformNotificationsPage";
 import PlatformTicketsPage from "@/components/PlatformTicketsPage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
+import PlatformSeasonalAnimeCalendarPage from "@/components/PlatformSeasonalAnimeCalendarPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
 import PlatformSpaceDrumPagesPage from "@/components/PlatformSpaceDrumPagesPage";
@@ -36,6 +37,7 @@ import TagPanel from "@/components/TagPanel";
 import TrackerMaintainerModal from "@/components/TrackerMaintainerModal";
 import TrackerCalendarPage from "@/components/TrackerCalendarPage";
 import SpaceDrumPage from "@/components/SpaceDrumPage";
+import SeasonalAnimeCalendarPage from "@/components/SeasonalAnimeCalendarPage";
 import { LIVE_STATUS_OPTIONS, normalizeCatalogCode } from "@/lib/animeDbMapping";
 import { formatPlatformDateTime } from "@/lib/dateTime";
 import { normalizeTag } from "@/lib/tags";
@@ -121,6 +123,7 @@ const VIEW_LABELS = {
   myAnimeList: "Mi lista anime",
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Animes terminados",
+  animeSeasonCalendar: "Calendario de temporada",
   platformTracker: "Mantenedor Rastreador",
   platformTags: "Mantenedor Tags",
   platformSpaceDrumChapters: "Mantenedor SpaceDrum",
@@ -129,6 +132,7 @@ const VIEW_LABELS = {
   platformSpaceDrumImport: "Importación SpaceDrum",
   platformAnimeTracking: "Mantenedor Viendo",
   platformAnimeCompleted: "Mantenedor de animes terminados",
+  platformAnimeSeasonCalendar: "Calendario de temporada",
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   platformNotifications: "Mantenedor Notificaciones",
@@ -151,6 +155,7 @@ const VIEW_SECTIONS = {
   myAnimeList: "Biblioteca de anime",
   animeLibraryTracking: "Biblioteca de anime",
   animeLibraryCompleted: "Biblioteca de anime",
+  animeSeasonCalendar: "Biblioteca de anime",
   spacedrum: "Lecturas",
   platformUsers: "Administración",
   platformRoles: "Administración",
@@ -165,6 +170,7 @@ const VIEW_SECTIONS = {
   platformSpaceDrumImport: "Administración",
   platformAnimeTracking: "Administración",
   platformAnimeCompleted: "Administración",
+  platformAnimeSeasonCalendar: "Administración",
 };
 
 const VIEW_PATHS = {
@@ -180,6 +186,7 @@ const VIEW_PATHS = {
   myAnimeList: "/mi-lista/anime",
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
+  animeSeasonCalendar: "/biblioteca-anime/calendario",
   platformTracker: "/administracion/rastreador",
   platformTags: "/administracion/tags",
   platformSpaceDrumChapters: "/administracion/spacedrum/capitulos",
@@ -188,6 +195,7 @@ const VIEW_PATHS = {
   platformSpaceDrumImport: "/administracion/spacedrum/importacion",
   platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
+  platformAnimeSeasonCalendar: "/administracion/biblioteca-anime/calendario",
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
   platformNotifications: "/administracion/notificaciones",
@@ -344,6 +352,8 @@ export default function HomePage({
   initialLives = EMPTY_LIST,
   initialLiveStatuses = LIVE_STATUS_OPTIONS,
   initialAnimeLibrary = EMPTY_LIST,
+  initialAnimeCalendar = null,
+  initialAnimeCalendarAdmin = null,
   initialPlatformUsers = EMPTY_LIST,
   initialPlatformRoles = EMPTY_LIST,
   initialPlatformPermissions = EMPTY_LIST,
@@ -422,6 +432,9 @@ export default function HomePage({
       : null;
   const canViewTrackingAnimeMaintainer = hasPermission("admin.anime.tracking.view");
   const canViewCompletedAnimeMaintainer = hasPermission("admin.anime.completed.view");
+  const canViewAnimeCalendarMaintainer = hasPermission("admin.anime.calendar.view");
+  const canSyncAnimeCalendar = hasPermission("admin.anime.calendar.sync");
+  const canUpdateAnimeCalendar = hasPermission("admin.anime.calendar.update");
   const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
   const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
   const canViewSpaceDrumChaptersMaintainer = hasPermission("admin.spacedrum.chapters.view");
@@ -449,6 +462,9 @@ export default function HomePage({
   const [animeStreamerRatings, setAnimeStreamerRatings] = useState(initialStreamerRatings || {});
   const [animeUserRatings, setAnimeUserRatings] = useState(initialUserRatings || {});
   const [isAnimeLibraryLoading, setIsAnimeLibraryLoading] = useState(false);
+  const [animeCalendar, setAnimeCalendar] = useState(initialAnimeCalendar);
+  const [animeCalendarAdmin, setAnimeCalendarAdmin] = useState(initialAnimeCalendarAdmin);
+  const [isAnimeCalendarLoading, setIsAnimeCalendarLoading] = useState(false);
   const [spaceDrumData, setSpaceDrumData] = useState(initialSpaceDrum);
   const [spaceDrumProgress, setSpaceDrumProgress] = useState(initialSpaceDrumProgress || EMPTY_OBJECT);
   const [isSpaceDrumLoading, setIsSpaceDrumLoading] = useState(false);
@@ -550,6 +566,14 @@ export default function HomePage({
   useEffect(() => {
     setAnimeLibrary(initialAnimeLibrary);
   }, [initialAnimeLibrary]);
+
+  useEffect(() => {
+    setAnimeCalendar(initialAnimeCalendar);
+  }, [initialAnimeCalendar]);
+
+  useEffect(() => {
+    setAnimeCalendarAdmin(initialAnimeCalendarAdmin);
+  }, [initialAnimeCalendarAdmin]);
 
   useEffect(() => {
     setAnimeStreamerRatings(initialStreamerRatings || EMPTY_OBJECT);
@@ -1022,6 +1046,38 @@ export default function HomePage({
   }, [currentView, currentUser?.id]);
 
   useEffect(() => {
+    if (currentView !== "animeSeasonCalendar" || animeCalendar) return undefined;
+    let isMounted = true;
+    setIsAnimeCalendarLoading(true);
+    fetch("/api/anime-calendar", { cache: "no-store" })
+      .then(readJsonResponse)
+      .then((payload) => {
+        if (isMounted) setAnimeCalendar(payload);
+      })
+      .catch(() => {
+        if (isMounted) toast.error("No se pudo cargar el Calendario de temporada.");
+      })
+      .finally(() => {
+        if (isMounted) setIsAnimeCalendarLoading(false);
+      });
+    return () => { isMounted = false; };
+  }, [animeCalendar, currentView]);
+
+  useEffect(() => {
+    if (currentView !== "platformAnimeSeasonCalendar" || animeCalendarAdmin || !canViewAnimeCalendarMaintainer) return undefined;
+    let isMounted = true;
+    fetch("/api/admin/anime-calendar", { cache: "no-store" })
+      .then(readJsonResponse)
+      .then((payload) => {
+        if (isMounted) setAnimeCalendarAdmin(payload);
+      })
+      .catch(() => {
+        if (isMounted) toast.error("No se pudo cargar la administración del calendario.");
+      });
+    return () => { isMounted = false; };
+  }, [animeCalendarAdmin, canViewAnimeCalendarMaintainer, currentView]);
+
+  useEffect(() => {
     if (skipVisibleResetRef.current[currentView]) {
       skipVisibleResetRef.current[currentView] = false;
       return;
@@ -1454,6 +1510,8 @@ export default function HomePage({
       myAnimeList: "anime.tracking.view",
       animeLibraryTracking: "anime.tracking.view",
       animeLibraryCompleted: "anime.completed.view",
+      animeSeasonCalendar: "anime.calendar.view",
+      platformAnimeSeasonCalendar: "admin.anime.calendar.view",
       platformAnimeTracking: "admin.anime.tracking.view",
       platformAnimeCompleted: "admin.anime.completed.view",
       platformTracker: "admin.tracker.view",
@@ -1572,6 +1630,7 @@ export default function HomePage({
           canManageSpaceDrum={canManageSpaceDrum}
           canManageAnimeTracking={canManageTrackingAnime}
           canManageAnimeCompleted={canManageCompletedAnime}
+          canManageAnimeCalendar={canViewAnimeCalendarMaintainer}
           isAuthenticated={isAuthenticated}
           canAccess={hasPermission}
           onSelect={selectView}
@@ -1967,6 +2026,10 @@ export default function HomePage({
               />
             ) : null}
 
+            {currentView === "animeSeasonCalendar" && hasPermission("anime.calendar.view") ? (
+              <SeasonalAnimeCalendarPage initialResult={animeCalendar} isLoading={isAnimeCalendarLoading} isAuthenticated={isAuthenticated} />
+            ) : null}
+
             {currentView === "animeLibraryCompleted" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
@@ -2120,6 +2183,14 @@ export default function HomePage({
                 formVariant="full"
                 mode="active"
                 onAnimesChange={setAnimeLibrary}
+              />
+            ) : null}
+
+            {currentView === "platformAnimeSeasonCalendar" && canViewAnimeCalendarMaintainer ? (
+              <PlatformSeasonalAnimeCalendarPage
+                initialResult={animeCalendarAdmin}
+                canSync={canSyncAnimeCalendar}
+                canUpdate={canUpdateAnimeCalendar}
               />
             ) : null}
 

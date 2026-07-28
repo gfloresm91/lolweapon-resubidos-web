@@ -212,6 +212,7 @@ Excepciones documentadas:
 
 - No usar `<select>` nativos en pantallas visibles de la app, porque el menú desplegable lo pinta el sistema operativo/navegador y rompe la línea visual oscura del proyecto.
 - Para filtros de páginas, toolbars y listados usar siempre `FilterSelect`.
+- Para catálogos extensos, `FilterSelect` admite búsqueda interna mediante `searchable`; usar esta variante antes de recurrir a `input + datalist`.
 - Para campos dentro de formularios o modales usar siempre `FormSelect`.
 - Si se necesita un selector nuevo, primero adaptar `FilterSelect` o `FormSelect`; crear una variante nueva solo si el comportamiento no encaja con esos componentes.
 - Caso documentado: en `/changelog`, los filtros `Módulo` y `Tipo` se implementaron inicialmente con `<select>`. Al abrirlos, el dropdown aparecía con estilo nativo claro/gris y no respetaba bordes, contraste ni estados del diseño. Se corrigió reemplazándolos por `FilterSelect` y eliminando el CSS específico del selector nativo.
@@ -304,6 +305,23 @@ Excepciones documentadas:
   - 3-4: regular
   - 5-6: bueno
   - 7-8: excelente
+
+## Calendario De Temporada
+
+- En el menú de Biblioteca de anime, `Calendario de temporada` se ubica antes de `Viendo`; Administración conserva el mismo orden.
+- La semana se presenta como un flujo vertical de lunes a domingo, con un bloque de ancho completo por día; no usar siete columnas paralelas ni scroll horizontal semanal.
+- Desktop muestra las emisiones de cada día en dos columnas de cards horizontales. Tablet y mobile usan una sola columna.
+- Las cards de emisión usan poster vertical amplio a la izquierda, contenido legible a la derecha y títulos limitados a tres líneas.
+- Los horarios se muestran en la zona IANA detectada por el navegador y admiten override local persistente.
+- El selector de zona horaria usa `FilterSelect` buscable e incluye una opción para volver a la detección automática.
+- Contenido adulto y donghua permanecen ocultos por defecto y se activan mediante controles independientes.
+- Los controles indican cuántos animes opcionales existen y el calendario informa emisiones visibles u ocultas por preferencias.
+- Las cards usan superficies sólidas, bordes visibles y sin hover con `transform`.
+- Al cambiar de temporada, ubicar automáticamente una semana relevante para no presentar una grilla vacía fuera de rango.
+- Diferenciar estados vacíos por semana sin emisiones, búsqueda sin resultados y contenido oculto por preferencias.
+- En esta pantalla larga, desactivar orbes ambientales y mantener tipografía secundaria legible.
+- La toolbar se mantiene plana, alineada a la izquierda y separada del contenido mediante espacio o divisor; no encerrar todos los controles en una card grande.
+- La administración siempre previsualiza la sincronización y preserva overrides manuales.
 
 ## Estados Sin Sesión
 

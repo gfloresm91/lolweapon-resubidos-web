@@ -151,6 +151,8 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 
 ## Gotchas conocidos
 
+- **Calendario de temporada** — AnimeSchedule entrega emisiones `sub` y plataformas; AniList completa metadata. Los datos viven en modelos estacionales separados, los horarios se guardan en UTC y las sincronizaciones administrativas deben preservar overrides.
+
 - **Importación XLSX del Rastreador** — `ID_BD` e `ID_INTERNO` son identificadores bloqueados y validados en servidor. La importación exige previsualización, rechaza archivos obsoletos mediante huella de origen y no crea filas nuevas en la primera etapa.
 - **Restore y sesión obsoleta** — `/login` y `/registro` consultan `/api/auth/session`: si la cookie ya no corresponde a `PlatformSession`, se elimina automáticamente; si la BD falla temporalmente, devuelve 503 sin borrar la cookie. DevTools → Application queda como fallback de diagnóstico.
 

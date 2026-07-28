@@ -17,10 +17,25 @@ const MONTH_LABELS = {
   "12": "Diciembre",
 };
 
-export function FilterSelect({ id, label, value, options, onChange, disabled = false, disabledHint = "" }) {
+export function FilterSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  disabled = false,
+  disabledHint = "",
+  searchable = false,
+  searchPlaceholder = "Buscar…",
+}) {
   const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const selectRef = useRef(null);
   const selectedOption = options.find((option) => option.value === value) || options[0];
+  const normalizedQuery = query.trim().toLocaleLowerCase("es");
+  const visibleOptions = normalizedQuery
+    ? options.filter((option) => option.label.toLocaleLowerCase("es").includes(normalizedQuery))
+    : options;
 
   useEffect(() => {
     if (!isOpen) {
@@ -55,6 +70,7 @@ export function FilterSelect({ id, label, value, options, onChange, disabled = f
 
     onChange(nextValue);
     setIsOpen(false);
+    setQuery("");
   }
 
   return (
@@ -68,7 +84,10 @@ export function FilterSelect({ id, label, value, options, onChange, disabled = f
         title={disabledHint}
         onClick={() => {
           if (!disabled) {
-            setIsOpen((current) => !current);
+            setIsOpen((current) => {
+              if (current) setQuery("");
+              return !current;
+            });
           }
         }}
       >
@@ -78,20 +97,36 @@ export function FilterSelect({ id, label, value, options, onChange, disabled = f
       </button>
 
       {isOpen && !disabled ? (
-        <div className="filter-select-menu" role="listbox" aria-label={label}>
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`filter-select-option ${option.value === value ? "is-selected" : ""}`}
-              role="option"
-              aria-selected={option.value === value}
-              onClick={() => selectOption(option.value)}
-            >
-              <span>{option.label}</span>
-              {option.value === value ? <span aria-hidden="true">✓</span> : null}
-            </button>
-          ))}
+        <div className="filter-select-menu">
+          {searchable ? (
+            <div className="filter-select-search">
+              <input
+                autoFocus
+                type="search"
+                value={query}
+                placeholder={searchPlaceholder}
+                aria-label={`Buscar en ${label}`}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => event.stopPropagation()}
+              />
+            </div>
+          ) : null}
+          <div role="listbox" aria-label={label}>
+            {visibleOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`filter-select-option ${option.value === value ? "is-selected" : ""}`}
+                role="option"
+                aria-selected={option.value === value}
+                onClick={() => selectOption(option.value)}
+              >
+                <span>{option.label}</span>
+                {option.value === value ? <span aria-hidden="true">✓</span> : null}
+              </button>
+            ))}
+            {!visibleOptions.length ? <p className="filter-select-empty">Sin coincidencias.</p> : null}
+          </div>
         </div>
       ) : null}
     </div>
