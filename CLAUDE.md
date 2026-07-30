@@ -153,6 +153,8 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 
 - **Calendario de temporada** — AnimeSchedule entrega emisiones `sub` y plataformas; AniList completa metadata. Los datos viven en modelos estacionales separados, los horarios se guardan en UTC y las sincronizaciones administrativas deben preservar overrides.
 
+- **Tier List de temporada** — `AnimeTierListEntry`/`AnimeTierListTheme` son independientes de `SeasonalAnime` (solo comparten `AnimeSeason`); Animes sincroniza directo desde AniList (sin AnimeSchedule) y Openings/Endings desde AnimeThemes.moe, dependiendo de que Animes ya esté sincronizado. A diferencia del Calendario, `anime.tierlist.*.view` sí se asigna a `invitado` por defecto (pueden armar el tablero sin guardar) y ambos mantenedores admin tienen CRUD completo con soft-delete, no solo overrides. Un item ya rankeado que se oculte/elimine se mantiene marcado en el tablero guardado del usuario.
+
 - **Importación XLSX del Rastreador** — `ID_BD` e `ID_INTERNO` son identificadores bloqueados y validados en servidor. La importación exige previsualización, rechaza archivos obsoletos mediante huella de origen y no crea filas nuevas en la primera etapa.
 - **Restore y sesión obsoleta** — `/login` y `/registro` consultan `/api/auth/session`: si la cookie ya no corresponde a `PlatformSession`, se elimina automáticamente; si la BD falla temporalmente, devuelve 503 sin borrar la cookie. DevTools → Application queda como fallback de diagnóstico.
 

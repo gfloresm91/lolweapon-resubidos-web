@@ -323,6 +323,26 @@ Excepciones documentadas:
 - La toolbar se mantiene plana, alineada a la izquierda y separada del contenido mediante espacio o divisor; no encerrar todos los controles en una card grande.
 - La administración siempre previsualiza la sincronización y preserva overrides manuales.
 
+## Tier List De Temporada
+
+- En el menú, `Tier List: Animes` y `Tier List: Openings/Endings` van justo después de `Calendario de temporada` (son herramientas de temporada, no de seguimiento personal como Viendo/Terminados).
+- La toolbar sigue el mismo patrón plano que Calendario de temporada (`season-calendar-toolbar`/`season-calendar-toggles`/`season-calendar-summary` reutilizados): sin card envolvente, separada del contenido con un borde inferior.
+- El selector de temporada usa etiquetas en español (`Verano 2026`, `· activa` si corresponde), igual que Calendario.
+- Los toggles de contenido (`Estándar`, `Adulto`, `Donghua`, más `Sin versión limpia` en Openings/Endings) usan la misma lógica de tres categorías mutuamente excluyentes que Calendario (estándar/adulto/donghua) más un eje independiente de spoiler; cada toggle muestra el conteo entre paréntesis y un resumen debajo indica cuántos items quedan ocultos por preferencias.
+- El área de drop de cada fila usa una estrategia de colisión `pointerWithin` con fallback a `rectIntersection` (no `closestCenter`), para que toda la fila —no solo el área cercana a una card existente— cuente como zona válida al soltar.
+- Cada fila (tier) usa una etiqueta de color sólido a la izquierda (click para renombrar inline) y un área de drop a la derecha con las cards en grid wrap; sin `transform` en hover, coherente con el resto del proyecto. Una fila vacía se muestra compacta con un hint discreto ("Arrastra aquí tus animes") en vez de un bloque de color grande y vacío.
+- Color de fila: modal dedicado con paleta de 10 swatches predefinidos para elegir rápido, más un selector de color libre (`<input type="color">` + campo hex) para no limitar la personalización. El trigger en la fila es solo un punto de color dentro de un `icon-tool-button` estándar; el picker nativo queda contenido dentro del modal, no expuesto como dropdown inline.
+- Paleta por defecto (S/A/B/C/D/F) y los 10 presets del modal usan tonos desaturados (no colores puros) para reducir fatiga visual sobre fondo oscuro, siguiendo el criterio de "Confort Visual En Temas Oscuros".
+- Cards: poster grande (no miniatura) + título truncado a dos líneas con contraste medio-alto. En Openings/Endings además llevan un badge numerado (secuencia del tema) en la esquina superior derecha — es funcional, no decorativo, así que no choca con la regla de "sin píldoras sobre el título". El badge solo aparece si el anime tiene más de un tema del mismo tipo (OP/ED); con una sola parte se omite tanto en la card como en el título del modal.
+- El ícono de play sobre la card solo aparece en `:hover`/`:focus-within`, centrado y grande sobre el poster (no una miniatura fija en la esquina).
+- El modal de reproducción muestra el nombre del tema con un ícono de nota musical en vez de texto plano, y soporta tanto video directo como embeds de YouTube/Drive. Si el tema tiene un video alternativo configurado, aparece un pill "Video original"/"Video alternativo" (mismo patrón visual que el toggle Openings/Endings) para elegir; por defecto siempre se reproduce el de la API.
+- Un item oculto por administración pero ya rankeado se muestra con overlay "Oculto por administración" en vez de desaparecer del tablero guardado.
+- Fila "Sin rankear" usa borde punteado para diferenciarse visualmente de los tiers, tiene contador de items y un buscador para localizar un anime en listas grandes.
+- Sin botón de guardar explícito: autosave con debounce. Arrastrar un anime a una fila nunca dispara un toast; el único toast de operación de tablero por ahora es al crear una fila nueva. Un indicador de texto discreto (`Guardando...` / `Guardado`) en la toolbar reemplaza al toast para el resto del ciclo de autosave.
+- El drag & drop soporta teclado (`KeyboardSensor` de dnd-kit) además de mouse/touch, y las transiciones respetan `prefers-reduced-motion`.
+- La exportación a imagen incluye solo las filas rankeadas, no el pool de "Sin rankear" (para no generar una imagen dominada por contenido sin rankear).
+- La página pública compartida (`/biblioteca-anime/tier-list/compartido/[shareToken]`) es de solo lectura, sin drag & drop ni acciones de edición.
+
 ## Estados Sin Sesión
 
 - Botones que requieren sesión se pueden mostrar, pero no deben redirigir inmediatamente.

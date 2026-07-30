@@ -86,6 +86,9 @@ export async function POST(request) {
       "anime.tracking.update",
       "anime.completed.create",
       "anime.completed.update",
+      "anime.tierlist.openings.manage",
+      "admin.anime.tierlist.animes.create",
+      "admin.anime.tierlist.openings.create",
     ]);
 
     if (authorization.response) {

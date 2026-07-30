@@ -7,6 +7,8 @@ import { Toaster, toast } from "sonner";
 
 import AccountMenu from "@/components/AccountMenu";
 import AnimeLibraryPage from "@/components/AnimeLibraryPage";
+import AnimeTierListAnimesPage from "@/components/AnimeTierListAnimesPage";
+import AnimeTierListOpeningsPage from "@/components/AnimeTierListOpeningsPage";
 import AppSidebar from "@/components/AppSidebar";
 import AppSidebarShell from "@/components/AppSidebarShell";
 import ChangelogPage from "@/components/ChangelogPage";
@@ -23,6 +25,8 @@ import RtfmPage from "@/components/RtfmPage";
 import PlatformNotificationsPage from "@/components/PlatformNotificationsPage";
 import PlatformTicketsPage from "@/components/PlatformTicketsPage";
 import PlatformAnimeMaintainerPage from "@/components/PlatformAnimeMaintainerPage";
+import PlatformAnimeTierListAnimesPage from "@/components/PlatformAnimeTierListAnimesPage";
+import PlatformAnimeTierListOpeningsPage from "@/components/PlatformAnimeTierListOpeningsPage";
 import PlatformSeasonalAnimeCalendarPage from "@/components/PlatformSeasonalAnimeCalendarPage";
 import PlatformSpaceDrumChaptersPage from "@/components/PlatformSpaceDrumChaptersPage";
 import PlatformSpaceDrumImportPage from "@/components/PlatformSpaceDrumImportPage";
@@ -124,6 +128,8 @@ const VIEW_LABELS = {
   animeLibraryTracking: "Viendo",
   animeLibraryCompleted: "Animes terminados",
   animeSeasonCalendar: "Calendario de temporada",
+  animeTierListAnimes: "Tier List de Animes",
+  animeTierListOpenings: "Tier List de Openings/Endings",
   platformTracker: "Mantenedor Rastreador",
   platformTags: "Mantenedor Tags",
   platformSpaceDrumChapters: "Mantenedor SpaceDrum",
@@ -133,6 +139,8 @@ const VIEW_LABELS = {
   platformAnimeTracking: "Mantenedor Viendo",
   platformAnimeCompleted: "Mantenedor de animes terminados",
   platformAnimeSeasonCalendar: "Calendario de temporada",
+  platformAnimeTierListAnimes: "Mantenedor Tier List de Animes",
+  platformAnimeTierListOpenings: "Mantenedor Openings/Endings",
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   platformNotifications: "Mantenedor Notificaciones",
@@ -156,6 +164,8 @@ const VIEW_SECTIONS = {
   animeLibraryTracking: "Biblioteca de anime",
   animeLibraryCompleted: "Biblioteca de anime",
   animeSeasonCalendar: "Biblioteca de anime",
+  animeTierListAnimes: "Biblioteca de anime",
+  animeTierListOpenings: "Biblioteca de anime",
   spacedrum: "Lecturas",
   platformUsers: "Administración",
   platformRoles: "Administración",
@@ -171,6 +181,8 @@ const VIEW_SECTIONS = {
   platformAnimeTracking: "Administración",
   platformAnimeCompleted: "Administración",
   platformAnimeSeasonCalendar: "Administración",
+  platformAnimeTierListAnimes: "Administración",
+  platformAnimeTierListOpenings: "Administración",
 };
 
 const VIEW_PATHS = {
@@ -187,6 +199,8 @@ const VIEW_PATHS = {
   animeLibraryTracking: "/biblioteca-anime/viendo",
   animeLibraryCompleted: "/biblioteca-anime/terminados",
   animeSeasonCalendar: "/biblioteca-anime/calendario",
+  animeTierListAnimes: "/biblioteca-anime/tier-list/animes",
+  animeTierListOpenings: "/biblioteca-anime/tier-list/openings",
   platformTracker: "/administracion/rastreador",
   platformTags: "/administracion/tags",
   platformSpaceDrumChapters: "/administracion/spacedrum/capitulos",
@@ -196,6 +210,8 @@ const VIEW_PATHS = {
   platformAnimeTracking: "/administracion/biblioteca-anime/viendo",
   platformAnimeCompleted: "/administracion/biblioteca-anime/terminados",
   platformAnimeSeasonCalendar: "/administracion/biblioteca-anime/calendario",
+  platformAnimeTierListAnimes: "/administracion/biblioteca-anime/tier-list-animes",
+  platformAnimeTierListOpenings: "/administracion/biblioteca-anime/openings",
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
   platformNotifications: "/administracion/notificaciones",
@@ -435,6 +451,16 @@ export default function HomePage({
   const canViewAnimeCalendarMaintainer = hasPermission("admin.anime.calendar.view");
   const canSyncAnimeCalendar = hasPermission("admin.anime.calendar.sync");
   const canUpdateAnimeCalendar = hasPermission("admin.anime.calendar.update");
+  const canViewAnimeTierListAnimesMaintainer = hasPermission("admin.anime.tierlist.animes.view");
+  const canSyncAnimeTierListAnimes = hasPermission("admin.anime.tierlist.animes.sync");
+  const canCreateAnimeTierListAnimes = hasPermission("admin.anime.tierlist.animes.create");
+  const canUpdateAnimeTierListAnimes = hasPermission("admin.anime.tierlist.animes.update");
+  const canDeleteAnimeTierListAnimes = hasPermission("admin.anime.tierlist.animes.delete");
+  const canViewAnimeTierListOpeningsMaintainer = hasPermission("admin.anime.tierlist.openings.view");
+  const canSyncAnimeTierListOpenings = hasPermission("admin.anime.tierlist.openings.sync");
+  const canCreateAnimeTierListOpenings = hasPermission("admin.anime.tierlist.openings.create");
+  const canUpdateAnimeTierListOpenings = hasPermission("admin.anime.tierlist.openings.update");
+  const canDeleteAnimeTierListOpenings = hasPermission("admin.anime.tierlist.openings.delete");
   const canManageTrackingAnime = canViewTrackingAnimeMaintainer && (canCreateTrackingAnime || canUpdateTrackingAnime || canDeleteTrackingAnime);
   const canManageCompletedAnime = canViewCompletedAnimeMaintainer && (canCreateCompletedAnime || canUpdateCompletedAnime || canDeleteCompletedAnime);
   const canViewSpaceDrumChaptersMaintainer = hasPermission("admin.spacedrum.chapters.view");
@@ -1511,7 +1537,11 @@ export default function HomePage({
       animeLibraryTracking: "anime.tracking.view",
       animeLibraryCompleted: "anime.completed.view",
       animeSeasonCalendar: "anime.calendar.view",
+      animeTierListAnimes: "anime.tierlist.animes.view",
+      animeTierListOpenings: "anime.tierlist.openings.view",
       platformAnimeSeasonCalendar: "admin.anime.calendar.view",
+      platformAnimeTierListAnimes: "admin.anime.tierlist.animes.view",
+      platformAnimeTierListOpenings: "admin.anime.tierlist.openings.view",
       platformAnimeTracking: "admin.anime.tracking.view",
       platformAnimeCompleted: "admin.anime.completed.view",
       platformTracker: "admin.tracker.view",
@@ -2030,6 +2060,14 @@ export default function HomePage({
               <SeasonalAnimeCalendarPage initialResult={animeCalendar} isLoading={isAnimeCalendarLoading} isAuthenticated={isAuthenticated} />
             ) : null}
 
+            {currentView === "animeTierListAnimes" && hasPermission("anime.tierlist.animes.view") ? (
+              <AnimeTierListAnimesPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
+            ) : null}
+
+            {currentView === "animeTierListOpenings" && hasPermission("anime.tierlist.openings.view") ? (
+              <AnimeTierListOpeningsPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
+            ) : null}
+
             {currentView === "animeLibraryCompleted" ? (
               <AnimeLibraryPage
                 animes={animeLibrary}
@@ -2191,6 +2229,24 @@ export default function HomePage({
                 initialResult={animeCalendarAdmin}
                 canSync={canSyncAnimeCalendar}
                 canUpdate={canUpdateAnimeCalendar}
+              />
+            ) : null}
+
+            {currentView === "platformAnimeTierListAnimes" && canViewAnimeTierListAnimesMaintainer ? (
+              <PlatformAnimeTierListAnimesPage
+                canSync={canSyncAnimeTierListAnimes}
+                canCreate={canCreateAnimeTierListAnimes}
+                canUpdate={canUpdateAnimeTierListAnimes}
+                canDelete={canDeleteAnimeTierListAnimes}
+              />
+            ) : null}
+
+            {currentView === "platformAnimeTierListOpenings" && canViewAnimeTierListOpeningsMaintainer ? (
+              <PlatformAnimeTierListOpeningsPage
+                canSync={canSyncAnimeTierListOpenings}
+                canCreate={canCreateAnimeTierListOpenings}
+                canUpdate={canUpdateAnimeTierListOpenings}
+                canDelete={canDeleteAnimeTierListOpenings}
               />
             ) : null}
 

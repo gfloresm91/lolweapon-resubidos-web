@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, MessageSquare, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ListOrdered, MessageSquare, Music2, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -68,6 +68,20 @@ const ANIME_ITEMS = [
     label: "Calendario de temporada",
     icon: CalendarDays,
     permission: "anime.calendar.view",
+  },
+  {
+    key: "animeTierListAnimes",
+    href: "/biblioteca-anime/tier-list/animes",
+    label: "Tier List: Animes",
+    icon: ListOrdered,
+    permission: "anime.tierlist.animes.view",
+  },
+  {
+    key: "animeTierListOpenings",
+    href: "/biblioteca-anime/tier-list/openings",
+    label: "Tier List: OP/ED",
+    icon: Music2,
+    permission: "anime.tierlist.openings.view",
   },
   {
     key: "animeLibraryTracking",
@@ -182,6 +196,20 @@ const ADMIN_TREE_ITEMS = [
         icon: Library,
         permission: "admin.anime.completed.view",
         manageFlag: "animeCompleted",
+      },
+      {
+        key: "platformAnimeTierListAnimes",
+        href: "/administracion/biblioteca-anime/tier-list-animes",
+        label: "Tier List: Animes",
+        icon: ListOrdered,
+        permission: "admin.anime.tierlist.animes.view",
+      },
+      {
+        key: "platformAnimeTierListOpenings",
+        href: "/administracion/biblioteca-anime/openings",
+        label: "Tier List: OP/ED",
+        icon: Music2,
+        permission: "admin.anime.tierlist.openings.view",
       },
     ],
   },

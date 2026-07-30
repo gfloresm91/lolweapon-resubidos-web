@@ -102,6 +102,32 @@ NEXT_PUBLIC_ANIME_CALENDAR_DEFAULT_TIME_ZONE=America/Santiago
 
 ---
 
+### Tier List de temporada
+
+Dos tableros tipo tiermaker, independientes del Calendario de temporada (no comparten datos con `SeasonalAnime`, solo la dimensión `AnimeSeason`):
+
+- **Animes** (`/biblioteca-anime/tier-list/animes`): roster sincronizado directo desde la query nativa de temporada de AniList (`Page(media(season, seasonYear))`), sin AnimeSchedule.
+- **Openings/Endings** (`/biblioteca-anime/tier-list/openings`): un mismo URL con toggle interno OP/ED (dos tableros independientes). Sincronizado desde AnimeThemes.moe (`https://graphql.animethemes.moe/`, `findAnimeByExternalSite(site: ANILIST, id: [...])`) para los animes ya cargados en el Tier List de esa temporada — requiere sincronizar Animes primero. Cada tema resuelve un solo video: prioriza la entry sin spoiler/nsfw y, dentro de ella, la mayor resolución (empate: fuente `BD` sobre `WEB`). Si solo hay entries con spoiler, se guarda igual (`isSpoiler: true`) y el front lo oculta por defecto.
+
+Cada usuario autenticado arma y guarda su propio tablero por temporada y tipo (`PlatformUserAnimeTierList`), con filas personalizables (nombre, color, orden) y autosave con debounce. Invitados pueden armar el tablero libremente (permiso `anime.tierlist.*.view` asignado por defecto a `invitado`, a diferencia del Calendario), pero no se guarda hasta iniciar sesión. Un anime u opening ya rankeado que el admin oculte o elimine se mantiene en el tablero del usuario marcado como "oculto por administración", pero deja de ofrecerse a usuarios nuevos.
+
+Compartir: exportar el tablero como imagen (`html-to-image`, client-side) o publicar un link de solo lectura (`isPublic` + `shareToken` opaco) en `/biblioteca-anime/tier-list/compartido/[shareToken]` — página standalone sin el shell de `HomePage`, pensada para compartirse fuera del sitio.
+
+Drag & drop implementado con `@dnd-kit/core` + `@dnd-kit/sortable` (soporte táctil).
+
+Administración con CRUD completo (crear, editar, ocultar/eliminar lógicamente, restaurar) en dos mantenedores independientes, cada uno con su propio sync preview/apply:
+
+- `/administracion/biblioteca-anime/tier-list-animes` — permisos `admin.anime.tierlist.animes.view/sync/create/update/delete`.
+- `/administracion/biblioteca-anime/openings` — permisos `admin.anime.tierlist.openings.view/sync/create/update/delete`.
+
+Variables:
+
+```env
+ANIME_THEMES_API_BASE_URL=https://graphql.animethemes.moe/
+```
+
+---
+
 ## Modelos de datos (Prisma)
 
 ### Anime
@@ -120,6 +146,11 @@ NEXT_PUBLIC_ANIME_CALENDAR_DEFAULT_TIME_ZONE=America/Santiago
 | `SeasonalAnimeAiring` | Emisión subtitulada concreta, horario UTC, plataforma y overrides |
 | `SeasonalAnimeSync` | Historial técnico de sincronizaciones remotas |
 | `PlatformUserSeasonalAnimeFavorite` | Animes de temporada marcados como favoritos por usuario, referenciados por `aniListId` (estable entre temporadas) |
+| `AnimeTierListEntry` | Roster de animes de temporada para el Tier List, independiente de `SeasonalAnime`: sincronizado directo desde AniList (sin AnimeSchedule) o creado manualmente por un admin |
+| `AnimeTierListTheme` | Opening/ending por anime del Tier List, sincronizado desde AnimeThemes.moe o creado manualmente; `type`/`sequence` efectivos consideran overrides manuales |
+| `PlatformUserAnimeTierList` | Tablero guardado por usuario, por temporada y por tipo (`animes`, `op`, `ed`); soporta compartir vía `isPublic`/`shareToken` |
+| `PlatformUserAnimeTier` | Fila personalizada del tablero (nombre, color, orden) |
+| `PlatformUserAnimeTierPlacement` | Colocación de un item (`AnimeTierListEntry` o `AnimeTierListTheme`) en una fila o en "Sin rankear" |
 
 ### Directos
 
@@ -271,6 +302,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Biblioteca de anime: Terminados | `anime.completed.view/create/update/delete`, `anime.completed.form.full/compact` |
 | Biblioteca de anime: Puntuación | `anime.rating.write`, `anime.rating.streamer` |
 | Biblioteca de anime: Calendario | `anime.calendar.view` |
+| Biblioteca de anime: Tier List | `anime.tierlist.animes.view`, `anime.tierlist.openings.view`, `anime.tierlist.openings.manage` (crear/editar/eliminar Openings/Endings desde el tablero; default `admin`, `moderador` y `streamer`) |
 | Lecturas: SpaceDrum | `spacedrum.view` |
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
@@ -281,6 +313,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Administración: Anime Viendo | `admin.anime.tracking.view` |
 | Administración: Anime Terminados | `admin.anime.completed.view` |
 | Administración: Calendario de anime | `admin.anime.calendar.view/sync/update` |
+| Administración: Tier List de Animes | `admin.anime.tierlist.animes.view/sync/create/update/delete` |
+| Administración: Tier List de Openings/Endings | `admin.anime.tierlist.openings.view/sync/create/update/delete` |
 
 ---
 
@@ -302,6 +336,9 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/rastreador/[id]` | Detalle de un directo (links, actividad) |
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
 | `/biblioteca-anime/calendario` | Calendario semanal de emisiones subtituladas en la zona horaria del usuario |
+| `/biblioteca-anime/tier-list/animes` | Tier List de animes de temporada (drag & drop, tiers personalizables). Controlado por `anime.tierlist.animes.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación, administración e invitados. |
+| `/biblioteca-anime/tier-list/openings` | Tier List de openings/endings de temporada, con toggle interno OP/ED. Controlado por `anime.tierlist.openings.view`, misma asignación por defecto que Animes. |
+| `/biblioteca-anime/tier-list/compartido/[shareToken]` | Vista pública de solo lectura de un tier list compartido, sin autenticación ni shell de `HomePage` |
 | `/biblioteca-anime/terminados` | Anime terminado, pausado, pendiente o dropeado |
 | `/mi-lista` | Lista personal del usuario (guardados, vistos, favoritos) |
 | `/spacedrum` | Lector bilingüe de SpaceDrum, controlado por permiso `spacedrum.view` |
@@ -310,6 +347,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/perfil` | Perfil del usuario (avatar, datos) |
 | `/administracion/...` | Panel de administración |
 | `/administracion/biblioteca-anime/calendario` | Sincronización y overrides del Calendario de temporada |
+| `/administracion/biblioteca-anime/tier-list-animes` | Mantenedor CRUD del roster de Animes del Tier List (sync AniList, crear/editar/eliminar/restaurar) |
+| `/administracion/biblioteca-anime/openings` | Mantenedor CRUD de Openings/Endings del Tier List (sync AnimeThemes.moe, crear/editar/eliminar/restaurar) |
 | `/administracion/notificaciones` | Mantenedor de notificaciones manuales y automáticas, protegido por permisos `admin.notifications.*` |
 | `/administracion/tickets` | Mantenedor administrativo de sugerencias/reclamos, protegido por `admin.tickets.view` |
 | `/administracion/tickets/[id]` | Conversación administrativa del ticket, permite responder con `admin.tickets.update` |
@@ -344,6 +383,9 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/anime-library` | GET/POST | Biblioteca de anime (CRUD) |
 | `/api/anime-calendar` | GET/POST | Temporadas y emisiones visibles (incluye favoritos del usuario si hay sesión); requiere `anime.calendar.view`. `POST` con `action: "toggle-favorite"` marca/desmarca un anime como favorito, requiere sesión |
 | `/api/admin/anime-calendar` | GET/POST | Previsualización, sincronización, activación y overrides del calendario |
+| `/api/anime-tier-list` | GET/POST | Tablero del Tier List (animes/openings/endings): `GET` con `kind` y `seasonId` devuelve roster y tablero guardado del usuario; `POST` con `action: "save"` autoguarda tiers/colocaciones, `"reset"` reinicia el tablero y `"set-public"` genera/retira el link compartido. Mutaciones requieren sesión. |
+| `/api/admin/anime-tier-list-animes` | GET/POST | Roster de Animes del Tier List: sync preview/apply desde AniList y CRUD (`create-entry`, `update-entry`, `delete-entry`, `restore-entry`) |
+| `/api/admin/anime-tier-list-openings` | GET/POST | Openings/Endings del Tier List: sync preview/apply desde AnimeThemes.moe (requiere Animes ya sincronizado) y CRUD (`create-theme`, `update-theme`, `delete-theme`, `restore-theme`) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
 | `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. No participa en OAuth ni sincronización de membresías. |
