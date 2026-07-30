@@ -2061,11 +2061,11 @@ export default function HomePage({
             ) : null}
 
             {currentView === "animeTierListAnimes" && hasPermission("anime.tierlist.animes.view") ? (
-              <AnimeTierListAnimesPage isAuthenticated={isAuthenticated} />
+              <AnimeTierListAnimesPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
             ) : null}
 
             {currentView === "animeTierListOpenings" && hasPermission("anime.tierlist.openings.view") ? (
-              <AnimeTierListOpeningsPage isAuthenticated={isAuthenticated} />
+              <AnimeTierListOpeningsPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
             ) : null}
 
             {currentView === "animeLibraryCompleted" ? (

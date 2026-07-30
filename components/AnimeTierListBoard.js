@@ -125,21 +125,21 @@ function applySequenceBadges(roster) {
   ));
 }
 
-function passesFilters(item, filters) {
+function passesFilters(item, filters, canManageThemes = false) {
   if (item.isSpoiler && !filters.showSpoiler) return false;
   if (item.isManual && !filters.showManual) return false;
   if (item.isAdult) return filters.showAdult;
   if (item.isDonghua) return filters.showDonghua;
-  if (item.isManual) return true;
+  if (item.isManual && canManageThemes) return true;
   return filters.showDefault;
 }
 
-function passesEntryFilters(entry, filters) {
+function passesEntryFilters(entry, filters, canManageThemes = false) {
   if (entry.isHidden) return filters.showHiddenByAdmin;
-  return passesFilters(entry, filters);
+  return passesFilters(entry, filters, canManageThemes);
 }
 
-function buildContainers(roster, tiers, placements, filters) {
+function buildContainers(roster, tiers, placements, filters, canManageThemes = false) {
   const itemsById = new Map(roster.map((item) => [item.id, item]));
   const placedIds = new Set(placements.map((placement) => placement.itemId));
   const containers = { _pool: [] };
@@ -156,7 +156,7 @@ function buildContainers(roster, tiers, placements, filters) {
       if (filters.showHiddenByAdmin) containers._pool.push(placement.itemId);
       continue;
     }
-    if (!passesFilters(item, filters)) continue;
+    if (!passesFilters(item, filters, canManageThemes)) continue;
     containers[tierKey || "_pool"].push(placement.itemId);
   }
 
@@ -166,14 +166,14 @@ function buildContainers(roster, tiers, placements, filters) {
       if (filters.showHiddenByAdmin) containers._pool.push(item.id);
       continue;
     }
-    if (!passesFilters(item, filters)) continue;
+    if (!passesFilters(item, filters, canManageThemes)) continue;
     containers._pool.push(item.id);
   }
 
   return { containers, itemsById };
 }
 
-function computeContentCounts(roster, filters) {
+function computeContentCounts(roster, filters, canManageThemes = false) {
   const counts = { default: 0, adult: 0, donghua: 0, spoiler: 0, manual: 0, hiddenByPreferences: 0, hiddenByAdmin: 0 };
   for (const item of roster) {
     if (item.isHidden) { counts.hiddenByAdmin += 1; continue; }
@@ -182,7 +182,7 @@ function computeContentCounts(roster, filters) {
     else counts.default += 1;
     if (item.isSpoiler) counts.spoiler += 1;
     if (item.isManual) counts.manual += 1;
-    if (!passesFilters(item, filters)) counts.hiddenByPreferences += 1;
+    if (!passesFilters(item, filters, canManageThemes)) counts.hiddenByPreferences += 1;
   }
   return counts;
 }
@@ -452,7 +452,7 @@ function TierColorModal({ tier, onClose, onChange }) {
   );
 }
 
-export default function AnimeTierListBoard({ kind, title, highlight, subtitle, isAuthenticated, viewToggle }) {
+export default function AnimeTierListBoard({ kind, title, highlight, subtitle, isAuthenticated, viewToggle, role = "invitado" }) {
   const [seasons, setSeasons] = useState([]);
   const [seasonId, setSeasonId] = useState("");
   const [roster, setRoster] = useState([]);
@@ -507,15 +507,15 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   );
 
   const { containers, itemsById } = useMemo(
-    () => buildContainers(roster, tiers, placements, filters),
-    [roster, tiers, placements, filters],
+    () => buildContainers(roster, tiers, placements, filters, canManageThemes),
+    [roster, tiers, placements, filters, canManageThemes],
   );
 
-  const contentCounts = useMemo(() => computeContentCounts(roster, filters), [roster, filters]);
+  const contentCounts = useMemo(() => computeContentCounts(roster, filters, canManageThemes), [roster, filters, canManageThemes]);
 
   const visibleEntriesWithoutTheme = useMemo(
-    () => entriesWithoutTheme.filter((entry) => passesEntryFilters(entry, filters)),
-    [entriesWithoutTheme, filters],
+    () => entriesWithoutTheme.filter((entry) => passesEntryFilters(entry, filters, canManageThemes)),
+    [entriesWithoutTheme, filters, canManageThemes],
   );
 
   const poolItemIds = useMemo(() => {
@@ -1236,6 +1236,18 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
             <p>
               Estás jugando sin sesión: puedes armar tu tier list, pero no se guardará.{" "}
               <a href="/login">Inicia sesión</a> para conservarlo.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {role === "invitado" || role === "publico" ? (
+        <div className="rtfm-notice-panel">
+          <div className="rtfm-notice is-info">
+            <Info size={18} aria-hidden="true" />
+            <p>
+              Este acceso es posiblemente temporal: más adelante los Tier Lists podrían quedar
+              disponibles solo para los tiers de pago del Twitch de Kala. No se encariñen mucho.
             </p>
           </div>
         </div>

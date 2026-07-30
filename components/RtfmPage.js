@@ -21,8 +21,10 @@ import {
   Info,
   KeyRound,
   Library,
+  ListOrdered,
   LogIn,
   MessageCircle,
+  Music2,
   PlayCircle,
   ShieldCheck,
   Sparkles,
@@ -142,6 +144,21 @@ const navigationTree = [
     icon: Library,
     children: [
       { title: "Calendario de temporada", href: "/biblioteca-anime/calendario", permission: "anime.calendar.view", icon: CalendarDays },
+      {
+        title: "Tier List: Animes",
+        href: "/biblioteca-anime/tier-list/animes",
+        permission: "anime.tierlist.animes.view",
+        icon: ListOrdered,
+      },
+      {
+        title: "Tier List: OP/ED",
+        href: "/biblioteca-anime/tier-list/openings",
+        permission: "anime.tierlist.openings.view",
+        icon: Music2,
+        children: [
+          { title: "Tier list compartido", href: "/biblioteca-anime/tier-list/compartido/[shareToken]", publicAccess: true, icon: File },
+        ],
+      },
       { title: "Viendo", href: "/biblioteca-anime/viendo", permission: "anime.tracking.view", icon: CircleDot },
       { title: "Terminados", href: "/biblioteca-anime/terminados", permission: "anime.completed.view", icon: CheckCircle2 },
       { title: "Mi lista anime", href: "/mi-lista/anime", permission: "anime.tracking.view", authRequired: true, icon: Bookmark },
@@ -171,6 +188,8 @@ const navigationTree = [
         adminArea: true,
         children: [
           { title: "Calendario de temporada", href: "/administracion/biblioteca-anime/calendario", permission: "admin.anime.calendar.view", adminArea: true, icon: CalendarDays },
+          { title: "Tier List: Animes", href: "/administracion/biblioteca-anime/tier-list-animes", permission: "admin.anime.tierlist.animes.view", adminArea: true, icon: ListOrdered },
+          { title: "Tier List: OP/ED", href: "/administracion/biblioteca-anime/openings", permission: "admin.anime.tierlist.openings.view", adminArea: true, icon: Music2 },
           { title: "Viendo", href: "/administracion/biblioteca-anime/viendo", permission: "admin.anime.tracking.view", adminArea: true, icon: CircleDot },
           { title: "Terminados", href: "/administracion/biblioteca-anime/terminados", permission: "admin.anime.completed.view", adminArea: true, icon: Library },
         ],
