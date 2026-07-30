@@ -401,6 +401,7 @@ model PlatformUser {
   authIdentities PlatformAuthIdentity[]
   identityLinkAttempts PlatformIdentityLinkAttempt[]
   seasonalAnimeFavorites PlatformUserSeasonalAnimeFavorite[]
+  animeTierLists PlatformUserAnimeTierList[]
 
   @@index([roleId])
   @@index([isActive])
@@ -649,6 +650,8 @@ model AnimeSeason {
 
   animes         SeasonalAnime[]
   syncs          SeasonalAnimeSync[]
+  tierListEntries AnimeTierListEntry[]
+  tierLists      PlatformUserAnimeTierList[]
 
   @@unique([year, season])
   @@index([status])
@@ -744,6 +747,120 @@ model PlatformUserSeasonalAnimeFavorite {
 
   @@unique([userId, aniListId])
   @@index([userId])
+}
+
+model AnimeTierListEntry {
+  id              Int         @id @default(autoincrement())
+  seasonId        Int
+  aniListId       Int?
+  isManual        Boolean     @default(false)
+  titleRomaji     String
+  titleEnglish    String?
+  titleNative     String?
+  imageUrl        String?
+  format          String?
+  episodes        Int?
+  status          String?
+  aniListUrl      String?
+  isAdult         Boolean     @default(false)
+  isDonghua       Boolean     @default(false)
+  manualTitle     String?
+  manualImageUrl  String?
+  manualIsAdult   Boolean?
+  manualIsDonghua Boolean?
+  manualVisible   Boolean?
+  sourceUpdatedAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  season          AnimeSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  themes          AnimeTierListTheme[]
+
+  @@unique([seasonId, aniListId])
+  @@index([seasonId])
+  @@index([deletedAt])
+}
+
+model AnimeTierListTheme {
+  id              Int                @id @default(autoincrement())
+  tierListEntryId Int
+  animeThemeId    Int?
+  isManual        Boolean            @default(false)
+  type            String
+  sequence        Int
+  songTitle       String?
+  artist          String?
+  videoUrl        String?
+  videoResolution Int?
+  videoSource     String?
+  isSpoiler       Boolean            @default(false)
+  manualType      String?
+  manualSequence  Int?
+  manualVideoUrl  String?
+  manualSongTitle String?
+  manualArtist    String?
+  manualVisible   Boolean?
+  alternateVideoUrl String?
+  sourceUpdatedAt DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  entry           AnimeTierListEntry @relation(fields: [tierListEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([tierListEntryId, animeThemeId])
+  @@index([tierListEntryId])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+model PlatformUserAnimeTierList {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  seasonId   Int
+  kind       String
+  isPublic   Boolean  @default(false)
+  shareToken String?  @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season     AnimeSeason  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  tiers      PlatformUserAnimeTier[]
+  placements PlatformUserAnimeTierPlacement[]
+
+  @@unique([userId, seasonId, kind])
+  @@index([seasonId])
+  @@index([shareToken])
+}
+
+model PlatformUserAnimeTier {
+  id         Int      @id @default(autoincrement())
+  tierListId Int
+  label      String
+  color      String
+  position   Int
+
+  tierList   PlatformUserAnimeTierList @relation(fields: [tierListId], references: [id], onDelete: Cascade)
+  placements PlatformUserAnimeTierPlacement[]
+
+  @@index([tierListId])
+}
+
+model PlatformUserAnimeTierPlacement {
+  id         Int    @id @default(autoincrement())
+  tierListId Int
+  tierId     Int?
+  itemId     Int
+  position   Int
+
+  tierList   PlatformUserAnimeTierList @relation(fields: [tierListId], references: [id], onDelete: Cascade)
+  tier       PlatformUserAnimeTier?    @relation(fields: [tierId], references: [id], onDelete: SetNull)
+
+  @@unique([tierListId, itemId])
+  @@index([tierListId])
+  @@index([tierId])
 }
 
 model AuditLog {
