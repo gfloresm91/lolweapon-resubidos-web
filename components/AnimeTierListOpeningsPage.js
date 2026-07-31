@@ -9,7 +9,6 @@ export default function AnimeTierListOpeningsPage({ isAuthenticated = false, rol
 
   return (
     <AnimeTierListBoard
-      key={kind}
       kind={kind}
       title="Tier List de"
       highlight={kind === "op" ? "Openings" : "Endings"}

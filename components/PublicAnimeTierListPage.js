@@ -82,7 +82,8 @@ function normalizeRosterItem(kind, item) {
     isSpoiler: item.isSpoiler,
     isHidden: item.isHidden,
     videoUrl: item.videoUrl,
-    alternateVideoUrl: item.alternateVideoUrl || null,
+    primarySourceLabel: item.primarySourceLabel || null,
+    alternateVideoUrls: Array.isArray(item.alternateVideoUrls) ? item.alternateVideoUrls : [],
     songTitle: item.songTitle,
   };
 }
@@ -232,7 +233,18 @@ export default function PublicAnimeTierListPage({ tierList }) {
       return (left?.title || "").localeCompare(right?.title || "") || (left?.sequence || 0) - (right?.sequence || 0);
     });
   }, [containers, isPoolSorted, itemsById]);
-  const activeVideoUrl = videoSource === "alternate" ? openItem?.alternateVideoUrl : openItem?.videoUrl;
+  const videoSources = useMemo(() => {
+    if (!openItem) return [];
+    return [
+      { key: "primary", label: openItem.primarySourceLabel || "Fuente principal", url: openItem.videoUrl },
+      ...(openItem.alternateVideoUrls || []).map((source, index) => ({
+        key: `alt-${index}`,
+        label: source.label || "Fuente alternativa",
+        url: source.url,
+      })),
+    ].filter((source) => source.url);
+  }, [openItem]);
+  const activeVideoUrl = videoSources.find((source) => source.key === videoSource)?.url || videoSources[0]?.url;
   const videoEmbed = activeVideoUrl ? resolveVideoEmbed(activeVideoUrl) : null;
 
   return (
@@ -341,10 +353,20 @@ export default function PublicAnimeTierListPage({ tierList }) {
             {openItem.songTitle ? (
               <p className="tierlist-video-song"><Music2 size={14} aria-hidden="true" /> {openItem.songTitle}</p>
             ) : null}
-            {openItem.alternateVideoUrl ? (
+            {videoSources.length > 1 ? (
               <div className="tracker-calendar-view-toggle tierlist-video-source-toggle" role="tablist" aria-label="Fuente del video">
-                <button type="button" role="tab" aria-selected={videoSource === "primary"} className={videoSource === "primary" ? "is-active" : ""} onClick={() => switchVideoSource("primary")}>Fuente principal</button>
-                <button type="button" role="tab" aria-selected={videoSource === "alternate"} className={videoSource === "alternate" ? "is-active" : ""} onClick={() => switchVideoSource("alternate")}>Fuente alternativa</button>
+                {videoSources.map((source) => (
+                  <button
+                    key={source.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={videoSource === source.key}
+                    className={videoSource === source.key ? "is-active" : ""}
+                    onClick={() => switchVideoSource(source.key)}
+                  >
+                    {source.label}
+                  </button>
+                ))}
               </div>
             ) : null}
             {videoEmbed ? (

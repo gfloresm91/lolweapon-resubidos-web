@@ -801,7 +801,8 @@ model AnimeTierListTheme {
   manualSongTitle String?
   manualArtist    String?
   manualVisible   Boolean?
-  alternateVideoUrl String?
+  manualPrimarySourceLabel String?
+  alternateVideoUrls Json?
   sourceUpdatedAt DateTime?
   deletedAt       DateTime?
   createdAt       DateTime           @default(now())

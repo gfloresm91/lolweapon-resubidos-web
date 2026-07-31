@@ -16,6 +16,7 @@ import MaintainerStats from "@/components/MaintainerStats";
 import MaintainerTable from "@/components/MaintainerTable";
 import MaintainerToolbar from "@/components/MaintainerToolbar";
 import Tooltip from "@/components/Tooltip";
+import VideoSourcesField from "@/components/VideoSourcesField";
 
 const AnimeImageDropzone = dynamic(() => import("@/components/AnimeImageDropzone"), { ssr: false });
 
@@ -96,6 +97,10 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
   const [editIsDonghuaOverride, setEditIsDonghuaOverride] = useState("");
   const [isOverrideOpen, setIsOverrideOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [createAlternateSources, setCreateAlternateSources] = useState([]);
+  const [editAlternateSources, setEditAlternateSources] = useState([]);
+  const [editPrimaryUrlValue, setEditPrimaryUrlValue] = useState("");
+  const [editPrimaryUrlTouched, setEditPrimaryUrlTouched] = useState(false);
 
   useEffect(() => {
     if (!createImageFile) {
@@ -120,7 +125,16 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
   useEffect(() => {
     setEditImageFile(null);
     setEditImageError("");
+    setEditAlternateSources(Array.isArray(editingTheme?.alternateVideoUrls) ? editingTheme.alternateVideoUrls : []);
+    setEditPrimaryUrlValue(editingTheme?.videoUrl || "");
+    setEditPrimaryUrlTouched(false);
   }, [editingTheme]);
+
+  useEffect(() => {
+    if (isCreateOpen) {
+      setCreateAlternateSources([]);
+    }
+  }, [isCreateOpen]);
 
   const stats = useMemo(() => ({
     seasons: seasons.length,
@@ -258,7 +272,8 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       songTitle: form.get("songTitle"),
       artist: form.get("artist"),
       videoUrl: form.get("videoUrl"),
-      alternateVideoUrl: form.get("alternateVideoUrl"),
+      primarySourceLabel: form.get("primarySourceLabel"),
+      alternateVideoUrls: createAlternateSources,
     };
     if (createSelectedAnime?.isManual) {
       const animeTitle = String(form.get("animeTitle") || "").trim();
@@ -298,7 +313,8 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
     const payload = {
       action: "update-theme",
       id: editingTheme.id,
-      alternateVideoUrl: form.get("alternateVideoUrl"),
+      primarySourceLabel: form.get("primarySourceLabel"),
+      alternateVideoUrls: editAlternateSources,
     };
     if (!editingTheme.animeAniListId) {
       payload.manualEntryIsAdult = form.get("animeIsAdult") === "on";
@@ -319,7 +335,9 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       payload.manualSequence = isOverrideOpen
         ? (editSequenceTouched ? form.get("manualSequence") : (editingTheme.manualSequence ?? ""))
         : "";
-      payload.manualVideoUrl = isOverrideOpen ? form.get("manualVideoUrl") : "";
+      payload.manualVideoUrl = isOverrideOpen
+        ? (editPrimaryUrlTouched ? editPrimaryUrlValue : editingTheme.manualVideoUrl)
+        : "";
       payload.manualSongTitle = isOverrideOpen ? form.get("manualSongTitle") : "";
       payload.manualArtist = isOverrideOpen ? form.get("manualArtist") : "";
     }
@@ -602,8 +620,12 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
           </div>
           <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" placeholder="Título de la canción" /></label>
           <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" placeholder="Artista o banda" /></label>
-          <label className="notification-form-field"><span>Fuente principal</span><input className="modal-input" name="videoUrl" placeholder="https://..." required /></label>
-          <label className="notification-form-field"><span>Fuente alternativa (opcional)</span><input className="modal-input" name="alternateVideoUrl" placeholder="YouTube o Drive, por si la fuente principal falla" /></label>
+          <span className="notification-form-field-label">Fuentes</span>
+          <div className="form-row tierlist-source-row">
+            <input className="modal-input" name="primarySourceLabel" defaultValue="Fuente principal" required />
+            <input className="modal-input" name="videoUrl" placeholder="https://..." required />
+          </div>
+          <VideoSourcesField sources={createAlternateSources} onChange={setCreateAlternateSources} />
         </MaintainerModal>
       ) : null}
 
@@ -699,8 +721,12 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
               </div>
               <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" defaultValue={editingTheme.songTitle || ""} placeholder="Título de la canción" /></label>
               <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" defaultValue={editingTheme.artist || ""} placeholder="Artista o banda" /></label>
-              <label className="notification-form-field"><span>Fuente principal</span><input className="modal-input" name="manualVideoUrl" defaultValue={editingTheme.videoUrl || ""} required /></label>
-              <label className="notification-form-field"><span>Fuente alternativa (opcional)</span><input className="modal-input" name="alternateVideoUrl" defaultValue={editingTheme.alternateVideoUrl || ""} placeholder="YouTube o Drive, por si la fuente principal falla" /></label>
+              <span className="notification-form-field-label">Fuentes</span>
+              <div className="form-row tierlist-source-row">
+                <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
+                <input className="modal-input" name="manualVideoUrl" defaultValue={editingTheme.videoUrl || ""} required />
+              </div>
+              <VideoSourcesField sources={editAlternateSources} onChange={setEditAlternateSources} />
             </>
           ) : (
             <>
@@ -722,8 +748,16 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                   </div>
                   <label className="notification-form-field"><span>Canción</span><input key="song-title-editable" className="modal-input" name="manualSongTitle" defaultValue={editingTheme.manualSongTitle || ""} placeholder={editingTheme.songTitle || ""} /></label>
                   <label className="notification-form-field"><span>Artista</span><input key="artist-editable" className="modal-input" name="manualArtist" defaultValue={editingTheme.manualArtist || ""} placeholder={editingTheme.artist || ""} /></label>
-                  <label className="notification-form-field"><span>Fuente principal</span><input key="video-url-editable" className="modal-input" name="manualVideoUrl" defaultValue={editingTheme.manualVideoUrl || ""} placeholder={editingTheme.videoUrl || "https://..."} /></label>
-                  <p className="field-help">Dejar vacío conserva el valor de la fuente para ese campo puntual; solo se guarda como override lo que escribas acá.</p>
+                  <span className="notification-form-field-label">Fuentes</span>
+                  <div className="form-row tierlist-source-row">
+                    <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
+                    <input
+                      key="video-url-editable"
+                      className="modal-input"
+                      value={editPrimaryUrlValue}
+                      onChange={(event) => { setEditPrimaryUrlTouched(true); setEditPrimaryUrlValue(event.target.value); }}
+                    />
+                  </div>
                 </>
               ) : (
                 <>
@@ -739,10 +773,14 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                   </div>
                   <label className="notification-form-field"><span>Canción</span><input key="song-title-readonly" className="modal-input" readOnly value={editingTheme.songTitle || ""} /></label>
                   <label className="notification-form-field"><span>Artista</span><input key="artist-readonly" className="modal-input" readOnly value={editingTheme.artist || ""} /></label>
-                  <label className="notification-form-field"><span>Fuente principal</span><input key="video-url-readonly" className="modal-input" readOnly value={editingTheme.videoUrl || ""} /></label>
+                  <span className="notification-form-field-label">Fuentes</span>
+                  <div className="form-row tierlist-source-row">
+                    <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
+                    <input key="video-url-readonly" className="modal-input" readOnly value={editingTheme.videoUrl || ""} />
+                  </div>
                 </>
               )}
-              <label className="notification-form-field"><span>Fuente alternativa (opcional)</span><input className="modal-input" name="alternateVideoUrl" defaultValue={editingTheme.alternateVideoUrl || ""} placeholder="YouTube o Drive, por si la fuente principal falla" /></label>
+              <VideoSourcesField sources={editAlternateSources} onChange={setEditAlternateSources} />
               <button
                 type="button"
                 className="anime-library-advanced-toggle"
@@ -750,6 +788,8 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                   if (isOverrideOpen) {
                     setManualType("");
                     setEditSequenceTouched(false);
+                    setEditPrimaryUrlValue(editingTheme.videoUrl || "");
+                    setEditPrimaryUrlTouched(false);
                   }
                   setIsOverrideOpen((current) => !current);
                 }}
