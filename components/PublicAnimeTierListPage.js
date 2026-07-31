@@ -93,9 +93,11 @@ function applySequenceBadges(roster) {
     if (item.entryId == null || item.isHidden) continue;
     visibleCounts.set(item.entryId, (visibleCounts.get(item.entryId) || 0) + 1);
   }
-  return roster.map((item) => (
-    item.entryId != null && (visibleCounts.get(item.entryId) || 0) <= 1 ? { ...item, badge: null } : item
-  ));
+  return roster.map((item) => {
+    const hasSiblings = item.entryId != null && (visibleCounts.get(item.entryId) || 0) > 1;
+    const hasMeaningfulSequence = item.badge != null && item.badge > 1;
+    return hasSiblings || hasMeaningfulSequence ? item : { ...item, badge: null };
+  });
 }
 
 function passesFilters(item, filters) {
