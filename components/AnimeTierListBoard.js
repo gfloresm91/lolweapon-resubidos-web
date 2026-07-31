@@ -1673,6 +1673,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   src={videoEmbed.embedUrl}
                   poster={openItem.imageUrl || undefined}
                   controls
+                  controlsList="nodownload"
+                  onContextMenu={(event) => event.preventDefault()}
                   className="tierlist-video-player"
                   onError={() => setVideoError(true)}
                 />

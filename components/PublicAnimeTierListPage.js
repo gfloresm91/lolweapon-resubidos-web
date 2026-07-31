@@ -355,6 +355,8 @@ export default function PublicAnimeTierListPage({ tierList }) {
                   src={videoEmbed.embedUrl}
                   poster={openItem.imageUrl || undefined}
                   controls
+                  controlsList="nodownload"
+                  onContextMenu={(event) => event.preventDefault()}
                   className="tierlist-video-player"
                   onError={() => setVideoError(true)}
                 />
