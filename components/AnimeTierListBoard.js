@@ -26,6 +26,7 @@ import ConfirmModal from "@/components/ConfirmModal";
 import { FilterSelect } from "@/components/FiltersBar";
 import FormSelect from "@/components/FormSelect";
 import MaintainerModal from "@/components/MaintainerModal";
+import VideoSourcesField from "@/components/VideoSourcesField";
 
 const AnimeImageDropzone = dynamic(() => import("@/components/AnimeImageDropzone"), { ssr: false });
 
@@ -78,7 +79,8 @@ function normalizeRosterItem(kind, item) {
       isSpoiler: false,
       isHidden: item.isHidden,
       videoUrl: null,
-      alternateVideoUrl: null,
+      primarySourceLabel: null,
+      alternateVideoUrls: [],
       songTitle: null,
     };
   }
@@ -94,7 +96,8 @@ function normalizeRosterItem(kind, item) {
     isSpoiler: item.isSpoiler,
     isHidden: item.isHidden,
     videoUrl: item.videoUrl,
-    alternateVideoUrl: item.alternateVideoUrl || null,
+    primarySourceLabel: item.primarySourceLabel || null,
+    alternateVideoUrls: Array.isArray(item.alternateVideoUrls) ? item.alternateVideoUrls : [],
     songTitle: item.songTitle,
     artist: item.artist,
     manualType: item.manualType || "",
@@ -481,6 +484,10 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const [createImageFile, setCreateImageFile] = useState(null);
   const [createImageError, setCreateImageError] = useState("");
   const [createImagePreviewUrl, setCreateImagePreviewUrl] = useState("");
+  const [createAlternateSources, setCreateAlternateSources] = useState([]);
+  const [editAlternateSources, setEditAlternateSources] = useState([]);
+  const [editPrimaryUrlValue, setEditPrimaryUrlValue] = useState("");
+  const [editPrimaryUrlTouched, setEditPrimaryUrlTouched] = useState(false);
   const [editingThemeItem, setEditingThemeItem] = useState(null);
   const [editManualType, setEditManualType] = useState("");
   const [editSequence, setEditSequence] = useState("1");
@@ -501,6 +508,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const exportRef = useRef(null);
   const autosaveTimer = useRef(null);
   const isFirstLoad = useRef(true);
+  const skipNextFilterSaveRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -554,9 +562,18 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     }
   }, [kind]);
 
-  useEffect(() => { loadBoard(); }, [loadBoard]);
+  useEffect(() => { loadBoard(seasonId); }, [loadBoard]);
 
   useEffect(() => {
+    skipNextFilterSaveRef.current = true;
+    setFilters(loadStoredFilters(kind));
+  }, [kind]);
+
+  useEffect(() => {
+    if (skipNextFilterSaveRef.current) {
+      skipNextFilterSaveRef.current = false;
+      return;
+    }
     window.localStorage.setItem(`tierlist-filters-v2-${kind}`, JSON.stringify(filters));
   }, [kind, filters]);
 
@@ -585,7 +602,16 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     }
     setEditImageFile(null);
     setEditImageError("");
+    setEditAlternateSources(Array.isArray(editingThemeItem?.alternateVideoUrls) ? editingThemeItem.alternateVideoUrls : []);
+    setEditPrimaryUrlValue(editingThemeItem?.videoUrl || "");
+    setEditPrimaryUrlTouched(false);
   }, [editingThemeItem]);
+
+  useEffect(() => {
+    if (isCreateThemeOpen) {
+      setCreateAlternateSources([]);
+    }
+  }, [isCreateThemeOpen]);
 
   useEffect(() => {
     if (!createImageFile) {
@@ -797,7 +823,18 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     }
   }
 
-  const activeVideoUrl = videoSource === "alternate" ? openItem?.alternateVideoUrl : openItem?.videoUrl;
+  const videoSources = useMemo(() => {
+    if (!openItem) return [];
+    return [
+      { key: "primary", label: openItem.primarySourceLabel || "Fuente principal", url: openItem.videoUrl },
+      ...(openItem.alternateVideoUrls || []).map((source, index) => ({
+        key: `alt-${index}`,
+        label: source.label || "Fuente alternativa",
+        url: source.url,
+      })),
+    ].filter((source) => source.url);
+  }, [openItem]);
+  const activeVideoUrl = videoSources.find((source) => source.key === videoSource)?.url || videoSources[0]?.url;
   const videoEmbed = activeVideoUrl ? resolveVideoEmbed(activeVideoUrl) : null;
   const triggerThemeLabel = `Agregar ${kind === "ed" ? "ending" : "opening"} manual`;
   const createThemeLabel = `Agregar ${createThemeType === "ED" ? "ending" : "opening"} manual`;
@@ -901,7 +938,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       songTitle: form.get("songTitle"),
       artist: form.get("artist"),
       videoUrl: form.get("videoUrl"),
-      alternateVideoUrl: form.get("alternateVideoUrl"),
+      primarySourceLabel: form.get("primarySourceLabel"),
+      alternateVideoUrls: createAlternateSources,
     };
     if (createSelectedAnime?.isManual) {
       const animeTitle = String(form.get("animeTitle") || "").trim();
@@ -960,7 +998,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       action: "update-theme",
       kind,
       id: editingThemeItem.id,
-      alternateVideoUrl: form.get("alternateVideoUrl"),
+      primarySourceLabel: form.get("primarySourceLabel"),
+      alternateVideoUrls: editAlternateSources,
     };
     if (!editingThemeItem.aniListId) {
       payload.manualEntryIsAdult = form.get("animeIsAdult") === "on";
@@ -981,7 +1020,9 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       payload.manualSequence = isEditOverrideOpen
         ? (editSequenceTouched ? form.get("manualSequence") : (editingThemeItem.manualSequence ?? ""))
         : "";
-      payload.manualVideoUrl = isEditOverrideOpen ? form.get("manualVideoUrl") : "";
+      payload.manualVideoUrl = isEditOverrideOpen
+        ? (editPrimaryUrlTouched ? editPrimaryUrlValue : editingThemeItem.manualVideoUrl)
+        : "";
       payload.manualSongTitle = isEditOverrideOpen ? form.get("manualSongTitle") : "";
       payload.manualArtist = isEditOverrideOpen ? form.get("manualArtist") : "";
     }
@@ -1453,8 +1494,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           </div>
           <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" placeholder="Título de la canción" /></label>
           <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" placeholder="Artista o banda" /></label>
-          <label className="notification-form-field"><span>Fuente principal</span><input className="modal-input" name="videoUrl" placeholder="https://..." required /></label>
-          <label className="notification-form-field"><span>Fuente alternativa (opcional)</span><input className="modal-input" name="alternateVideoUrl" placeholder="YouTube o Drive, por si la fuente principal falla" /></label>
+          <span className="notification-form-field-label">Fuentes</span>
+          <div className="form-row tierlist-source-row">
+            <input className="modal-input" name="primarySourceLabel" defaultValue="Fuente principal" required />
+            <input className="modal-input" name="videoUrl" placeholder="https://..." required />
+          </div>
+          <VideoSourcesField sources={createAlternateSources} onChange={setCreateAlternateSources} />
         </MaintainerModal>
       ) : null}
 
@@ -1550,14 +1595,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
               </div>
               <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" defaultValue={editingThemeItem.songTitle || ""} placeholder="Título de la canción" /></label>
               <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" defaultValue={editingThemeItem.artist || ""} placeholder="Artista o banda" /></label>
-              <label className="notification-form-field">
-                <span>Fuente principal</span>
+              <span className="notification-form-field-label">Fuentes</span>
+              <div className="form-row tierlist-source-row">
+                <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
                 <input className="modal-input" name="manualVideoUrl" defaultValue={editingThemeItem.rawVideoUrl || ""} required />
-              </label>
-              <label className="notification-form-field">
-                <span>Fuente alternativa (opcional)</span>
-                <input className="modal-input" name="alternateVideoUrl" defaultValue={editingThemeItem.alternateVideoUrl || ""} placeholder="YouTube o Drive" />
-              </label>
+              </div>
+              <VideoSourcesField sources={editAlternateSources} onChange={setEditAlternateSources} />
             </>
           ) : (
             <>
@@ -1589,11 +1632,16 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                     <span>Artista</span>
                     <input key="artist-editable" className="modal-input" name="manualArtist" defaultValue={editingThemeItem.manualArtist || ""} placeholder={editingThemeItem.rawArtist || ""} />
                   </label>
-                  <label className="notification-form-field">
-                    <span>Fuente principal</span>
-                    <input key="video-url-editable" className="modal-input" name="manualVideoUrl" defaultValue={editingThemeItem.manualVideoUrl || ""} placeholder={editingThemeItem.rawVideoUrl || "https://..."} />
-                  </label>
-                  <p className="field-help">Dejar vacío conserva el valor de la fuente para ese campo puntual; solo se guarda como override lo que escribas acá.</p>
+                  <span className="notification-form-field-label">Fuentes</span>
+                  <div className="form-row tierlist-source-row">
+                    <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
+                    <input
+                      key="video-url-editable"
+                      className="modal-input"
+                      value={editPrimaryUrlValue}
+                      onChange={(event) => { setEditPrimaryUrlTouched(true); setEditPrimaryUrlValue(event.target.value); }}
+                    />
+                  </div>
                 </>
               ) : (
                 <>
@@ -1615,16 +1663,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                     <span>Artista</span>
                     <input key="artist-readonly" className="modal-input" readOnly value={editingThemeItem.artist || ""} />
                   </label>
-                  <label className="notification-form-field">
-                    <span>Fuente principal</span>
+                  <span className="notification-form-field-label">Fuentes</span>
+                  <div className="form-row tierlist-source-row">
+                    <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
                     <input key="video-url-readonly" className="modal-input" readOnly value={editingThemeItem.videoUrl || ""} />
-                  </label>
+                  </div>
                 </>
               )}
-              <label className="notification-form-field">
-                <span>Fuente alternativa (opcional)</span>
-                <input className="modal-input" name="alternateVideoUrl" defaultValue={editingThemeItem.alternateVideoUrl || ""} placeholder="YouTube o Drive" />
-              </label>
+              <VideoSourcesField sources={editAlternateSources} onChange={setEditAlternateSources} />
               <button
                 type="button"
                 className="anime-library-advanced-toggle"
@@ -1632,6 +1678,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   if (isEditOverrideOpen) {
                     setEditManualType("");
                     setEditSequenceTouched(false);
+                    setEditPrimaryUrlValue(editingThemeItem.videoUrl || "");
+                    setEditPrimaryUrlTouched(false);
                   }
                   setIsEditOverrideOpen((current) => !current);
                 }}
@@ -1659,10 +1707,20 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
             {openItem.songTitle ? (
               <p className="tierlist-video-song"><Music2 size={14} aria-hidden="true" /> {openItem.songTitle}</p>
             ) : null}
-            {openItem.alternateVideoUrl ? (
+            {videoSources.length > 1 ? (
               <div className="tracker-calendar-view-toggle tierlist-video-source-toggle" role="tablist" aria-label="Fuente del video">
-                <button type="button" role="tab" aria-selected={videoSource === "primary"} className={videoSource === "primary" ? "is-active" : ""} onClick={() => switchVideoSource("primary")}>Fuente principal</button>
-                <button type="button" role="tab" aria-selected={videoSource === "alternate"} className={videoSource === "alternate" ? "is-active" : ""} onClick={() => switchVideoSource("alternate")}>Fuente alternativa</button>
+                {videoSources.map((source) => (
+                  <button
+                    key={source.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={videoSource === source.key}
+                    className={videoSource === source.key ? "is-active" : ""}
+                    onClick={() => switchVideoSource(source.key)}
+                  >
+                    {source.label}
+                  </button>
+                ))}
               </div>
             ) : null}
             {videoEmbed ? (

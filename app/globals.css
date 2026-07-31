@@ -3643,6 +3643,13 @@ body:has(.notifications-page) .bg-orb {
   font-weight: 700;
   margin-bottom: 0.45rem;
 }
+.notification-form-field-label {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin: 0 0 0.45rem;
+}
 .notification-editor-modal .notification-link-icon-row {
   align-items: start;
 }
@@ -21208,6 +21215,23 @@ body:has(.tierlist-page)::before {
 .tierlist-card-actions .icon-tool-button {
   width: 1.9rem;
   height: 1.9rem;
+}
+
+.tierlist-sources-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+}
+
+.tierlist-source-row {
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: 0.8rem;
 }
 
 .tierlist-video-modal {
