@@ -380,6 +380,7 @@ export default function PublicAnimeTierListPage({ tierList }) {
                   poster={openItem.imageUrl || undefined}
                   controls
                   controlsList="nodownload"
+                  referrerPolicy="no-referrer"
                   onContextMenu={(event) => event.preventDefault()}
                   className="tierlist-video-player"
                   onError={() => setVideoError(true)}
