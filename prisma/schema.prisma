@@ -645,6 +645,7 @@ model AnimeSeason {
   status         String            @default("draft")
   lastSyncedAt   DateTime?
   lastSyncStatus String?
+  createdSource  String            @default("calendar")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -769,6 +770,7 @@ model AnimeTierListEntry {
   manualIsAdult   Boolean?
   manualIsDonghua Boolean?
   manualVisible   Boolean?
+  duplicateGroupId Int?
   sourceUpdatedAt DateTime?
   deletedAt       DateTime?
   createdAt       DateTime    @default(now())
@@ -780,6 +782,7 @@ model AnimeTierListEntry {
   @@unique([seasonId, aniListId])
   @@index([seasonId])
   @@index([deletedAt])
+  @@index([duplicateGroupId])
 }
 
 model AnimeTierListTheme {
@@ -794,7 +797,7 @@ model AnimeTierListTheme {
   videoUrl        String?
   videoResolution Int?
   videoSource     String?
-  isSpoiler       Boolean            @default(false)
+  isNsfw          Boolean            @default(false)
   manualType      String?
   manualSequence  Int?
   manualVideoUrl  String?
@@ -805,6 +808,7 @@ model AnimeTierListTheme {
   alternateVideoUrls Json?
   sourceUpdatedAt DateTime?
   deletedAt       DateTime?
+  removedAt       DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
@@ -813,6 +817,7 @@ model AnimeTierListTheme {
   @@unique([tierListEntryId, animeThemeId])
   @@index([tierListEntryId])
   @@index([type])
+  @@index([removedAt])
   @@index([deletedAt])
 }
 

@@ -11,10 +11,17 @@ import {
 import {
   createAnimeTierListTheme,
   deleteAnimeTierListTheme,
+  removeAnimeTierListTheme,
   restoreAnimeTierListTheme,
   updateAnimeTierListTheme,
+  updateAnimeTierListThemeVisibility,
 } from "@/lib/repositories/animeTierListThemeRepository";
-import { relinkAnimeTierListEntry } from "@/lib/repositories/animeTierListEntryRepository";
+import {
+  deleteAnimeTierListEntry,
+  duplicateAnimeTierListEntryAsManual,
+  relinkAnimeTierListEntry,
+  updateAnimeTierListEntry,
+} from "@/lib/repositories/animeTierListEntryRepository";
 import { can } from "@/lib/repositories/platformUserRepository";
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
@@ -57,7 +64,7 @@ export async function POST(request) {
   const authorization = await ensurePermissionAuthorized(request, permissionForKind(payload.kind));
   if (authorization.response) return authorization.response;
 
-  if (["create-theme", "update-theme", "delete-theme", "restore-theme", "relink-entry"].includes(payload.action)) {
+  if (["create-theme", "update-theme", "update-theme-visibility", "delete-theme", "restore-theme", "remove-theme", "relink-entry", "duplicate-entry", "update-entry", "delete-entry"].includes(payload.action)) {
     if (payload.kind === "animes" || !can(authorization.user, MANAGE_THEMES_PERMISSION)) {
       return jsonError("Permiso insuficiente", { status: 403 });
     }
@@ -123,6 +130,91 @@ export async function POST(request) {
           request,
         });
         return NextResponse.json({ success: true, theme });
+      }
+
+      if (payload.action === "update-theme-visibility") {
+        const theme = await updateAnimeTierListThemeVisibility({ id: payload.id, manualVisible: payload.manualVisible });
+        await createAuditLog({
+          actor: authorization.user,
+          action: "update",
+          module: "admin.anime.tierlist.openings",
+          entityType: "AnimeTierListTheme",
+          entityId: String(theme.id),
+          entityLabel: `${theme.type}${theme.sequence}`,
+          summary: payload.manualVisible === false ? "Pasó un opening/ending a borrador desde el tablero" : "Publicó un opening/ending desde el tablero",
+          after: theme,
+          request,
+        });
+        return NextResponse.json({ success: true, theme });
+      }
+
+      if (payload.action === "remove-theme") {
+        const theme = await removeAnimeTierListTheme(payload.id);
+        await createAuditLog({
+          actor: authorization.user,
+          action: "delete",
+          module: "admin.anime.tierlist.openings",
+          entityType: "AnimeTierListTheme",
+          entityId: String(theme.id),
+          entityLabel: `${theme.type}${theme.sequence}`,
+          summary: "Eliminó un opening/ending desde el tablero",
+          request,
+        });
+        return NextResponse.json({ success: true, theme });
+      }
+
+      if (payload.action === "duplicate-entry") {
+        const entry = await duplicateAnimeTierListEntryAsManual({
+          sourceEntryId: payload.entryId,
+          seasonId: payload.seasonId,
+          title: payload.title,
+          imageUrl: payload.imageUrl,
+          isAdult: payload.isAdult,
+          isDonghua: payload.isDonghua,
+        });
+        await createAuditLog({
+          actor: authorization.user,
+          action: "create",
+          module: "admin.anime.tierlist.openings",
+          entityType: "AnimeTierListEntry",
+          entityId: String(entry.id),
+          entityLabel: entry.title,
+          summary: "Duplicó un anime sin tema como entrada manual desde el tablero",
+          after: entry,
+          request,
+        });
+        return NextResponse.json({ success: true, entry });
+      }
+
+      if (payload.action === "update-entry") {
+        const entry = await updateAnimeTierListEntry({ id: payload.id, manualVisible: payload.manualVisible });
+        await createAuditLog({
+          actor: authorization.user,
+          action: "update",
+          module: "admin.anime.tierlist.openings",
+          entityType: "AnimeTierListEntry",
+          entityId: String(entry.id),
+          entityLabel: entry.title,
+          summary: payload.manualVisible === false ? "Ocultó un anime sin tema desde el tablero" : "Mostró un anime sin tema desde el tablero",
+          after: entry,
+          request,
+        });
+        return NextResponse.json({ success: true, entry });
+      }
+
+      if (payload.action === "delete-entry") {
+        const entry = await deleteAnimeTierListEntry(payload.id);
+        await createAuditLog({
+          actor: authorization.user,
+          action: "delete",
+          module: "admin.anime.tierlist.openings",
+          entityType: "AnimeTierListEntry",
+          entityId: String(entry.id),
+          entityLabel: entry.title,
+          summary: "Eliminó un anime sin tema desde el tablero",
+          request,
+        });
+        return NextResponse.json({ success: true, entry });
       }
 
       const theme = await updateAnimeTierListTheme(payload);

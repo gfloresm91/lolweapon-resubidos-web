@@ -551,9 +551,9 @@ export default function RtfmPage({ initialRoles = [], initialPermissions = [], c
         <div className="rtfm-notice is-info">
           <ExternalLink size={18} aria-hidden="true" />
           <p>
-            Link caído, pero se deja en honor al gran Piero:{" "}
-            <a href="https://drive.pieront.com/" target="_blank" rel="noreferrer">
-              https://drive.pieront.com/
+            02-08-2026: Piero ha revivido, repito, Piero ha revivido, esto no es un simulacro{" "}
+            <a href="https://drive.kala-vods.com/" target="_blank" rel="noreferrer">
+              https://drive.kala-vods.com/
             </a>
           </p>
         </div>

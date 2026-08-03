@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDownAZ, Music2, Play, X } from "lucide-react";
+import { ArrowDownAZ, Info, Music2, Play, X } from "lucide-react";
 
 import AnimePosterImage from "@/components/AnimePosterImage";
+import FormSelect from "@/components/FormSelect";
 import { KIND_LABELS, SEASON_LABELS } from "@/lib/animeTierListLabels";
 
-const DEFAULT_FILTERS = { showDefault: true, showAdult: false, showDonghua: false, showSpoiler: false };
+const DEFAULT_FILTERS = { hideAdult: true, hideDonghua: false, focusMode: "" };
 const DEFAULT_TIME_ZONE = "UTC";
 
 function extractYouTubeId(url) {
@@ -66,7 +67,7 @@ function normalizeRosterItem(kind, item) {
       badge: null,
       isAdult: item.isAdult,
       isDonghua: item.isDonghua,
-      isSpoiler: false,
+      isNsfw: false,
       isHidden: item.isHidden,
     };
   }
@@ -79,8 +80,9 @@ function normalizeRosterItem(kind, item) {
     sequence: item.sequence,
     isAdult: item.isAdult,
     isDonghua: item.isDonghua,
-    isSpoiler: item.isSpoiler,
+    isNsfw: item.isNsfw,
     isHidden: item.isHidden,
+    isDraft: Boolean(item.isDraft),
     videoUrl: item.videoUrl,
     primarySourceLabel: item.primarySourceLabel || null,
     alternateVideoUrls: Array.isArray(item.alternateVideoUrls) ? item.alternateVideoUrls : [],
@@ -89,36 +91,47 @@ function normalizeRosterItem(kind, item) {
 }
 
 function applySequenceBadges(roster) {
-  const visibleCounts = new Map();
+  const siblingCounts = new Map();
   for (const item of roster) {
-    if (item.entryId == null || item.isHidden) continue;
-    visibleCounts.set(item.entryId, (visibleCounts.get(item.entryId) || 0) + 1);
+    if (item.entryId == null) continue;
+    siblingCounts.set(item.entryId, (siblingCounts.get(item.entryId) || 0) + 1);
   }
   return roster.map((item) => {
-    const hasSiblings = item.entryId != null && (visibleCounts.get(item.entryId) || 0) > 1;
+    const hasSiblings = item.entryId != null && (siblingCounts.get(item.entryId) || 0) > 1;
     const hasMeaningfulSequence = item.badge != null && item.badge > 1;
     return hasSiblings || hasMeaningfulSequence ? item : { ...item, badge: null };
   });
 }
 
 function passesFilters(item, filters) {
-  if (item.isSpoiler && !filters.showSpoiler) return false;
-  if (item.isAdult) return filters.showAdult;
-  if (item.isDonghua) return filters.showDonghua;
-  return filters.showDefault;
+  if (filters.focusMode) {
+    const matchesFocus = {
+      adult: () => Boolean(item.isAdult),
+      donghua: () => Boolean(item.isDonghua),
+    }[filters.focusMode]?.() ?? true;
+    if (!matchesFocus) return false;
+  }
+  if (filters.focusMode !== "adult" && item.isAdult && filters.hideAdult) return false;
+  if (filters.focusMode !== "donghua" && item.isDonghua && filters.hideDonghua) return false;
+  return true;
 }
 
-function computeContentCounts(roster, filters) {
-  const counts = { default: 0, adult: 0, donghua: 0, spoiler: 0, hiddenByPreferences: 0 };
+// Conteos crudos por propiedad: fijos, no dependen del estado actual de los filtros.
+function computeContentCounts(roster) {
+  const counts = { total: 0, adult: 0, donghua: 0 };
   for (const item of roster) {
     if (item.isHidden) continue;
+    counts.total += 1;
     if (item.isAdult) counts.adult += 1;
-    else if (item.isDonghua) counts.donghua += 1;
-    else counts.default += 1;
-    if (item.isSpoiler) counts.spoiler += 1;
-    if (!passesFilters(item, filters)) counts.hiddenByPreferences += 1;
+    if (item.isDonghua) counts.donghua += 1;
   }
   return counts;
+}
+
+function countVisibleRoster(roster, filters) {
+  return roster.reduce((total, item) => (
+    !item.isHidden && passesFilters(item, filters) ? total + 1 : total
+  ), 0);
 }
 
 function buildContainers(roster, tiers, placements, filters) {
@@ -183,7 +196,11 @@ function TierListCard({ itemId, itemsById, onOpen }) {
           </div>
         ) : null}
         {item.videoUrl ? <span className="tierlist-card-play"><Play size={22} /></span> : null}
-        {item.isHidden ? <span className="tierlist-card-hidden-flag">Oculto por administración</span> : null}
+        {item.isDraft ? (
+          <span className="tierlist-card-hidden-flag">Borrador</span>
+        ) : item.isHidden ? (
+          <span className="tierlist-card-hidden-flag">Oculto por administración</span>
+        ) : null}
       </div>
       <span className="tierlist-card-title">{item.title}</span>
     </div>
@@ -222,7 +239,8 @@ export default function PublicAnimeTierListPage({ tierList }) {
     () => buildContainers(roster, tiers, placements, filters),
     [roster, tiers, placements, filters],
   );
-  const contentCounts = useMemo(() => computeContentCounts(roster, filters), [roster, filters]);
+  const contentCounts = useMemo(() => computeContentCounts(roster), [roster]);
+  const visibleRosterCount = useMemo(() => countVisibleRoster(roster, filters), [roster, filters]);
   const updatedAtLabel = formatUpdatedAt(updatedAt, timeZone);
   const poolItemIds = useMemo(() => {
     const ids = containers._pool || [];
@@ -262,47 +280,58 @@ export default function PublicAnimeTierListPage({ tierList }) {
         {updatedAtLabel ? <p className="tierlist-readonly-updated">Actualizado el {updatedAtLabel}</p> : null}
       </header>
 
+      {kind !== "animes" ? (
+        <div className="rtfm-notice-panel">
+          <div className="rtfm-notice is-info">
+            <Info size={18} aria-hidden="true" />
+            <p>Créditos al bueno de cerchupy por su continuo compromiso en los tiers.</p>
+          </div>
+        </div>
+      ) : null}
+
       <section className="tierlist-toolbar" aria-label="Filtros del tier list">
-        <div className="season-calendar-toggles">
-          <button
-            type="button"
-            className={`season-calendar-toggle ${filters.showDefault ? "is-active" : ""}`}
-            aria-pressed={filters.showDefault}
-            onClick={() => setFilters((current) => ({ ...current, showDefault: !current.showDefault }))}
-          >
-            Mostrar estándar ({contentCounts.default})
-          </button>
-          <button
-            type="button"
-            className={`season-calendar-toggle ${filters.showAdult ? "is-active" : ""}`}
-            aria-pressed={filters.showAdult}
-            onClick={() => setFilters((current) => ({ ...current, showAdult: !current.showAdult }))}
-          >
-            Mostrar adulto ({contentCounts.adult})
-          </button>
-          <button
-            type="button"
-            className={`season-calendar-toggle ${filters.showDonghua ? "is-active" : ""}`}
-            aria-pressed={filters.showDonghua}
-            onClick={() => setFilters((current) => ({ ...current, showDonghua: !current.showDonghua }))}
-          >
-            Mostrar donghua ({contentCounts.donghua})
-          </button>
-          {kind !== "animes" ? (
-            <button
-              type="button"
-              className={`season-calendar-toggle ${filters.showSpoiler ? "is-active" : ""}`}
-              aria-pressed={filters.showSpoiler}
-              onClick={() => setFilters((current) => ({ ...current, showSpoiler: !current.showSpoiler }))}
-            >
-              Mostrar sin versión limpia ({contentCounts.spoiler})
-            </button>
-          ) : null}
+        <div className="tierlist-filter-groups">
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Ocultar</span>
+            <div className="season-calendar-toggles">
+              <button
+                type="button"
+                disabled={filters.focusMode === "adult"}
+                className={`season-calendar-toggle ${filters.hideAdult ? "is-active" : ""}`}
+                aria-pressed={filters.hideAdult}
+                onClick={() => setFilters((current) => ({ ...current, hideAdult: !current.hideAdult }))}
+              >
+                Adulto ({contentCounts.adult})
+              </button>
+              <button
+                type="button"
+                disabled={filters.focusMode === "donghua"}
+                className={`season-calendar-toggle ${filters.hideDonghua ? "is-active" : ""}`}
+                aria-pressed={filters.hideDonghua}
+                onClick={() => setFilters((current) => ({ ...current, hideDonghua: !current.hideDonghua }))}
+              >
+                Donghua ({contentCounts.donghua})
+              </button>
+            </div>
+          </div>
+
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Ver</span>
+            <FormSelect
+              value={filters.focusMode || ""}
+              onChange={(value) => setFilters((current) => ({ ...current, focusMode: value }))}
+              options={[
+                { value: "", label: "Todo" },
+                { value: "adult", label: "Solo adulto" },
+                { value: "donghua", label: "Solo donghua" },
+              ]}
+            />
+          </div>
         </div>
         <p className="season-calendar-summary" aria-live="polite">
-          {contentCounts.hiddenByPreferences
-            ? `${contentCounts.hiddenByPreferences} ocultos por tus preferencias`
-            : "Todo el contenido disponible está visible"}
+          {visibleRosterCount < contentCounts.total
+            ? `${visibleRosterCount} visibles de ${contentCounts.total} · ${contentCounts.total - visibleRosterCount} ocultos por tus filtros`
+            : `Mostrando los ${contentCounts.total} disponibles`}
         </p>
       </section>
 

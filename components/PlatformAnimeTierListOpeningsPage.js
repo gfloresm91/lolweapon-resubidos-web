@@ -101,6 +101,12 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
   const [editAlternateSources, setEditAlternateSources] = useState([]);
   const [editPrimaryUrlValue, setEditPrimaryUrlValue] = useState("");
   const [editPrimaryUrlTouched, setEditPrimaryUrlTouched] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState("");
+  const [editTitleTouched, setEditTitleTouched] = useState(false);
+  const [editSongTitleValue, setEditSongTitleValue] = useState("");
+  const [editSongTitleTouched, setEditSongTitleTouched] = useState(false);
+  const [editArtistValue, setEditArtistValue] = useState("");
+  const [editArtistTouched, setEditArtistTouched] = useState(false);
 
   useEffect(() => {
     if (!createImageFile) {
@@ -125,9 +131,17 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
   useEffect(() => {
     setEditImageFile(null);
     setEditImageError("");
-    setEditAlternateSources(Array.isArray(editingTheme?.alternateVideoUrls) ? editingTheme.alternateVideoUrls : []);
+    setEditAlternateSources(Array.isArray(editingTheme?.alternateVideoUrls)
+      ? editingTheme.alternateVideoUrls.map((source) => ({ id: crypto.randomUUID(), ...source }))
+      : []);
     setEditPrimaryUrlValue(editingTheme?.videoUrl || "");
     setEditPrimaryUrlTouched(false);
+    setEditTitleValue(editingTheme?.animeTitle || "");
+    setEditTitleTouched(false);
+    setEditSongTitleValue(editingTheme?.songTitle || "");
+    setEditSongTitleTouched(false);
+    setEditArtistValue(editingTheme?.artist || "");
+    setEditArtistTouched(false);
   }, [editingTheme]);
 
   useEffect(() => {
@@ -319,9 +333,11 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
     if (!editingTheme.animeAniListId) {
       payload.manualEntryIsAdult = form.get("animeIsAdult") === "on";
       payload.manualEntryIsDonghua = form.get("animeIsDonghua") === "on";
+      payload.manualEntryTitle = form.get("manualEntryTitle");
     } else {
       payload.manualEntryIsAdultOverride = editIsAdultOverride;
       payload.manualEntryIsDonghuaOverride = editIsDonghuaOverride;
+      payload.manualEntryTitle = editTitleTouched ? editTitleValue : editingTheme.manualAnimeTitle;
     }
     if (editingTheme.isManual) {
       payload.type = manualType;
@@ -329,7 +345,6 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       payload.videoUrl = form.get("manualVideoUrl");
       payload.songTitle = form.get("songTitle");
       payload.artist = form.get("artist");
-      payload.manualEntryTitle = form.get("manualEntryTitle");
     } else {
       payload.manualType = isOverrideOpen ? manualType : "";
       payload.manualSequence = isOverrideOpen
@@ -338,8 +353,12 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       payload.manualVideoUrl = isOverrideOpen
         ? (editPrimaryUrlTouched ? editPrimaryUrlValue : editingTheme.manualVideoUrl)
         : "";
-      payload.manualSongTitle = isOverrideOpen ? form.get("manualSongTitle") : "";
-      payload.manualArtist = isOverrideOpen ? form.get("manualArtist") : "";
+      payload.manualSongTitle = isOverrideOpen
+        ? (editSongTitleTouched ? editSongTitleValue : editingTheme.manualSongTitle)
+        : "";
+      payload.manualArtist = isOverrideOpen
+        ? (editArtistTouched ? editArtistValue : editingTheme.manualArtist)
+        : "";
     }
     try {
       if (editImageFile) {
@@ -621,7 +640,7 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
           <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" placeholder="Título de la canción" /></label>
           <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" placeholder="Artista o banda" /></label>
           <span className="notification-form-field-label">Fuentes</span>
-          <div className="form-row tierlist-source-row">
+          <div className="form-row tierlist-primary-source-row">
             <input className="modal-input" name="primarySourceLabel" defaultValue="Fuente principal" required />
             <input className="modal-input" name="videoUrl" placeholder="https://..." required />
           </div>
@@ -661,29 +680,42 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
             <button type="button" className="tracker-action-secondary" onClick={() => setIsEditAniListSearchOpen(true)}>Cambiar ficha AniList</button>
           </div>
           {!editingTheme.animeAniListId ? (
-            <div className="tierlist-content-flags">
-              <label className="tierlist-content-flag"><input type="checkbox" name="animeIsAdult" defaultChecked={editingTheme.animeIsAdult} /> Contenido adulto</label>
-              <label className="tierlist-content-flag"><input type="checkbox" name="animeIsDonghua" defaultChecked={editingTheme.animeIsDonghua} /> Donghua</label>
-            </div>
+            <>
+              <label className="notification-form-field"><span>Título</span><input className="modal-input" name="manualEntryTitle" defaultValue={editingTheme.animeTitle || ""} placeholder="Título del anime" required /></label>
+              <div className="tierlist-content-flags">
+                <label className="tierlist-content-flag"><input type="checkbox" name="animeIsAdult" defaultChecked={editingTheme.animeIsAdult} /> Contenido adulto</label>
+                <label className="tierlist-content-flag"><input type="checkbox" name="animeIsDonghua" defaultChecked={editingTheme.animeIsDonghua} /> Donghua</label>
+              </div>
+            </>
           ) : (
-            <div className="form-row">
-              <div className="notification-form-field">
-                <span>Contenido adulto</span>
-                <FormSelect
-                  value={editIsAdultOverride}
-                  onChange={setEditIsAdultOverride}
-                  options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+            <>
+              <label className="notification-form-field">
+                <span>Título</span>
+                <input
+                  className="modal-input"
+                  value={editTitleValue}
+                  onChange={(event) => { setEditTitleTouched(true); setEditTitleValue(event.target.value); }}
                 />
+              </label>
+              <div className="form-row">
+                <div className="notification-form-field">
+                  <span>Contenido adulto</span>
+                  <FormSelect
+                    value={editIsAdultOverride}
+                    onChange={setEditIsAdultOverride}
+                    options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+                  />
+                </div>
+                <div className="notification-form-field">
+                  <span>Donghua</span>
+                  <FormSelect
+                    value={editIsDonghuaOverride}
+                    onChange={setEditIsDonghuaOverride}
+                    options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+                  />
+                </div>
               </div>
-              <div className="notification-form-field">
-                <span>Donghua</span>
-                <FormSelect
-                  value={editIsDonghuaOverride}
-                  onChange={setEditIsDonghuaOverride}
-                  options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
-                />
-              </div>
-            </div>
+            </>
           )}
           <div className="notification-form-field">
             <span>Poster</span>
@@ -704,7 +736,6 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
           </div>
           {editingTheme.isManual ? (
             <>
-              <label className="notification-form-field"><span>Título</span><input className="modal-input" name="manualEntryTitle" defaultValue={editingTheme.animeTitle || ""} placeholder="Título del anime" /></label>
               <div className="form-row">
                 <div className="notification-form-field">
                   <span>Tipo</span>
@@ -722,7 +753,7 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
               <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" defaultValue={editingTheme.songTitle || ""} placeholder="Título de la canción" /></label>
               <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" defaultValue={editingTheme.artist || ""} placeholder="Artista o banda" /></label>
               <span className="notification-form-field-label">Fuentes</span>
-              <div className="form-row tierlist-source-row">
+              <div className="form-row tierlist-primary-source-row">
                 <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
                 <input className="modal-input" name="manualVideoUrl" defaultValue={editingTheme.videoUrl || ""} required />
               </div>
@@ -746,10 +777,26 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                       </div>
                     </div>
                   </div>
-                  <label className="notification-form-field"><span>Canción</span><input key="song-title-editable" className="modal-input" name="manualSongTitle" defaultValue={editingTheme.manualSongTitle || ""} placeholder={editingTheme.songTitle || ""} /></label>
-                  <label className="notification-form-field"><span>Artista</span><input key="artist-editable" className="modal-input" name="manualArtist" defaultValue={editingTheme.manualArtist || ""} placeholder={editingTheme.artist || ""} /></label>
+                  <label className="notification-form-field">
+                    <span>Canción</span>
+                    <input
+                      key="song-title-editable"
+                      className="modal-input"
+                      value={editSongTitleValue}
+                      onChange={(event) => { setEditSongTitleTouched(true); setEditSongTitleValue(event.target.value); }}
+                    />
+                  </label>
+                  <label className="notification-form-field">
+                    <span>Artista</span>
+                    <input
+                      key="artist-editable"
+                      className="modal-input"
+                      value={editArtistValue}
+                      onChange={(event) => { setEditArtistTouched(true); setEditArtistValue(event.target.value); }}
+                    />
+                  </label>
                   <span className="notification-form-field-label">Fuentes</span>
-                  <div className="form-row tierlist-source-row">
+                  <div className="form-row tierlist-primary-source-row">
                     <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
                     <input
                       key="video-url-editable"
@@ -774,7 +821,7 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                   <label className="notification-form-field"><span>Canción</span><input key="song-title-readonly" className="modal-input" readOnly value={editingTheme.songTitle || ""} /></label>
                   <label className="notification-form-field"><span>Artista</span><input key="artist-readonly" className="modal-input" readOnly value={editingTheme.artist || ""} /></label>
                   <span className="notification-form-field-label">Fuentes</span>
-                  <div className="form-row tierlist-source-row">
+                  <div className="form-row tierlist-primary-source-row">
                     <input className="modal-input" name="primarySourceLabel" defaultValue={editingTheme.primarySourceLabel || "Fuente principal"} required />
                     <input key="video-url-readonly" className="modal-input" readOnly value={editingTheme.videoUrl || ""} />
                   </div>
@@ -790,6 +837,10 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
                     setEditSequenceTouched(false);
                     setEditPrimaryUrlValue(editingTheme.videoUrl || "");
                     setEditPrimaryUrlTouched(false);
+                    setEditSongTitleValue(editingTheme.songTitle || "");
+                    setEditSongTitleTouched(false);
+                    setEditArtistValue(editingTheme.artist || "");
+                    setEditArtistTouched(false);
                   }
                   setIsOverrideOpen((current) => !current);
                 }}
