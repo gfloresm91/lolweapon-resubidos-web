@@ -36,6 +36,13 @@ import {
 
 const archiveLinks = [
   {
+    title: "Web de Piero",
+    href: "https://drive.kala-vods.com/",
+    icon: History,
+    description: "Nacimiento de los resubidos.",
+    note: "Creado y mantenido por el bueno de Piero, sin esta fuente original esta web no hubiese existido.",
+  },
+  {
     title: "Web de resubidos",
     href: "https://resubidos.lolweapon.com/",
     icon: Archive,
@@ -551,9 +558,9 @@ export default function RtfmPage({ initialRoles = [], initialPermissions = [], c
         <div className="rtfm-notice is-info">
           <ExternalLink size={18} aria-hidden="true" />
           <p>
-            Link caído, pero se deja en honor al gran Piero:{" "}
-            <a href="https://drive.pieront.com/" target="_blank" rel="noreferrer">
-              https://drive.pieront.com/
+            02-08-2026: Piero ha revivido, repito, Piero ha revivido, esto no es un simulacro{" "}
+            <a href="https://drive.kala-vods.com/" target="_blank" rel="noreferrer">
+              https://drive.kala-vods.com/
             </a>
           </p>
         </div>

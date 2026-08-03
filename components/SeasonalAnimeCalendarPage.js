@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, CalendarDays, ChevronLeft, ChevronRight, Clock3, Globe2, Info } from "lucide-react";
+import { Bookmark, CalendarDays, ChevronLeft, ChevronRight, Clock3, Info } from "lucide-react";
 import { toast } from "sonner";
 
 import { FilterSelect } from "@/components/FiltersBar";
+import FormSelect from "@/components/FormSelect";
 import { AniListChip, PlatformChip } from "@/components/SeasonalAnimePlatformChip";
 import SeasonalAnimeDetailModal from "@/components/SeasonalAnimeDetailModal";
 import Tooltip from "@/components/Tooltip";
 
 const TIME_ZONE_STORAGE_KEY = "kala_anime_calendar_timezone";
-const ADULT_STORAGE_KEY = "kala_anime_calendar_adult";
-const DONGHUA_STORAGE_KEY = "kala_anime_calendar_donghua";
-const DEFAULT_STORAGE_KEY = "kala_anime_calendar_default";
+const ADULT_STORAGE_KEY = "kala_anime_calendar_hide_adult";
+const DONGHUA_STORAGE_KEY = "kala_anime_calendar_hide_donghua";
 const AUTO_TIME_ZONE_VALUE = "__auto__";
 const DAY_NAMES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SEASON_LABELS = { WINTER: "Invierno", SPRING: "Primavera", SUMMER: "Verano", FALL: "Otoño" };
+const DEFAULT_FILTERS = { hideAdult: true, hideDonghua: false, focusMode: "" };
 
 function toDateKey(date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
@@ -84,6 +85,19 @@ function getSeasonWeekAnchor(activeSeason, timeZone) {
   return new Date(`${getZonedDateKey(now, timeZone)}T12:00:00Z`);
 }
 
+function isAnimeAllowedByPreferences(anime, filters) {
+  if (filters.focusMode) {
+    const matchesFocus = {
+      adult: () => Boolean(anime.isAdult),
+      donghua: () => Boolean(anime.isDonghua),
+    }[filters.focusMode]?.() ?? true;
+    if (!matchesFocus) return false;
+  }
+  if (filters.focusMode !== "adult" && anime.isAdult && filters.hideAdult) return false;
+  if (filters.focusMode !== "donghua" && anime.isDonghua && filters.hideDonghua) return false;
+  return true;
+}
+
 export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoading = false, isAuthenticated = false }) {
   const [result, setResult] = useState(initialResult || { seasons: [], activeSeason: null });
   const [selectedSeasonId, setSelectedSeasonId] = useState(String(initialResult?.activeSeason?.id || ""));
@@ -91,9 +105,7 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
   const [timeZoneSelection, setTimeZoneSelection] = useState(AUTO_TIME_ZONE_VALUE);
   const [timeZones, setTimeZones] = useState(["UTC"]);
   const [weekStart, setWeekStart] = useState(() => getWeekStart(toDateKey(new Date())));
-  const [showAdult, setShowAdult] = useState(false);
-  const [showDonghua, setShowDonghua] = useState(false);
-  const [showDefault, setShowDefault] = useState(true);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [calendarView, setCalendarView] = useState("season");
   const [detailEntry, setDetailEntry] = useState(null);
   const [search, setSearch] = useState("");
@@ -108,9 +120,11 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
     setTimeZoneSelection(stored ? nextZone : AUTO_TIME_ZONE_VALUE);
     setTimeZones(Array.from(new Set([nextZone, ...supported])).filter(Boolean));
     setWeekStart(getWeekStart(getZonedDateKey(new Date(), nextZone)));
-    setShowAdult(readStoredBoolean(ADULT_STORAGE_KEY));
-    setShowDonghua(readStoredBoolean(DONGHUA_STORAGE_KEY));
-    setShowDefault(readStoredBoolean(DEFAULT_STORAGE_KEY, true));
+    setFilters((current) => ({
+      ...current,
+      hideAdult: readStoredBoolean(ADULT_STORAGE_KEY, true),
+      hideDonghua: readStoredBoolean(DONGHUA_STORAGE_KEY, false),
+    }));
   }, []);
 
   useEffect(() => {
@@ -189,13 +203,6 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
 
   const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
 
-  function isAnimeAllowedByPreferences(anime) {
-    if (anime.isAdult && !showAdult) return false;
-    if (anime.isDonghua && !showDonghua) return false;
-    if (!anime.isAdult && !anime.isDonghua && !showDefault) return false;
-    return true;
-  }
-
   const favoriteAnimes = useMemo(
     () => (result.activeSeason?.animes || []).filter((anime) => anime.isFavorite),
     [result.activeSeason],
@@ -210,7 +217,7 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
     const map = Object.fromEntries(days.map((day) => [day.key, []]));
     const query = search.trim().toLocaleLowerCase("es");
     for (const anime of animesInScope) {
-      if (!anime.isVisible || !isAnimeAllowedByPreferences(anime)) continue;
+      if (!anime.isVisible || !isAnimeAllowedByPreferences(anime, filters)) continue;
       if (query && ![anime.title, anime.titleEnglish, anime.titleNative].filter(Boolean).join(" ").toLocaleLowerCase("es").includes(query)) continue;
       for (const airing of anime.airings || []) {
         if (!airing.isVisible) continue;
@@ -221,32 +228,28 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
     Object.values(map).forEach((items) => items.sort((left, right) => new Date(left.airing.airingAt) - new Date(right.airing.airingAt)));
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animesInScope, days, search, showAdult, showDonghua, showDefault, timeZone]);
+  }, [animesInScope, days, search, filters, timeZone]);
 
   // Conteos calculados sobre la semana visible, para que coincidan con "N ocultas por preferencias".
   const weekCategoryTotals = useMemo(() => {
     const dayKeys = new Set(days.map((day) => day.key));
-    const totals = { adult: 0, donghua: 0, default: 0, hidden: 0, totalScheduled: 0 };
+    const totals = { adult: 0, donghua: 0, hidden: 0 };
     for (const anime of animesInScope) {
       if (!anime.isVisible) continue;
-      const isRegular = !anime.isAdult && !anime.isDonghua;
       for (const airing of anime.airings || []) {
         if (!airing.isVisible || !dayKeys.has(getZonedDateKey(new Date(airing.airingAt), timeZone))) continue;
-        totals.totalScheduled += 1;
         if (anime.isAdult) totals.adult += 1;
         if (anime.isDonghua) totals.donghua += 1;
-        if (isRegular) totals.default += 1;
-        if (!isAnimeAllowedByPreferences(anime)) totals.hidden += 1;
+        if (!isAnimeAllowedByPreferences(anime, filters)) totals.hidden += 1;
       }
     }
     return totals;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [animesInScope, days, showAdult, showDonghua, showDefault, timeZone]);
+  }, [animesInScope, days, filters, timeZone]);
 
   const weekSummary = useMemo(() => ({
     visible: Object.values(grouped).reduce((total, items) => total + items.length, 0),
     hiddenByPreferences: weekCategoryTotals.hidden,
-    totalScheduled: weekCategoryTotals.totalScheduled,
   }), [grouped, weekCategoryTotals]);
 
   function moveWeek(amount) {
@@ -276,15 +279,9 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
       </header>
 
       <section className="season-calendar-toolbar" aria-label="Controles del calendario">
-        <div className="season-calendar-week-nav">
-          <button type="button" className="tracker-action-secondary" aria-label="Semana anterior" onClick={() => moveWeek(-1)}><ChevronLeft size={18} /></button>
-          <button type="button" className="tracker-action-secondary" onClick={() => setWeekStart(getWeekStart(todayKey))}>Hoy</button>
-          <button type="button" className="tracker-action-secondary" aria-label="Semana siguiente" onClick={() => moveWeek(1)}><ChevronRight size={18} /></button>
-          <strong>{rangeLabel}</strong>
-        </div>
-        <div className="season-calendar-filters">
-          <div className="season-calendar-season-field">
-            <span>Temporada</span>
+        <div className="tierlist-filter-groups">
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Temporada</span>
             <FilterSelect
               label="Temporada"
               value={selectedSeasonId}
@@ -295,14 +292,8 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
               disabled={!result.seasons?.length}
             />
           </div>
-          <label className="season-calendar-search">
-            <span>Buscar anime</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Título..." />
-          </label>
-        </div>
-        <div className="season-calendar-preferences">
-          <div className="season-calendar-timezone">
-            <Globe2 size={17} aria-hidden="true" />
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Zona horaria</span>
             <FilterSelect
               label="Zona horaria"
               value={timeZoneSelection}
@@ -315,22 +306,56 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
               searchPlaceholder="Buscar zona IANA…"
             />
           </div>
-          <div className="season-calendar-toggles">
-            <button type="button" className={`season-calendar-toggle ${showDefault ? "is-active" : ""}`} aria-pressed={showDefault} onClick={() => {
-              const next = !showDefault; setShowDefault(next); window.localStorage.setItem(DEFAULT_STORAGE_KEY, String(next));
-            }}>Mostrar estándar ({weekCategoryTotals.default})</button>
-            <button type="button" className={`season-calendar-toggle ${showAdult ? "is-active" : ""}`} aria-pressed={showAdult} onClick={() => {
-              const next = !showAdult; setShowAdult(next); window.localStorage.setItem(ADULT_STORAGE_KEY, String(next));
-            }}>Mostrar adulto ({weekCategoryTotals.adult})</button>
-            <button type="button" className={`season-calendar-toggle ${showDonghua ? "is-active" : ""}`} aria-pressed={showDonghua} onClick={() => {
-              const next = !showDonghua; setShowDonghua(next); window.localStorage.setItem(DONGHUA_STORAGE_KEY, String(next));
-            }}>Mostrar donghua ({weekCategoryTotals.donghua})</button>
+
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Ocultar</span>
+            <div className="season-calendar-toggles">
+              <button
+                type="button"
+                disabled={filters.focusMode === "adult"}
+                className={`season-calendar-toggle ${filters.hideAdult ? "is-active" : ""}`}
+                aria-pressed={filters.hideAdult}
+                onClick={() => setFilters((current) => {
+                  const next = { ...current, hideAdult: !current.hideAdult };
+                  window.localStorage.setItem(ADULT_STORAGE_KEY, String(next.hideAdult));
+                  return next;
+                })}
+              >
+                Adulto ({weekCategoryTotals.adult})
+              </button>
+              <button
+                type="button"
+                disabled={filters.focusMode === "donghua"}
+                className={`season-calendar-toggle ${filters.hideDonghua ? "is-active" : ""}`}
+                aria-pressed={filters.hideDonghua}
+                onClick={() => setFilters((current) => {
+                  const next = { ...current, hideDonghua: !current.hideDonghua };
+                  window.localStorage.setItem(DONGHUA_STORAGE_KEY, String(next.hideDonghua));
+                  return next;
+                })}
+              >
+                Donghua ({weekCategoryTotals.donghua})
+              </button>
+            </div>
           </div>
-          <p className="season-calendar-summary" aria-live="polite">
-            <strong>{weekSummary.visible}</strong> emisiones visibles
-            {weekSummary.hiddenByPreferences ? ` · ${weekSummary.hiddenByPreferences} ocultas por preferencias` : ""}
-          </p>
+
+          <div className="tierlist-filter-group">
+            <span className="tierlist-filter-group-label">Ver</span>
+            <FormSelect
+              value={filters.focusMode || ""}
+              onChange={(value) => setFilters((current) => ({ ...current, focusMode: value }))}
+              options={[
+                { value: "", label: "Todo" },
+                { value: "adult", label: "Solo adulto" },
+                { value: "donghua", label: "Solo donghua" },
+              ]}
+            />
+          </div>
         </div>
+        <p className="season-calendar-summary" aria-live="polite">
+          <strong>{weekSummary.visible}</strong> emisiones visibles
+          {weekSummary.hiddenByPreferences ? ` · ${weekSummary.hiddenByPreferences} ocultas por preferencias` : ""}
+        </p>
       </section>
 
       {!isLoading && !isFetching && result.activeSeason ? (
@@ -343,6 +368,21 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
               Favoritos ({favoriteAnimes.length})
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {!isLoading && !isFetching && result.activeSeason ? (
+        <div className="season-calendar-week-nav">
+          <button type="button" className="tracker-action-secondary" aria-label="Semana anterior" onClick={() => moveWeek(-1)}><ChevronLeft size={18} /></button>
+          <button type="button" className="tracker-action-secondary" onClick={() => setWeekStart(getWeekStart(todayKey))}>Hoy</button>
+          <button type="button" className="tracker-action-secondary" aria-label="Semana siguiente" onClick={() => moveWeek(1)}><ChevronRight size={18} /></button>
+          <strong>{rangeLabel}</strong>
+          <input
+            className="season-calendar-search-input season-calendar-week-nav-search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar anime..."
+          />
         </div>
       ) : null}
 
@@ -375,12 +415,9 @@ export default function SeasonalAnimeCalendarPage({ initialResult = null, isLoad
             {search.trim() ? <button type="button" className="tracker-action-secondary" onClick={() => setSearch("")}>Limpiar búsqueda</button> : null}
             {weekSummary.hiddenByPreferences ? (
               <button type="button" className="tracker-action-secondary" onClick={() => {
-                setShowAdult(true);
-                setShowDonghua(true);
-                setShowDefault(true);
-                window.localStorage.setItem(ADULT_STORAGE_KEY, "true");
-                window.localStorage.setItem(DONGHUA_STORAGE_KEY, "true");
-                window.localStorage.setItem(DEFAULT_STORAGE_KEY, "true");
+                setFilters({ hideAdult: false, hideDonghua: false, focusMode: "" });
+                window.localStorage.setItem(ADULT_STORAGE_KEY, "false");
+                window.localStorage.setItem(DONGHUA_STORAGE_KEY, "false");
               }}>Mostrar contenido oculto</button>
             ) : null}
             <button type="button" className="tracker-action-secondary" onClick={goToRelevantWeek}>Ir a una semana con emisiones</button>

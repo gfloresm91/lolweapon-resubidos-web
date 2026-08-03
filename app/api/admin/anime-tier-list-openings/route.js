@@ -11,24 +11,31 @@ import {
   updateAnimeTierListTheme,
 } from "@/lib/repositories/animeTierListThemeRepository";
 import { relinkAnimeTierListEntry } from "@/lib/repositories/animeTierListEntryRepository";
+import { SEASON_LABELS } from "@/lib/animeTierListLabels";
 import { getPrismaClient } from "@/lib/prisma";
 import { ensurePermissionAuthorized } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
+// Orden cronológico de trimestres (no alfabético): define el orden de las claves de SEASON_LABELS.
+const SEASON_ORDER = Object.keys(SEASON_LABELS);
+
 async function listSeasonsWithEntries() {
   const prisma = getPrismaClient();
   const rows = await prisma.animeSeason.findMany({
-    orderBy: [{ year: "desc" }, { season: "asc" }],
     include: { _count: { select: { tierListEntries: true } } },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    year: row.year,
-    season: row.season,
-    status: row.status,
-    entriesCount: row._count.tierListEntries,
-  }));
+  return rows
+    .map((row) => ({
+      id: row.id,
+      year: row.year,
+      season: row.season,
+      status: row.status,
+      entriesCount: row._count.tierListEntries,
+    }))
+    .sort((left, right) => (
+      right.year - left.year || SEASON_ORDER.indexOf(right.season) - SEASON_ORDER.indexOf(left.season)
+    ));
 }
 
 export async function GET(request) {

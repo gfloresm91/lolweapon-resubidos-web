@@ -19293,8 +19293,6 @@ body:has(.season-calendar-page)::before {
 }
 
 .season-calendar-week-nav,
-.season-calendar-filters,
-.season-calendar-preferences,
 .season-sync-controls,
 .season-admin-heading {
   display: flex;
@@ -19303,15 +19301,45 @@ body:has(.season-calendar-page)::before {
   flex-wrap: wrap;
 }
 
-.season-calendar-preferences {
-  min-width: 0;
-}
-
 .season-calendar-toggles {
   display: flex;
   gap: 0.7rem;
   flex-wrap: wrap;
 }
+
+.tierlist-filter-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tierlist-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0;
+}
+
+.tierlist-filter-group + .tierlist-filter-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tierlist-filter-group-label {
+  flex: 0 0 7.75rem;
+  width: 7.75rem;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 
 .season-calendar-week-nav strong {
   color: #dbe5f3;
@@ -19320,24 +19348,26 @@ body:has(.season-calendar-page)::before {
 
 .season-calendar-week-nav {
   padding-bottom: 0.1rem;
+  margin-bottom: 1.5rem;
 }
 
-.season-calendar-filters {
-  display: grid;
-  grid-template-columns: minmax(190px, 260px) minmax(220px, 1fr);
-  gap: 0.8rem;
+.tierlist-filter-group .filter-select {
+  flex: 1;
+  min-width: 220px;
 }
 
-.season-calendar-search,
-.season-calendar-season-field {
-  display: grid;
-  gap: 0.35rem;
-  color: #b6c2d2;
-  font-size: 0.78rem;
+.tierlist-filter-group .filter-select-label {
+  display: none;
 }
 
-.season-calendar-search input {
-  min-height: 42px;
+.tierlist-filter-group .filter-select-button {
+  min-height: 46px;
+}
+
+.season-calendar-search-input {
+  flex: 1;
+  min-width: 220px;
+  min-height: 46px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 10px;
   background: #0b1017;
@@ -19345,34 +19375,11 @@ body:has(.season-calendar-page)::before {
   padding: 0 0.75rem;
 }
 
-.season-calendar-season-field .filter-select-label {
-  display: none;
-}
-
-.season-calendar-season-field .filter-select-button {
-  min-height: 42px;
-}
-
-.season-calendar-timezone {
-  display: grid;
-  grid-template-columns: auto minmax(220px, 300px);
-  align-items: center;
-  gap: 0.55rem;
-  min-width: 0;
-  color: #aab7ca;
-}
-
-.season-calendar-timezone .filter-select {
-  min-width: 0;
-}
-
-.season-calendar-timezone .filter-select-button {
-  min-height: 42px;
-  background: #0b1017;
-}
-
-.season-calendar-timezone .filter-select-menu {
-  min-width: min(360px, calc(100vw - 2rem));
+.season-calendar-week-nav-search {
+  flex: 0 1 260px;
+  min-width: 180px;
+  min-height: 40px;
+  margin-left: auto;
 }
 
 .season-calendar-toggle {
@@ -19383,6 +19390,11 @@ body:has(.season-calendar-page)::before {
   color: #b6c2d2;
   padding: 0 0.85rem;
   cursor: pointer;
+}
+
+.season-calendar-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .season-calendar-toggle.is-active {
@@ -20035,7 +20047,6 @@ a.season-airing-platform.season-airing-platform:hover {
 }
 
 @media (max-width: 900px) {
-  .season-calendar-filters,
   .season-sync-preview {
     grid-template-columns: 1fr 1fr;
   }
@@ -20054,13 +20065,11 @@ a.season-airing-platform.season-airing-platform:hover {
 }
 
 @media (max-width: 600px) {
-  .season-calendar-filters,
   .season-sync-preview {
     grid-template-columns: 1fr;
   }
 
-  .season-calendar-week-nav > strong,
-  .season-calendar-timezone {
+  .season-calendar-week-nav > strong {
     width: 100%;
   }
 
@@ -20072,12 +20081,10 @@ a.season-airing-platform.season-airing-platform:hover {
     flex: 1;
   }
 
-  .season-calendar-timezone {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .season-calendar-timezone .filter-select {
+  .season-calendar-week-nav-search {
     width: 100%;
+    margin-left: 0;
+    flex-basis: 100%;
   }
 
   .season-calendar-toggle,
@@ -20667,6 +20674,19 @@ body:has(.tierlist-page)::before {
   }
 }
 
+.tierlist-page .tierlist-toolbar-actions .tracker-action-primary,
+.tierlist-page .tierlist-toolbar-actions .tracker-action-secondary {
+  min-height: 44px;
+  font-size: 0.9rem;
+  padding: 0.5rem 1.1rem;
+}
+
+.tierlist-page .season-calendar-view-switch-row .tracker-calendar-view-toggle button {
+  min-height: 40px;
+  font-size: 0.85rem;
+  padding: 0 1.05rem;
+}
+
 @media (min-width: 768px) and (max-width: 1024px) {
   .tierlist-page .tierlist-toolbar-top {
     flex-direction: column;
@@ -20686,13 +20706,15 @@ body:has(.tierlist-page)::before {
     font-size: 0.95rem;
   }
 
-  .tierlist-page .season-calendar-toggles {
+  .tierlist-page .season-calendar-toggles,
+  .season-calendar-page .season-calendar-toggles {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.7rem;
   }
 
-  .tierlist-page .season-calendar-toggle {
+  .tierlist-page .season-calendar-toggle,
+  .season-calendar-page .season-calendar-toggle {
     min-height: 46px;
     font-size: 0.9rem;
   }
@@ -20743,10 +20765,16 @@ body:has(.tierlist-page)::before {
   }
 }
 
+@media (min-width: 901px) and (max-width: 1024px) {
+  .tierlist-page .tierlist-admin-toggles {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 .tierlist-page-readonly {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1.75rem 4.5rem;
+  padding: 0 2.5rem 4.5rem;
 }
 
 .tierlist-page-readonly .tierlist-row {
@@ -20905,6 +20933,11 @@ body:has(.tierlist-page)::before {
 }
 
 .tierlist-row-label button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
   background: none;
   border: 0;
   color: inherit;
@@ -20915,6 +20948,8 @@ body:has(.tierlist-page)::before {
 
 .tierlist-row-label-input {
   width: 100%;
+  height: 100%;
+  min-height: 3rem;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(0, 0, 0, 0.3);
   border-radius: 8px;
@@ -20922,6 +20957,9 @@ body:has(.tierlist-page)::before {
   font: inherit;
   text-align: center;
   padding: 0.2rem;
+  resize: none;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .tierlist-row-drop,
@@ -20987,12 +21025,28 @@ body:has(.tierlist-page)::before {
   margin-top: 0.5rem;
 }
 
+.tierlist-pool-pending {
+  margin-bottom: 1.5rem;
+}
+
 .tierlist-pool-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.tierlist-pool-subsection {
+  margin-bottom: 1.4rem;
+}
+
+.tierlist-pool-subsection-title {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   margin-bottom: 0.6rem;
 }
 
@@ -21217,6 +21271,15 @@ body:has(.tierlist-page)::before {
   height: 1.9rem;
 }
 
+.tierlist-card-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.tierlist-card-actions-grid .icon-tool-button {
+  width: 100%;
+}
+
 .tierlist-sources-field {
   display: flex;
   flex-direction: column;
@@ -21224,14 +21287,42 @@ body:has(.tierlist-page)::before {
   margin-bottom: 1.2rem;
 }
 
+.tierlist-primary-source-row,
 .tierlist-source-row {
-  grid-template-columns: 1fr 1fr auto;
   align-items: center;
   padding: 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.02);
   margin-bottom: 0.8rem;
+}
+
+.tierlist-primary-source-row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.tierlist-source-row {
+  grid-template-columns: auto 1fr 1fr auto;
+}
+
+.tierlist-source-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.tierlist-source-drag-handle:active {
+  cursor: grabbing;
+}
+
+.tierlist-source-row.is-dragging {
+  opacity: 0.4;
+}
+
+.tierlist-source-row.is-overlay {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  border-color: rgba(139, 92, 246, 0.55);
+  background: #171021;
+  cursor: grabbing;
 }
 
 .tierlist-video-modal {

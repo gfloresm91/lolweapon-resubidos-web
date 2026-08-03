@@ -17,7 +17,7 @@ import {
 import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { toPng } from "html-to-image";
-import { AlertTriangle, ArrowDown, ArrowDownAZ, ArrowUp, Copy, Download, Edit3, Eye, EyeOff, Info, Music2, Play, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowDownAZ, ArrowUp, Copy, Download, Edit3, Eye, EyeOff, FileEdit, Globe, Info, Music2, Play, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import AnimePosterImage from "@/components/AnimePosterImage";
@@ -76,7 +76,7 @@ function normalizeRosterItem(kind, item) {
       badge: null,
       isAdult: item.isAdult,
       isDonghua: item.isDonghua,
-      isSpoiler: false,
+      isNsfw: false,
       isHidden: item.isHidden,
       videoUrl: null,
       primarySourceLabel: null,
@@ -89,12 +89,16 @@ function normalizeRosterItem(kind, item) {
     entryId: item.tierListEntryId,
     aniListId: item.aniListId ?? null,
     title: item.animeTitle,
+    rawTitle: item.rawAnimeTitle || "",
+    manualTitle: item.manualAnimeTitle ?? null,
     imageUrl: item.imageUrl,
     badge: item.sequence,
     isAdult: item.isAdult,
     isDonghua: item.isDonghua,
-    isSpoiler: item.isSpoiler,
+    isNsfw: item.isNsfw,
     isHidden: item.isHidden,
+    isDeletedByAdmin: Boolean(item.isDeletedByAdmin),
+    isDraft: Boolean(item.isDraft),
     videoUrl: item.videoUrl,
     primarySourceLabel: item.primarySourceLabel || null,
     alternateVideoUrls: Array.isArray(item.alternateVideoUrls) ? item.alternateVideoUrls : [],
@@ -118,25 +122,34 @@ function normalizeRosterItem(kind, item) {
 }
 
 function applySequenceBadges(roster) {
-  const visibleCounts = new Map();
+  const siblingCounts = new Map();
   for (const item of roster) {
-    if (item.entryId == null || item.isHidden) continue;
-    visibleCounts.set(item.entryId, (visibleCounts.get(item.entryId) || 0) + 1);
+    if (item.entryId == null) continue;
+    siblingCounts.set(item.entryId, (siblingCounts.get(item.entryId) || 0) + 1);
   }
   return roster.map((item) => {
-    const hasSiblings = item.entryId != null && (visibleCounts.get(item.entryId) || 0) > 1;
+    const hasSiblings = item.entryId != null && (siblingCounts.get(item.entryId) || 0) > 1;
     const hasMeaningfulSequence = item.badge != null && item.badge > 1;
     return hasSiblings || hasMeaningfulSequence ? item : { ...item, badge: null };
   });
 }
 
 function passesFilters(item, filters, canManageThemes = false) {
-  if (item.isSpoiler && !filters.showSpoiler) return false;
-  if (item.isManual && !filters.showManual) return false;
-  if (item.isAdult) return filters.showAdult;
-  if (item.isDonghua) return filters.showDonghua;
-  if (item.isManual && canManageThemes) return true;
-  return filters.showDefault;
+  // Modo revisión: aísla una sola categoría. Los interruptores de "ocultar" siguen aplicando
+  // encima (salvo el que sería contradictorio con el propio modo activo), para poder combinar
+  // por ejemplo "Solo manuales" + "Ocultar adulto".
+  if (filters.focusMode) {
+    const matchesFocus = {
+      adult: () => Boolean(item.isAdult),
+      donghua: () => Boolean(item.isDonghua),
+      manual: () => canManageThemes && Boolean(item.isManual),
+      synced: () => canManageThemes && !item.isManual,
+    }[filters.focusMode]?.() ?? true;
+    if (!matchesFocus) return false;
+  }
+  if (filters.focusMode !== "adult" && item.isAdult && filters.hideAdult) return false;
+  if (filters.focusMode !== "donghua" && item.isDonghua && filters.hideDonghua) return false;
+  return true;
 }
 
 function passesEntryFilters(entry, filters, canManageThemes = false) {
@@ -144,7 +157,7 @@ function passesEntryFilters(entry, filters, canManageThemes = false) {
   return passesFilters(entry, filters, canManageThemes);
 }
 
-function buildContainers(roster, tiers, placements, filters, canManageThemes = false) {
+function buildBoardContainers(roster, tiers, placements, filters, canManageThemes = false) {
   const itemsById = new Map(roster.map((item) => [item.id, item]));
   const placedIds = new Set(placements.map((placement) => placement.itemId));
   const containers = { _pool: [] };
@@ -156,9 +169,7 @@ function buildContainers(roster, tiers, placements, filters, canManageThemes = f
     const tierKey = placement.tierKey && containers[placement.tierKey] ? placement.tierKey : null;
     if (item.isHidden) {
       // Ya rankeado en una fila: se mantiene visible con overlay pase lo que pase.
-      if (tierKey) { containers[tierKey].push(placement.itemId); continue; }
-      // Solo en el pool: se muestra si se activó "Mostrar ocultos" (admin/streamer).
-      if (filters.showHiddenByAdmin) containers._pool.push(placement.itemId);
+      if (tierKey) containers[tierKey].push(placement.itemId);
       continue;
     }
     if (!passesFilters(item, filters, canManageThemes)) continue;
@@ -167,10 +178,7 @@ function buildContainers(roster, tiers, placements, filters, canManageThemes = f
 
   for (const item of roster) {
     if (placedIds.has(item.id)) continue;
-    if (item.isHidden) {
-      if (filters.showHiddenByAdmin) containers._pool.push(item.id);
-      continue;
-    }
+    if (item.isHidden) continue;
     if (!passesFilters(item, filters, canManageThemes)) continue;
     containers._pool.push(item.id);
   }
@@ -178,21 +186,81 @@ function buildContainers(roster, tiers, placements, filters, canManageThemes = f
   return { containers, itemsById };
 }
 
-function computeContentCounts(roster, filters, canManageThemes = false) {
-  const counts = { default: 0, adult: 0, donghua: 0, spoiler: 0, manual: 0, hiddenByPreferences: 0, hiddenByAdmin: 0 };
+// Sin tema/Borradores/Ocultos son mutuamente excluyentes: un tema eliminado prevalece sobre
+// un borrador. A propósito NO depende de "placements": rankear o mover algo no cambia si es
+// oculto/borrador, así que separarlo evita recalcular esto (y re-renderizar el panel completo
+// de Administración) en cada evento de arrastre normal.
+function buildReviewPools(roster, filters, canManageThemes = false) {
+  const hiddenPoolItems = [];
+  const draftPoolItems = [];
+  const publishedPoolItems = [];
   for (const item of roster) {
-    if (item.isHidden) { counts.hiddenByAdmin += 1; continue; }
+    if (!passesFilters(item, filters, canManageThemes)) continue;
+    if (!item.isHidden) {
+      if (filters.showPublished) publishedPoolItems.push(item);
+      continue;
+    }
+    if (item.isDraft) {
+      if (filters.showDrafts) draftPoolItems.push(item);
+    } else if (filters.showHiddenByAdmin) {
+      hiddenPoolItems.push(item);
+    }
+  }
+
+  // Ocultos/Borradores/Publicados no se pueden reordenar a mano: se listan siempre alfabéticamente.
+  const sequenceOf = (item) => item?.manualSequence ?? item?.rawSequence ?? 0;
+  const sortByTitle = (items) => [...items]
+    .sort((left, right) => (left.title || "").localeCompare(right.title || "") || sequenceOf(left) - sequenceOf(right))
+    .map((item) => item.id);
+
+  return {
+    hiddenPoolItemIds: sortByTitle(hiddenPoolItems),
+    draftPoolItemIds: sortByTitle(draftPoolItems),
+    publishedPoolItemIds: sortByTitle(publishedPoolItems),
+  };
+}
+
+// Conteos crudos por propiedad: fijos, no dependen del estado actual de los filtros.
+// Adulto/Donghua suman también "Sin tema", porque Ocultar adulto/donghua también los filtra ahí.
+function computeContentCounts(roster, entriesWithoutTheme = []) {
+  const counts = {
+    total: 0, adult: 0, donghua: 0, hiddenByAdmin: 0, drafts: 0, visibleAdult: 0, visibleDonghua: 0,
+  };
+  for (const item of roster) {
+    // Adulto/Donghua cuentan sobre todo el roster (Publicados, Borradores y Ocultos incluidos):
+    // en modo admin "Ocultar adulto/donghua" filtra los 4 paneles, así que ese contador debe
+    // reflejarlos a todos. visibleAdult/visibleDonghua quedan acotados a lo publicado (mismo
+    // universo que "total"), que es lo único que un usuario normal puede llegar a ver.
     if (item.isAdult) counts.adult += 1;
-    else if (item.isDonghua) counts.donghua += 1;
-    else counts.default += 1;
-    if (item.isSpoiler) counts.spoiler += 1;
-    if (item.isManual) counts.manual += 1;
-    if (!passesFilters(item, filters, canManageThemes)) counts.hiddenByPreferences += 1;
+    if (item.isDonghua) counts.donghua += 1;
+    if (item.isDraft) { counts.drafts += 1; continue; }
+    if (item.isHidden) { counts.hiddenByAdmin += 1; continue; }
+    counts.total += 1;
+    if (item.isAdult) counts.visibleAdult += 1;
+    if (item.isDonghua) counts.visibleDonghua += 1;
+  }
+  for (const entry of entriesWithoutTheme) {
+    if (entry.isAdult) counts.adult += 1;
+    if (entry.isDonghua) counts.donghua += 1;
   }
   return counts;
 }
 
-const DEFAULT_FILTERS = { showDefault: true, showAdult: false, showDonghua: false, showSpoiler: true, showManual: true, showHiddenByAdmin: false };
+function countVisibleRoster(roster, filters, canManageThemes = false) {
+  return roster.reduce((total, item) => (
+    !item.isHidden && passesFilters(item, filters, canManageThemes) ? total + 1 : total
+  ), 0);
+}
+
+const DEFAULT_FILTERS = {
+  hideAdult: true,
+  hideDonghua: false,
+  showHiddenByAdmin: false,
+  showEntriesWithoutTheme: false,
+  showDrafts: false,
+  showPublished: false,
+  focusMode: "",
+};
 
 function collisionDetectionStrategy(args) {
   const pointerCollisions = pointerWithin(args);
@@ -273,12 +341,13 @@ function loadStoredFilters(kind) {
   }
 }
 
-function ItemCard({ item, onOpen, isOverlay = false, canManageThemes = false, onEditItem, onDuplicate, onToggleVisibility }) {
+function ItemCard({ item, onOpen, isOverlay = false, canManageThemes = false, onEditItem, onDuplicate, onToggleVisibility, onMarkAsDraft, onPublish }) {
   const sortable = useSortable({ id: item.id, disabled: isOverlay });
   const style = isOverlay ? undefined : {
     transform: CSS.Transform.toString(sortable.transform),
     transition: sortable.transition,
   };
+  const showFourActions = canManageThemes && !item.isDraft && Boolean(onMarkAsDraft);
 
   return (
     <div
@@ -301,11 +370,15 @@ function ItemCard({ item, onOpen, isOverlay = false, canManageThemes = false, on
           </div>
         ) : null}
         {item.videoUrl ? <span className="tierlist-card-play"><Play size={22} /></span> : null}
-        {item.isHidden ? <span className="tierlist-card-hidden-flag">Oculto por administración</span> : null}
+        {item.isDraft ? (
+          <span className="tierlist-card-hidden-flag">Borrador</span>
+        ) : item.isHidden ? (
+          <span className="tierlist-card-hidden-flag">Oculto por administración</span>
+        ) : null}
       </div>
       <span className="tierlist-card-title">{item.title}</span>
       {canManageThemes ? (
-        <div className="tierlist-card-actions">
+        <div className={`tierlist-card-actions ${showFourActions ? "tierlist-card-actions-grid" : ""}`}>
           <button
             type="button"
             className="icon-tool-button"
@@ -324,42 +397,82 @@ function ItemCard({ item, onOpen, isOverlay = false, canManageThemes = false, on
           >
             <Copy size={14} />
           </button>
-          <button
-            type="button"
-            className={`icon-tool-button ${item.isHidden ? "" : "danger"}`}
-            aria-label={item.isHidden ? "Mostrar tema" : "Ocultar tema"}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => { event.stopPropagation(); onToggleVisibility?.(item); }}
-          >
-            {item.isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-          </button>
+          {item.isDraft ? (
+            <button
+              type="button"
+              className="icon-tool-button"
+              aria-label="Publicar tema"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); onPublish?.(item); }}
+            >
+              <Globe size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`icon-tool-button ${item.isHidden ? "" : "danger"}`}
+              aria-label={item.isHidden ? "Mostrar tema" : "Ocultar tema"}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); onToggleVisibility?.(item); }}
+            >
+              {item.isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+            </button>
+          )}
+          {showFourActions ? (
+            <button
+              type="button"
+              className="icon-tool-button"
+              aria-label="Pasar a borrador"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => { event.stopPropagation(); onMarkAsDraft?.(item); }}
+            >
+              <FileEdit size={14} />
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 }
 
-function TierRow({ tier, itemIds, itemsById, onOpenItem, onRename, onOpenColorPicker, onDelete, onMove, canMoveUp, canMoveDown, canManageThemes, onEditItem, onDuplicate, onToggleVisibility }) {
+function TierRow({ tier, itemIds, itemsById, onOpenItem, onRename, onOpenColorPicker, onDelete, onMove, canMoveUp, canMoveDown, canManageThemes, onEditItem, onDuplicate, onToggleVisibility, onMarkAsDraft, onPublish }) {
   const { setNodeRef } = useDroppable({ id: tier.key });
   const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const [labelHeight, setLabelHeight] = useState(null);
+  const labelRef = useRef(null);
+
+  function startEditingLabel() {
+    if (labelRef.current) setLabelHeight(labelRef.current.getBoundingClientRect().height);
+    setIsEditingLabel(true);
+  }
+
+  function stopEditingLabel() {
+    setIsEditingLabel(false);
+    setLabelHeight(null);
+  }
 
   return (
     <div className="tierlist-row">
-      <div className="tierlist-row-label" style={{ backgroundColor: tier.color }}>
+      <div
+        ref={labelRef}
+        className="tierlist-row-label"
+        style={{ backgroundColor: tier.color, ...(isEditingLabel && labelHeight ? { height: `${labelHeight}px` } : {}) }}
+      >
         {isEditingLabel ? (
-          <input
+          <textarea
             className="tierlist-row-label-input"
             defaultValue={tier.label}
             autoFocus
-            maxLength={40}
-            onBlur={(event) => { onRename(tier.key, event.target.value); setIsEditingLabel(false); }}
+            maxLength={80}
+            onFocus={(event) => event.target.select()}
+            onBlur={(event) => { onRename(tier.key, event.target.value); stopEditingLabel(); }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-              if (event.key === "Escape") setIsEditingLabel(false);
+              if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
+              if (event.key === "Escape") stopEditingLabel();
             }}
           />
         ) : (
-          <button type="button" onClick={() => setIsEditingLabel(true)} title="Renombrar fila">{tier.label}</button>
+          <button type="button" onClick={startEditingLabel} title="Renombrar fila">{tier.label}</button>
         )}
       </div>
 
@@ -378,6 +491,8 @@ function TierRow({ tier, itemIds, itemsById, onOpenItem, onRename, onOpenColorPi
                 onEditItem={onEditItem}
                 onDuplicate={onDuplicate}
                 onToggleVisibility={onToggleVisibility}
+                onMarkAsDraft={onMarkAsDraft}
+                onPublish={onPublish}
               />
             );
           })}
@@ -471,11 +586,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const [videoError, setVideoError] = useState(false);
   const [videoSource, setVideoSource] = useState("primary");
   const [canManageThemes, setCanManageThemes] = useState(false);
+  // Modo usuario siempre por defecto, incluso para admins: nunca arranca en modo admin por accidente.
+  const [viewMode, setViewMode] = useState("user");
   const [entriesWithoutTheme, setEntriesWithoutTheme] = useState([]);
-  const [showEntriesWithoutTheme, setShowEntriesWithoutTheme] = useState(false);
   const [isCreateThemeOpen, setIsCreateThemeOpen] = useState(false);
   const [isAniListSearchOpen, setIsAniListSearchOpen] = useState(false);
   const [createSelectedAnime, setCreateSelectedAnime] = useState(null);
+  const [createTitleValue, setCreateTitleValue] = useState("");
+  const [createTitleTouched, setCreateTitleTouched] = useState(false);
   const [createThemeType, setCreateThemeType] = useState(kind === "ed" ? "ED" : "OP");
   const [createSequence, setCreateSequence] = useState("1");
   const [createIsAdultOverride, setCreateIsAdultOverride] = useState("");
@@ -488,6 +606,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const [editAlternateSources, setEditAlternateSources] = useState([]);
   const [editPrimaryUrlValue, setEditPrimaryUrlValue] = useState("");
   const [editPrimaryUrlTouched, setEditPrimaryUrlTouched] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState("");
+  const [editTitleTouched, setEditTitleTouched] = useState(false);
+  const [editSongTitleValue, setEditSongTitleValue] = useState("");
+  const [editSongTitleTouched, setEditSongTitleTouched] = useState(false);
+  const [editArtistValue, setEditArtistValue] = useState("");
+  const [editArtistTouched, setEditArtistTouched] = useState(false);
   const [editingThemeItem, setEditingThemeItem] = useState(null);
   const [editManualType, setEditManualType] = useState("");
   const [editSequence, setEditSequence] = useState("1");
@@ -500,15 +624,22 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const [editImagePreviewUrl, setEditImagePreviewUrl] = useState("");
   const [isEditAniListSearchOpen, setIsEditAniListSearchOpen] = useState(false);
   const [pendingDeleteTheme, setPendingDeleteTheme] = useState(null);
+  const [pendingDeleteEntry, setPendingDeleteEntry] = useState(null);
+  const [pendingDraftTheme, setPendingDraftTheme] = useState(null);
+  const [pendingPublishTheme, setPendingPublishTheme] = useState(null);
+  const [pendingRemoveTheme, setPendingRemoveTheme] = useState(null);
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [pendingDeleteTier, setPendingDeleteTier] = useState(null);
   const [colorPickerTier, setColorPickerTier] = useState(null);
   const [poolSearch, setPoolSearch] = useState("");
+  const [adminSearch, setAdminSearch] = useState("");
   const [filters, setFilters] = useState(() => loadStoredFilters(kind));
   const exportRef = useRef(null);
   const autosaveTimer = useRef(null);
   const isFirstLoad = useRef(true);
   const skipNextFilterSaveRef = useRef(false);
+  const dragOverRafRef = useRef(null);
+  const pendingDragOverEventRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -516,17 +647,78 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // En modo usuario, incluso un admin ve el tablero exactamente como un usuario sin permisos
+  // (sin botones ni panel de administración): así el rendimiento del ranking nunca se ve afectado.
+  const isAdminView = canManageThemes && viewMode === "admin";
+  const showBoard = viewMode === "user";
+
   const { containers, itemsById } = useMemo(
-    () => buildContainers(roster, tiers, placements, filters, canManageThemes),
-    [roster, tiers, placements, filters, canManageThemes],
+    () => buildBoardContainers(roster, tiers, placements, filters, isAdminView),
+    [roster, tiers, placements, filters, isAdminView],
   );
 
-  const contentCounts = useMemo(() => computeContentCounts(roster, filters, canManageThemes), [roster, filters, canManageThemes]);
+  const { hiddenPoolItemIds, draftPoolItemIds, publishedPoolItemIds } = useMemo(
+    () => buildReviewPools(roster, filters, isAdminView),
+    [roster, filters, isAdminView],
+  );
+
+  const contentCounts = useMemo(() => computeContentCounts(roster, entriesWithoutTheme), [roster, entriesWithoutTheme]);
+  const visibleRosterCount = useMemo(
+    () => countVisibleRoster(roster, filters, isAdminView),
+    [roster, filters, isAdminView],
+  );
 
   const visibleEntriesWithoutTheme = useMemo(
-    () => entriesWithoutTheme.filter((entry) => passesEntryFilters(entry, filters, canManageThemes)),
-    [entriesWithoutTheme, filters, canManageThemes],
+    () => entriesWithoutTheme.filter((entry) => passesEntryFilters(entry, filters, isAdminView)),
+    [entriesWithoutTheme, filters, isAdminView],
   );
+
+  const entryDuplicateCounts = useMemo(() => {
+    const counts = new Map();
+    for (const entry of entriesWithoutTheme) {
+      const groupKey = entry.duplicateGroupId || entry.id;
+      counts.set(groupKey, (counts.get(groupKey) || 0) + 1);
+    }
+    return counts;
+  }, [entriesWithoutTheme]);
+
+  const entryDuplicatePositions = useMemo(() => {
+    const groups = new Map();
+    for (const entry of entriesWithoutTheme) {
+      const groupKey = entry.duplicateGroupId || entry.id;
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(entry);
+    }
+    const positions = new Map();
+    for (const members of groups.values()) {
+      [...members].sort((left, right) => left.id - right.id).forEach((member, index) => positions.set(member.id, index + 1));
+    }
+    return positions;
+  }, [entriesWithoutTheme]);
+
+  const searchedEntriesWithoutTheme = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return visibleEntriesWithoutTheme;
+    return visibleEntriesWithoutTheme.filter((entry) => entry.title?.toLowerCase().includes(query));
+  }, [visibleEntriesWithoutTheme, adminSearch]);
+
+  const searchedDraftPoolItemIds = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return draftPoolItemIds;
+    return draftPoolItemIds.filter((id) => itemsById.get(id)?.title?.toLowerCase().includes(query));
+  }, [draftPoolItemIds, adminSearch, itemsById]);
+
+  const searchedHiddenPoolItemIds = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return hiddenPoolItemIds;
+    return hiddenPoolItemIds.filter((id) => itemsById.get(id)?.title?.toLowerCase().includes(query));
+  }, [hiddenPoolItemIds, adminSearch, itemsById]);
+
+  const searchedPublishedPoolItemIds = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase();
+    if (!query) return publishedPoolItemIds;
+    return publishedPoolItemIds.filter((id) => itemsById.get(id)?.title?.toLowerCase().includes(query));
+  }, [publishedPoolItemIds, adminSearch, itemsById]);
 
   const poolItemIds = useMemo(() => {
     const ids = containers._pool || [];
@@ -569,6 +761,10 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     setFilters(loadStoredFilters(kind));
   }, [kind]);
 
+  useEffect(() => () => {
+    if (dragOverRafRef.current) cancelAnimationFrame(dragOverRafRef.current);
+  }, []);
+
   useEffect(() => {
     if (skipNextFilterSaveRef.current) {
       skipNextFilterSaveRef.current = false;
@@ -602,9 +798,17 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     }
     setEditImageFile(null);
     setEditImageError("");
-    setEditAlternateSources(Array.isArray(editingThemeItem?.alternateVideoUrls) ? editingThemeItem.alternateVideoUrls : []);
+    setEditAlternateSources(Array.isArray(editingThemeItem?.alternateVideoUrls)
+      ? editingThemeItem.alternateVideoUrls.map((source) => ({ id: crypto.randomUUID(), ...source }))
+      : []);
     setEditPrimaryUrlValue(editingThemeItem?.videoUrl || "");
     setEditPrimaryUrlTouched(false);
+    setEditTitleValue(editingThemeItem?.title || "");
+    setEditTitleTouched(false);
+    setEditSongTitleValue(editingThemeItem?.songTitle || "");
+    setEditSongTitleTouched(false);
+    setEditArtistValue(editingThemeItem?.artist || "");
+    setEditArtistTouched(false);
   }, [editingThemeItem]);
 
   useEffect(() => {
@@ -612,6 +816,11 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       setCreateAlternateSources([]);
     }
   }, [isCreateThemeOpen]);
+
+  useEffect(() => {
+    setCreateTitleValue(createSelectedAnime?.title || "");
+    setCreateTitleTouched(false);
+  }, [createSelectedAnime]);
 
   useEffect(() => {
     if (!createImageFile) {
@@ -670,10 +879,15 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   }
 
   function handleDragStart(event) {
+    if (dragOverRafRef.current) {
+      cancelAnimationFrame(dragOverRafRef.current);
+      dragOverRafRef.current = null;
+    }
+    pendingDragOverEventRef.current = null;
     setActiveId(event.active.id);
   }
 
-  function handleDragOver(event) {
+  function processDragOver(event) {
     const { active, over } = event;
     if (!over) return;
     const activeContainer = findContainerKey(active.id);
@@ -681,6 +895,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     if (!activeContainer || !overContainer || activeContainer === overContainer) return;
 
     setPlacements((current) => {
+      // Si el ítem ya está en el contenedor destino no se toca el estado (evita renders de más).
+      const alreadyThere = current.some((placement) => (
+        placement.itemId === active.id && (placement.tierKey ?? "_pool") === overContainer
+      ));
+      if (alreadyThere) return current;
+
       const next = current.filter((placement) => placement.itemId !== active.id);
       const insertAt = next.filter((placement) => (placement.tierKey ?? "_pool") === overContainer).length;
       next.splice(insertAt, 0, { itemId: active.id, tierKey: overContainer === "_pool" ? null : overContainer });
@@ -688,7 +908,28 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     });
   }
 
+  // Throttleado a un procesamiento por frame: dnd-kit puede disparar "over" muchas veces por
+  // frame (auto-scroll, pointermove de alta frecuencia), y encadenar un setState por cada uno
+  // es lo que puede disparar "Maximum update depth exceeded". requestAnimationFrame corta esa
+  // cadena sincrónica sin perder la vista previa en vivo ni las animaciones de dnd-kit.
+  function handleDragOver(event) {
+    pendingDragOverEventRef.current = event;
+    if (dragOverRafRef.current) return;
+    dragOverRafRef.current = requestAnimationFrame(() => {
+      dragOverRafRef.current = null;
+      const pendingEvent = pendingDragOverEventRef.current;
+      pendingDragOverEventRef.current = null;
+      if (pendingEvent) processDragOver(pendingEvent);
+    });
+  }
+
   function handleDragEnd(event) {
+    if (dragOverRafRef.current) {
+      cancelAnimationFrame(dragOverRafRef.current);
+      dragOverRafRef.current = null;
+    }
+    pendingDragOverEventRef.current = null;
+
     const { active, over } = event;
     setActiveId(null);
     if (!over) return;
@@ -721,7 +962,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
 
   function renameTier(key, label) {
     if (!label.trim()) return;
-    setTiers((current) => current.map((tier) => (tier.key === key ? { ...tier, label: label.trim().slice(0, 40) } : tier)));
+    setTiers((current) => current.map((tier) => (tier.key === key ? { ...tier, label: label.trim().slice(0, 80) } : tier)));
   }
 
   function recolorTier(key, color) {
@@ -871,7 +1112,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       setCreateIsDonghuaOverride("");
     }
     setCreateThemeType(kind === "ed" ? "ED" : "OP");
-    setCreateSequence("1");
+    setCreateSequence(String(entryDuplicatePositions.get(entry.id) || 1));
     setDuplicateSourceItemId(null);
     setIsCreateThemeOpen(true);
   }
@@ -929,6 +1170,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   async function createTheme(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const submitterVisible = event.nativeEvent.submitter?.dataset.visible;
     const payload = {
       action: "create-theme",
       kind,
@@ -941,6 +1183,9 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       primarySourceLabel: form.get("primarySourceLabel"),
       alternateVideoUrls: createAlternateSources,
     };
+    if (typeof submitterVisible === "string") {
+      payload.manualVisible = submitterVisible === "true";
+    }
     if (createSelectedAnime?.isManual) {
       const animeTitle = String(form.get("animeTitle") || "").trim();
       if (!animeTitle) {
@@ -954,6 +1199,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       payload.aniListId = createSelectedAnime.aniListId;
       payload.animeIsAdultOverride = createIsAdultOverride;
       payload.animeIsDonghuaOverride = createIsDonghuaOverride;
+      if (createTitleTouched) payload.manualEntryTitle = createTitleValue;
     } else {
       toast.error("Busca y selecciona un anime en AniList.");
       return;
@@ -972,7 +1218,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       setIsCreateThemeOpen(false);
       setCreateSelectedAnime(null);
       setCreateImageFile(null);
-      const boardData = await loadBoard(seasonId, { silent: true });
+        const boardData = await loadBoard(seasonId, { silent: true });
       if (duplicateSourceItemId && data.theme?.id && boardData) {
         const freshPlacements = boardData.placements || [];
         const sourceIndex = freshPlacements.findIndex((placement) => placement.itemId === duplicateSourceItemId);
@@ -994,6 +1240,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   async function saveEditTheme(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const submitterVisible = event.nativeEvent.submitter?.dataset.visible;
     const payload = {
       action: "update-theme",
       kind,
@@ -1001,12 +1248,17 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       primarySourceLabel: form.get("primarySourceLabel"),
       alternateVideoUrls: editAlternateSources,
     };
+    if (editingThemeItem.isDraft && typeof submitterVisible === "string") {
+      payload.manualVisible = submitterVisible === "true";
+    }
     if (!editingThemeItem.aniListId) {
       payload.manualEntryIsAdult = form.get("animeIsAdult") === "on";
       payload.manualEntryIsDonghua = form.get("animeIsDonghua") === "on";
+      payload.manualEntryTitle = form.get("manualEntryTitle");
     } else {
       payload.manualEntryIsAdultOverride = editIsAdultOverride;
       payload.manualEntryIsDonghuaOverride = editIsDonghuaOverride;
+      payload.manualEntryTitle = editTitleTouched ? editTitleValue : editingThemeItem.manualTitle;
     }
     if (editingThemeItem.isManual) {
       payload.type = editManualType;
@@ -1014,7 +1266,6 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       payload.videoUrl = form.get("manualVideoUrl");
       payload.songTitle = form.get("songTitle");
       payload.artist = form.get("artist");
-      payload.manualEntryTitle = form.get("manualEntryTitle");
     } else {
       payload.manualType = isEditOverrideOpen ? editManualType : "";
       payload.manualSequence = isEditOverrideOpen
@@ -1023,8 +1274,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       payload.manualVideoUrl = isEditOverrideOpen
         ? (editPrimaryUrlTouched ? editPrimaryUrlValue : editingThemeItem.manualVideoUrl)
         : "";
-      payload.manualSongTitle = isEditOverrideOpen ? form.get("manualSongTitle") : "";
-      payload.manualArtist = isEditOverrideOpen ? form.get("manualArtist") : "";
+      payload.manualSongTitle = isEditOverrideOpen
+        ? (editSongTitleTouched ? editSongTitleValue : editingThemeItem.manualSongTitle)
+        : "";
+      payload.manualArtist = isEditOverrideOpen
+        ? (editArtistTouched ? editArtistValue : editingThemeItem.manualArtist)
+        : "";
     }
     try {
       if (editImageFile) {
@@ -1109,6 +1364,411 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     }
   }
 
+  function requestPublishTheme(item) {
+    setPendingPublishTheme(item);
+  }
+
+  async function confirmPublishTheme() {
+    if (!pendingPublishTheme) return;
+    try {
+      const response = await fetch("/api/anime-tier-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update-theme-visibility", kind, id: pendingPublishTheme.id, manualVisible: true }),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error);
+      setPendingPublishTheme(null);
+      await loadBoard(seasonId, { silent: true });
+      toast.success("Tema publicado.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo publicar el tema.");
+    }
+  }
+
+  function requestDraftTheme(item) {
+    setPendingDraftTheme(item);
+  }
+
+  async function confirmDraftTheme() {
+    if (!pendingDraftTheme) return;
+    try {
+      const response = await fetch("/api/anime-tier-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update-theme-visibility", kind, id: pendingDraftTheme.id, manualVisible: false }),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error);
+      setPendingDraftTheme(null);
+      await loadBoard(seasonId, { silent: true });
+      toast.success("Tema pasado a borrador.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo pasar el tema a borrador.");
+    }
+  }
+
+  function requestRemoveTheme(item) {
+    setPendingRemoveTheme(item);
+  }
+
+  async function confirmRemoveTheme() {
+    if (!pendingRemoveTheme) return;
+    try {
+      const response = await fetch("/api/anime-tier-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove-theme", kind, id: pendingRemoveTheme.id }),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error);
+      setPendingRemoveTheme(null);
+      await loadBoard(seasonId, { silent: true });
+      toast.success("Tema eliminado. Queda visible solo en administración.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo eliminar el tema.");
+    }
+  }
+
+  async function toggleEntryVisibility(entry) {
+    try {
+      const response = await fetch("/api/anime-tier-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update-entry", kind, id: entry.id, manualVisible: Boolean(entry.isHidden) }),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error);
+      await loadBoard(seasonId, { silent: true });
+      toast.success(entry.isHidden ? "Anime visible de nuevo." : "Anime ocultado.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo actualizar el anime.");
+    }
+  }
+
+  async function confirmDeleteEntry() {
+    if (!pendingDeleteEntry) return;
+    try {
+      const response = await fetch("/api/anime-tier-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete-entry", kind, id: pendingDeleteEntry.id }),
+      });
+      const data = await readJson(response);
+      if (!response.ok || !data.success) throw new Error(data.error);
+      setPendingDeleteEntry(null);
+      await loadBoard(seasonId, { silent: true });
+      toast.success("Anime eliminado. Queda visible solo en administración.");
+    } catch (error) {
+      toast.error(error.message || "No se pudo eliminar el anime.");
+    }
+  }
+
+  // Se separa en un useMemo porque este panel puede tener cientos de nodos (Sin temas/Borradores/
+  // Ocultos): sin esto, cada evento de arrastre en el tablero (que solo cambia `placements`)
+  // forzaría reconstruir toda esta sección de nuevo aunque su contenido no haya cambiado.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const adminReviewPanel = useMemo(() => (
+    isAdminView && (filters.showEntriesWithoutTheme || filters.showDrafts || filters.showHiddenByAdmin || filters.showPublished) ? (
+      <div className="tierlist-pool tierlist-pool-pending">
+        <div className="tierlist-pool-header">
+          <h2>
+            Administración{" "}
+            <span className="tierlist-pool-count">
+              ({entriesWithoutTheme.length + contentCounts.drafts + contentCounts.hiddenByAdmin + contentCounts.total} en total)
+            </span>
+          </h2>
+          <div className="tierlist-pool-header-actions">
+            <div className="tierlist-pool-buttons">
+              <button type="button" className="tracker-action-secondary" onClick={openCreateTheme}>
+                <Plus size={16} /> {triggerThemeLabel}
+              </button>
+            </div>
+            <label className="tierlist-pool-search">
+              <Search size={15} aria-hidden="true" />
+              <input
+                type="text"
+                value={adminSearch}
+                onChange={(event) => setAdminSearch(event.target.value)}
+                placeholder="Buscar anime..."
+                aria-label="Buscar anime en administración"
+              />
+            </label>
+          </div>
+        </div>
+
+        {filters.showEntriesWithoutTheme ? (
+          <div className="tierlist-pool-subsection">
+            <h3 className="tierlist-pool-subsection-title">
+              Sin temas{" "}
+              <span className="tierlist-pool-count">
+                ({searchedEntriesWithoutTheme.length < entriesWithoutTheme.length
+                  ? `${searchedEntriesWithoutTheme.length} de ${entriesWithoutTheme.length}`
+                  : entriesWithoutTheme.length})
+              </span>
+            </h3>
+            {entriesWithoutTheme.length ? (
+              visibleEntriesWithoutTheme.length ? (
+                searchedEntriesWithoutTheme.length ? (
+                <div className="tierlist-row-drop tierlist-pool-drop">
+                  {searchedEntriesWithoutTheme.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className={`tierlist-card is-add-action ${entry.isHidden ? "is-hidden-by-admin" : ""}`}
+                      onClick={() => openCreateThemeForEntry(entry)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => { if (event.key === "Enter") openCreateThemeForEntry(entry); }}
+                      title={`Agregar ${kind === "ed" ? "ending" : "opening"} para ${entry.title}`}
+                    >
+                      <div className="tierlist-card-media">
+                        <AnimePosterImage src={entry.imageUrl} title={entry.title} className="tierlist-card-poster" decorative />
+                        {(entryDuplicateCounts.get(entry.duplicateGroupId || entry.id) || 1) > 1 ? (
+                          <span className="tierlist-card-badge">{entryDuplicateCounts.get(entry.duplicateGroupId || entry.id)}</span>
+                        ) : null}
+                        {entry.isAdult || entry.isDonghua ? (
+                          <div className="tierlist-card-flags">
+                            {entry.isAdult ? <span className="tierlist-card-flag is-adult">18+</span> : null}
+                            {entry.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
+                          </div>
+                        ) : null}
+                        <span className="tierlist-card-play"><Plus size={22} /></span>
+                        {entry.isHidden ? <span className="tierlist-card-hidden-flag">Oculto por administración</span> : null}
+                      </div>
+                      <span className="tierlist-card-title">{entry.title}</span>
+                      <div className="tierlist-card-actions">
+                        <button
+                          type="button"
+                          className="icon-tool-button"
+                          aria-label="Editar"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); openCreateThemeForEntry(entry); }}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={`icon-tool-button ${entry.isHidden ? "" : "danger"}`}
+                          aria-label={entry.isHidden ? "Mostrar" : "Ocultar"}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); toggleEntryVisibility(entry); }}
+                        >
+                          {entry.isHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-tool-button danger"
+                          aria-label="Eliminar"
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); setPendingDeleteEntry(entry); }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                ) : (
+                  <p className="field-hint">Ningún anime sin tema coincide con &quot;{adminSearch.trim()}&quot;.</p>
+                )
+              ) : (
+                <p className="field-hint">{entriesWithoutTheme.length} ocultos por tus preferencias de filtro.</p>
+              )
+            ) : (
+              <p className="field-hint">Todos los animes de esta temporada ya tienen {kind === "ed" ? "ending" : "opening"} cargado.</p>
+            )}
+          </div>
+        ) : null}
+
+        {filters.showDrafts ? (
+          <div className="tierlist-pool-subsection">
+            <h3 className="tierlist-pool-subsection-title">
+              Borradores{" "}
+              <span className="tierlist-pool-count">
+                ({searchedDraftPoolItemIds.length < contentCounts.drafts
+                  ? `${searchedDraftPoolItemIds.length} de ${contentCounts.drafts}`
+                  : contentCounts.drafts})
+              </span>
+            </h3>
+            {draftPoolItemIds.length ? (
+              searchedDraftPoolItemIds.length ? (
+              <div className="tierlist-row-drop tierlist-pool-drop">
+                {searchedDraftPoolItemIds.map((id) => {
+                  const item = itemsById.get(id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} className="tierlist-card is-draft">
+                      <div className="tierlist-card-media">
+                        <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
+                        {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
+                        {item.isAdult || item.isDonghua ? (
+                          <div className="tierlist-card-flags">
+                            {item.isAdult ? <span className="tierlist-card-flag is-adult">18+</span> : null}
+                            {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span className="tierlist-card-title">{item.title}</span>
+                      <div className="tierlist-card-actions tierlist-card-actions-grid">
+                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={() => setEditingThemeItem(item)}>
+                          <Edit3 size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={() => duplicateTheme(item)}>
+                          <Copy size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={() => setPendingDeleteTheme(item)}>
+                          <EyeOff size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button" aria-label="Publicar tema" onClick={() => requestPublishTheme(item)}>
+                          <Globe size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              ) : (
+                <p className="field-hint">Ningún borrador coincide con &quot;{adminSearch.trim()}&quot;.</p>
+              )
+            ) : (
+              <p className="field-hint">No hay borradores con los filtros actuales.</p>
+            )}
+          </div>
+        ) : null}
+
+        {filters.showHiddenByAdmin ? (
+          <div className="tierlist-pool-subsection">
+            <h3 className="tierlist-pool-subsection-title">
+              Ocultos{" "}
+              <span className="tierlist-pool-count">
+                ({searchedHiddenPoolItemIds.length < contentCounts.hiddenByAdmin
+                  ? `${searchedHiddenPoolItemIds.length} de ${contentCounts.hiddenByAdmin}`
+                  : contentCounts.hiddenByAdmin})
+              </span>
+            </h3>
+            {hiddenPoolItemIds.length ? (
+              searchedHiddenPoolItemIds.length ? (
+              <div className="tierlist-row-drop tierlist-pool-drop">
+                {searchedHiddenPoolItemIds.map((id) => {
+                  const item = itemsById.get(id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} className="tierlist-card is-hidden-by-admin">
+                      <div className="tierlist-card-media">
+                        <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
+                        {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
+                        {item.isAdult || item.isDonghua ? (
+                          <div className="tierlist-card-flags">
+                            {item.isAdult ? <span className="tierlist-card-flag is-adult">18+</span> : null}
+                            {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span className="tierlist-card-title">{item.title}</span>
+                      <div className="tierlist-card-actions">
+                        <button type="button" className="icon-tool-button" aria-label="Mostrar tema" onClick={() => handleToggleVisibility(item)}>
+                          <Eye size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={() => setPendingDraftTheme(item)}>
+                          <FileEdit size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button danger" aria-label="Eliminar tema" onClick={() => setPendingRemoveTheme(item)}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              ) : (
+                <p className="field-hint">Ningún tema oculto coincide con &quot;{adminSearch.trim()}&quot;.</p>
+              )
+            ) : (
+              <p className="field-hint">No hay temas ocultos con los filtros actuales.</p>
+            )}
+          </div>
+        ) : null}
+
+        {filters.showPublished ? (
+          <div className="tierlist-pool-subsection">
+            <h3 className="tierlist-pool-subsection-title">
+              Publicados{" "}
+              <span className="tierlist-pool-count">
+                ({searchedPublishedPoolItemIds.length < contentCounts.total
+                  ? `${searchedPublishedPoolItemIds.length} de ${contentCounts.total}`
+                  : contentCounts.total})
+              </span>
+            </h3>
+            {publishedPoolItemIds.length ? (
+              searchedPublishedPoolItemIds.length ? (
+              <div className="tierlist-row-drop tierlist-pool-drop">
+                {searchedPublishedPoolItemIds.map((id) => {
+                  const item = itemsById.get(id);
+                  if (!item) return null;
+                  return (
+                    <div key={id} className="tierlist-card">
+                      <div className="tierlist-card-media">
+                        <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
+                        {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
+                        {item.isAdult || item.isDonghua ? (
+                          <div className="tierlist-card-flags">
+                            {item.isAdult ? <span className="tierlist-card-flag is-adult">18+</span> : null}
+                            {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span className="tierlist-card-title">{item.title}</span>
+                      <div className="tierlist-card-actions tierlist-card-actions-grid">
+                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={() => setEditingThemeItem(item)}>
+                          <Edit3 size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={() => duplicateTheme(item)}>
+                          <Copy size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={() => setPendingDeleteTheme(item)}>
+                          <EyeOff size={14} />
+                        </button>
+                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={() => setPendingDraftTheme(item)}>
+                          <FileEdit size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              ) : (
+                <p className="field-hint">Ningún tema publicado coincide con &quot;{adminSearch.trim()}&quot;.</p>
+              )
+            ) : (
+              <p className="field-hint">No hay temas publicados con los filtros actuales.</p>
+            )}
+          </div>
+        ) : null}
+      </div>
+    ) : null
+  ), [
+    isAdminView,
+    filters.showEntriesWithoutTheme,
+    filters.showDrafts,
+    filters.showHiddenByAdmin,
+    filters.showPublished,
+    adminSearch,
+    searchedEntriesWithoutTheme,
+    entriesWithoutTheme,
+    visibleEntriesWithoutTheme,
+    entryDuplicateCounts,
+    kind,
+    searchedDraftPoolItemIds,
+    draftPoolItemIds,
+    searchedPublishedPoolItemIds,
+    publishedPoolItemIds,
+    searchedHiddenPoolItemIds,
+    hiddenPoolItemIds,
+    itemsById,
+    triggerThemeLabel,
+    contentCounts,
+  ]);
+
   return (
     <main className="tierlist-page">
       <header className="watching-header">
@@ -1124,153 +1784,157 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       </div>
 
       <div className="tierlist-desktop-only">
-      <section className="tierlist-toolbar" aria-label="Controles del tier list">
-        <div className="tierlist-toolbar-top">
-          {seasons.length ? (
-            <div className="season-calendar-season-field">
-              <span>Temporada</span>
-              <FilterSelect
-                id={`tierlist-${kind}-season`}
-                label="Temporada"
-                value={seasonId}
-                options={seasons.map((season) => ({ value: String(season.id), label: seasonLabel(season) }))}
-                onChange={(value) => loadBoard(value)}
-              />
-            </div>
-          ) : null}
-
-          <div className="tierlist-toolbar-actions">
-            <button type="button" className="tracker-action-primary" onClick={addTier}><Plus size={16} /> Fila</button>
-            <button type="button" className="tracker-action-secondary" onClick={requestReset}><RotateCcw size={16} /> Reiniciar</button>
-            <button type="button" className="tracker-action-secondary" onClick={exportImage}><Download size={16} /> Imagen</button>
-            {isAuthenticated ? (
-              <button type="button" className="tracker-action-secondary" onClick={handleTogglePublic}>{isPublic ? "Hacer privado" : "Compartir"}</button>
-            ) : null}
-            {isPublic && shareToken ? (
-              <button type="button" className="tracker-action-secondary" onClick={copyShareLink}><Copy size={16} /> Copiar link</button>
-            ) : null}
+      {kind !== "animes" ? (
+        <div className="rtfm-notice-panel">
+          <div className="rtfm-notice is-info">
+            <Info size={18} aria-hidden="true" />
+            <p>Créditos al bueno de cerchupy por su continuo compromiso en los tiers.</p>
           </div>
         </div>
+      ) : null}
+      {canManageThemes ? (
+        <div className="season-calendar-view-switch-row">
+          <div className="tracker-calendar-view-toggle" role="tablist" aria-label="Modo de vista">
+            <button type="button" role="tab" aria-selected={viewMode === "user"} className={viewMode === "user" ? "is-active" : ""} onClick={() => setViewMode("user")}>Usuario</button>
+            <button type="button" role="tab" aria-selected={viewMode === "admin"} className={viewMode === "admin" ? "is-active" : ""} onClick={() => setViewMode("admin")}>Administración</button>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="tierlist-toolbar" aria-label="Controles del tier list">
+        {showBoard ? (
+          <div className="tierlist-toolbar-top">
+            <div className="tierlist-toolbar-actions">
+              <button type="button" className="tracker-action-primary" onClick={addTier}><Plus size={16} /> Fila</button>
+              <button type="button" className="tracker-action-secondary" onClick={requestReset}><RotateCcw size={16} /> Reiniciar</button>
+              <button type="button" className="tracker-action-secondary" onClick={exportImage}><Download size={16} /> Imagen</button>
+              {isAuthenticated ? (
+                <button type="button" className="tracker-action-secondary" onClick={handleTogglePublic}>{isPublic ? "Hacer privado" : "Compartir"}</button>
+              ) : null}
+              {isPublic && shareToken ? (
+                <button type="button" className="tracker-action-secondary" onClick={copyShareLink}><Copy size={16} /> Copiar link</button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         {seasons.length ? (
           <>
-            <div className="season-calendar-toggles">
-              <button
-                type="button"
-                className={`season-calendar-toggle ${filters.showDefault ? "is-active" : ""}`}
-                aria-pressed={filters.showDefault}
-                onClick={() => setFilters((current) => ({ ...current, showDefault: !current.showDefault }))}
-              >
-                Mostrar general ({contentCounts.default})
-              </button>
-              {kind !== "animes" ? (
-                <button
-                  type="button"
-                  className={`season-calendar-toggle ${filters.showSpoiler ? "is-active" : ""}`}
-                  aria-pressed={filters.showSpoiler}
-                  onClick={() => setFilters((current) => ({ ...current, showSpoiler: !current.showSpoiler }))}
-                >
-                  Mostrar con spoilers ({contentCounts.spoiler})
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className={`season-calendar-toggle ${filters.showAdult ? "is-active" : ""}`}
-                aria-pressed={filters.showAdult}
-                onClick={() => setFilters((current) => ({ ...current, showAdult: !current.showAdult }))}
-              >
-                Mostrar adulto ({contentCounts.adult})
-              </button>
-              <button
-                type="button"
-                className={`season-calendar-toggle ${filters.showDonghua ? "is-active" : ""}`}
-                aria-pressed={filters.showDonghua}
-                onClick={() => setFilters((current) => ({ ...current, showDonghua: !current.showDonghua }))}
-              >
-                Mostrar donghua ({contentCounts.donghua})
-              </button>
-              {canManageThemes ? (
-                <button
-                  type="button"
-                  className={`season-calendar-toggle ${filters.showHiddenByAdmin ? "is-active" : ""}`}
-                  aria-pressed={filters.showHiddenByAdmin}
-                  onClick={() => setFilters((current) => ({ ...current, showHiddenByAdmin: !current.showHiddenByAdmin }))}
-                >
-                  Mostrar ocultos ({contentCounts.hiddenByAdmin})
-                </button>
-              ) : null}
-              {canManageThemes && kind !== "animes" ? (
-                <button
-                  type="button"
-                  className={`season-calendar-toggle ${showEntriesWithoutTheme ? "is-active" : ""}`}
-                  aria-pressed={showEntriesWithoutTheme}
-                  onClick={() => setShowEntriesWithoutTheme((current) => !current)}
-                >
-                  Sin tema ({entriesWithoutTheme.length})
-                </button>
-              ) : null}
-              {canManageThemes && kind !== "animes" ? (
-                <button
-                  type="button"
-                  className={`season-calendar-toggle ${filters.showManual ? "is-active" : ""}`}
-                  aria-pressed={filters.showManual}
-                  onClick={() => setFilters((current) => ({ ...current, showManual: !current.showManual }))}
-                >
-                  Mostrar manuales ({contentCounts.manual})
-                </button>
+            <div className="tierlist-filter-groups">
+              <div className="tierlist-filter-group">
+                <span className="tierlist-filter-group-label">Temporada</span>
+                <FilterSelect
+                  id={`tierlist-${kind}-season`}
+                  label="Temporada"
+                  value={seasonId}
+                  options={seasons.map((season) => ({ value: String(season.id), label: seasonLabel(season) }))}
+                  onChange={(value) => loadBoard(value)}
+                />
+              </div>
+
+              <div className="tierlist-filter-group">
+                <span className="tierlist-filter-group-label">Ocultar</span>
+                <div className="season-calendar-toggles">
+                  <button
+                    type="button"
+                    disabled={filters.focusMode === "adult"}
+                    className={`season-calendar-toggle ${filters.hideAdult ? "is-active" : ""}`}
+                    aria-pressed={filters.hideAdult}
+                    onClick={() => setFilters((current) => ({ ...current, hideAdult: !current.hideAdult }))}
+                  >
+                    Adulto ({isAdminView ? contentCounts.adult : contentCounts.visibleAdult})
+                  </button>
+                  <button
+                    type="button"
+                    disabled={filters.focusMode === "donghua"}
+                    className={`season-calendar-toggle ${filters.hideDonghua ? "is-active" : ""}`}
+                    aria-pressed={filters.hideDonghua}
+                    onClick={() => setFilters((current) => ({ ...current, hideDonghua: !current.hideDonghua }))}
+                  >
+                    Donghua ({isAdminView ? contentCounts.donghua : contentCounts.visibleDonghua})
+                  </button>
+                </div>
+              </div>
+
+              <div className="tierlist-filter-group">
+                <span className="tierlist-filter-group-label">Ver</span>
+                <FormSelect
+                  value={filters.focusMode || ""}
+                  onChange={(value) => setFilters((current) => ({ ...current, focusMode: value }))}
+                  options={[
+                    { value: "", label: "Todo" },
+                    { value: "adult", label: "Solo adulto" },
+                    { value: "donghua", label: "Solo donghua" },
+                    ...(isAdminView && kind !== "animes" ? [
+                      { value: "manual", label: "Solo manuales" },
+                      { value: "synced", label: "Solo sincronizados" },
+                    ] : []),
+                  ]}
+                />
+              </div>
+
+              {isAdminView ? (
+                <div className="tierlist-filter-group">
+                  <span className="tierlist-filter-group-label">Administración</span>
+                  <div className="season-calendar-toggles tierlist-admin-toggles">
+                    {kind !== "animes" ? (
+                      <button
+                        type="button"
+                        className={`season-calendar-toggle ${filters.showEntriesWithoutTheme ? "is-active" : ""}`}
+                        aria-pressed={filters.showEntriesWithoutTheme}
+                        onClick={() => setFilters((current) => ({ ...current, showEntriesWithoutTheme: !current.showEntriesWithoutTheme }))}
+                      >
+                        Sin temas ({entriesWithoutTheme.length})
+                      </button>
+                    ) : null}
+                    {kind !== "animes" ? (
+                      <button
+                        type="button"
+                        className={`season-calendar-toggle ${filters.showDrafts ? "is-active" : ""}`}
+                        aria-pressed={filters.showDrafts}
+                        onClick={() => setFilters((current) => ({ ...current, showDrafts: !current.showDrafts }))}
+                      >
+                        Borradores ({contentCounts.drafts})
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={`season-calendar-toggle ${filters.showHiddenByAdmin ? "is-active" : ""}`}
+                      aria-pressed={filters.showHiddenByAdmin}
+                      onClick={() => setFilters((current) => ({ ...current, showHiddenByAdmin: !current.showHiddenByAdmin }))}
+                    >
+                      Ocultos ({contentCounts.hiddenByAdmin})
+                    </button>
+                    {kind !== "animes" ? (
+                      <button
+                        type="button"
+                        className={`season-calendar-toggle ${filters.showPublished ? "is-active" : ""}`}
+                        aria-pressed={filters.showPublished}
+                        onClick={() => setFilters((current) => ({ ...current, showPublished: !current.showPublished }))}
+                      >
+                        Publicados ({contentCounts.total})
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
               ) : null}
             </div>
-            <p className="season-calendar-summary" aria-live="polite">
-              {contentCounts.hiddenByPreferences
-                ? `${contentCounts.hiddenByPreferences} ocultos por tus preferencias`
-                : "Todo el contenido disponible está visible"}
-            </p>
+            {showBoard ? (
+              <p className="season-calendar-summary" aria-live="polite">
+                {visibleRosterCount < contentCounts.total
+                  ? `${visibleRosterCount} visibles de ${contentCounts.total} · ${contentCounts.total - visibleRosterCount} ocultos por tus filtros`
+                  : `Mostrando los ${contentCounts.total} disponibles`}
+              </p>
+            ) : null}
           </>
         ) : null}
       </section>
 
-      {canManageThemes && showEntriesWithoutTheme ? (
-        <div className="tierlist-pool">
-          <div className="tierlist-pool-header">
-            <h2>Sin tema <span className="tierlist-pool-count">({entriesWithoutTheme.length})</span></h2>
-          </div>
-          {entriesWithoutTheme.length ? (
-            visibleEntriesWithoutTheme.length ? (
-              <div className="tierlist-row-drop tierlist-pool-drop">
-                {visibleEntriesWithoutTheme.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className="tierlist-card is-add-action"
-                    onClick={() => openCreateThemeForEntry(entry)}
-                    title={`Agregar ${kind === "ed" ? "ending" : "opening"} para ${entry.title}`}
-                  >
-                    <div className="tierlist-card-media">
-                      <AnimePosterImage src={entry.imageUrl} title={entry.title} className="tierlist-card-poster" decorative />
-                      {entry.isAdult || entry.isDonghua ? (
-                        <div className="tierlist-card-flags">
-                          {entry.isAdult ? <span className="tierlist-card-flag is-adult">18+</span> : null}
-                          {entry.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
-                        </div>
-                      ) : null}
-                      <span className="tierlist-card-play"><Plus size={22} /></span>
-                    </div>
-                    <span className="tierlist-card-title">{entry.title}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="field-hint">{entriesWithoutTheme.length} ocultos por tus preferencias de filtro.</p>
-            )
-          ) : (
-            <p className="field-hint">Todos los animes de esta temporada ya tienen {kind === "ed" ? "ending" : "opening"} cargado.</p>
-          )}
-        </div>
-      ) : null}
-
       {viewToggle ? (
         <div className="season-calendar-view-switch-row">{viewToggle}</div>
       ) : null}
+
+      {adminReviewPanel}
 
       {!isAuthenticated ? (
         <div className="rtfm-notice-panel">
@@ -1300,6 +1964,10 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
         <TierListSkeleton />
       ) : !seasons.length ? (
         <p className="field-hint">Todavía no hay temporadas sincronizadas. Un administrador debe sincronizar una temporada desde el mantenedor correspondiente.</p>
+      ) : !showBoard ? (
+        !adminReviewPanel ? (
+          <p className="field-hint">Activá alguno de los filtros de Administración de arriba (Sin temas, Borradores, Ocultos o Publicados) para empezar a gestionar.</p>
+        ) : null
       ) : (
         <div className="tierlist-board">
           <DndContext
@@ -1323,10 +1991,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   onMove={moveTier}
                   canMoveUp={index > 0}
                   canMoveDown={index < tiers.length - 1}
-                  canManageThemes={canManageThemes}
+                  canManageThemes={isAdminView}
                   onEditItem={setEditingThemeItem}
                   onDuplicate={duplicateTheme}
                   onToggleVisibility={handleToggleVisibility}
+                  onMarkAsDraft={requestDraftTheme}
+                  onPublish={requestPublishTheme}
                 />
               ))}
             </div>
@@ -1336,7 +2006,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                 <h2>Sin rankear <span className="tierlist-pool-count">({containers._pool.length})</span></h2>
                 <div className="tierlist-pool-header-actions">
                   <div className="tierlist-pool-buttons">
-                    {canManageThemes ? (
+                    {isAdminView ? (
                       <button type="button" className="tracker-action-secondary" onClick={openCreateTheme}>
                         <Plus size={16} /> {triggerThemeLabel}
                       </button>
@@ -1357,17 +2027,23 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   </label>
                 </div>
               </div>
-              {poolSearch.trim() && !poolItemIds.length ? (
-                <p className="field-hint">Ningún anime sin rankear coincide con "{poolSearch.trim()}".</p>
+              {!poolItemIds.length ? (
+                <p className="field-hint">
+                  {poolSearch.trim()
+                    ? `Ningún anime sin rankear coincide con "${poolSearch.trim()}".`
+                    : "No hay nada sin rankear con los filtros actuales."}
+                </p>
               ) : null}
               <PoolDroppable
                 itemIds={poolItemIds}
                 itemsById={itemsById}
                 onOpenItem={setOpenItem}
-                canManageThemes={canManageThemes}
+                canManageThemes={isAdminView}
                 onEditItem={setEditingThemeItem}
                 onDuplicate={duplicateTheme}
                 onToggleVisibility={handleToggleVisibility}
+                onMarkAsDraft={requestDraftTheme}
+                onPublish={requestPublishTheme}
               />
             </div>
 
@@ -1412,6 +2088,50 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
         onConfirm={hideTheme}
       />
 
+      <ConfirmModal
+        isOpen={Boolean(pendingDraftTheme)}
+        title="Pasar a borrador"
+        description={`"${pendingDraftTheme?.title || ""}"${pendingDraftTheme?.badge ? ` #${pendingDraftTheme.badge}` : ""} pasará a borrador. Dejará de ofrecerse a usuarios nuevos hasta que lo publiques de nuevo; quienes ya lo tengan rankeado lo seguirán viendo marcado como oculto.`}
+        confirmLabel="Pasar a borrador"
+        tone="default"
+        cancelLabel="Cancelar"
+        onCancel={() => setPendingDraftTheme(null)}
+        onConfirm={confirmDraftTheme}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingPublishTheme)}
+        title="Publicar tema"
+        description={`Se publicará "${pendingPublishTheme?.title || ""}"${pendingPublishTheme?.badge ? ` #${pendingPublishTheme.badge}` : ""}. Quedará visible para todos los usuarios.`}
+        confirmLabel="Publicar"
+        tone="default"
+        cancelLabel="Cancelar"
+        onCancel={() => setPendingPublishTheme(null)}
+        onConfirm={confirmPublishTheme}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingRemoveTheme)}
+        title="Eliminar tema"
+        description={`Se eliminará "${pendingRemoveTheme?.title || ""}"${pendingRemoveTheme?.badge ? ` #${pendingRemoveTheme.badge}` : ""}. Dejará de aparecer en el tablero por completo; quedará visible únicamente en administración.`}
+        confirmLabel="Eliminar"
+        tone="danger"
+        cancelLabel="Cancelar"
+        onCancel={() => setPendingRemoveTheme(null)}
+        onConfirm={confirmRemoveTheme}
+      />
+
+      <ConfirmModal
+        isOpen={Boolean(pendingDeleteEntry)}
+        title="Eliminar anime"
+        description={`Se eliminará "${pendingDeleteEntry?.title || ""}" de esta temporada. Quedará visible únicamente en administración; no se puede restaurar desde aquí.`}
+        confirmLabel="Eliminar"
+        tone="danger"
+        cancelLabel="Cancelar"
+        onCancel={() => setPendingDeleteEntry(null)}
+        onConfirm={confirmDeleteEntry}
+      />
+
       {isCreateThemeOpen ? (
         <MaintainerModal
           as="form"
@@ -1420,7 +2140,13 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           onClose={closeCreateTheme}
           onSubmit={createTheme}
           noValidate
-          actions={<><button type="button" className="tracker-action-secondary" onClick={closeCreateTheme}>Cancelar</button><button type="submit" className="tracker-action-primary">Guardar</button></>}
+          actions={(
+            <>
+              <button type="button" className="tracker-action-secondary" onClick={closeCreateTheme}>Cancelar</button>
+              <button type="submit" data-visible="false" className="tracker-action-secondary">Guardar como borrador</button>
+              <button type="submit" data-visible="true" className="tracker-action-primary">Publicar</button>
+            </>
+          )}
         >
           <div className="notification-form-field">
             <span>Anime</span>
@@ -1442,7 +2168,16 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
               <label className="tierlist-content-flag"><input type="checkbox" name="animeIsDonghua" defaultChecked={Boolean(createSelectedAnime?.isDonghua)} /> Donghua</label>
             </div>
           ) : (
-            <div className="form-row">
+            <>
+              <label className="notification-form-field">
+                <span>Título</span>
+                <input
+                  className="modal-input"
+                  value={createTitleValue}
+                  onChange={(event) => { setCreateTitleTouched(true); setCreateTitleValue(event.target.value); }}
+                />
+              </label>
+              <div className="form-row">
               <div className="notification-form-field">
                 <span>Contenido adulto</span>
                 <FormSelect
@@ -1459,7 +2194,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
                 />
               </div>
-            </div>
+              </div>
+            </>
           )}
           <div className="notification-form-field">
             <span>Poster (opcional)</span>
@@ -1495,7 +2231,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" placeholder="Título de la canción" /></label>
           <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" placeholder="Artista o banda" /></label>
           <span className="notification-form-field-label">Fuentes</span>
-          <div className="form-row tierlist-source-row">
+          <div className="form-row tierlist-primary-source-row">
             <input className="modal-input" name="primarySourceLabel" defaultValue="Fuente principal" required />
             <input className="modal-input" name="videoUrl" placeholder="https://..." required />
           </div>
@@ -1521,7 +2257,18 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           onClose={() => setEditingThemeItem(null)}
           onSubmit={saveEditTheme}
           noValidate
-          actions={<><button type="button" className="tracker-action-secondary" onClick={() => setEditingThemeItem(null)}>Cancelar</button><button type="submit" className="tracker-action-primary">Guardar</button></>}
+          actions={editingThemeItem.isDraft ? (
+            <>
+              <button type="button" className="tracker-action-secondary" onClick={() => setEditingThemeItem(null)}>Cancelar</button>
+              <button type="submit" data-visible="false" className="tracker-action-secondary">Guardar como borrador</button>
+              <button type="submit" data-visible="true" className="tracker-action-primary">Publicar</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="tracker-action-secondary" onClick={() => setEditingThemeItem(null)}>Cancelar</button>
+              <button type="submit" className="tracker-action-primary">Guardar</button>
+            </>
+          )}
         >
           <span className={`tierlist-origin-badge ${editingThemeItem.isManual ? "is-manual" : "is-synced"}`}>
             {editingThemeItem.isManual ? "Creado manualmente" : "Sincronizado desde AnimeThemes.moe"}
@@ -1535,29 +2282,42 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
             <button type="button" className="tracker-action-secondary" onClick={() => setIsEditAniListSearchOpen(true)}>Cambiar ficha AniList</button>
           </div>
           {!editingThemeItem.aniListId ? (
-            <div className="tierlist-content-flags">
-              <label className="tierlist-content-flag"><input type="checkbox" name="animeIsAdult" defaultChecked={editingThemeItem.isAdult} /> Contenido adulto</label>
-              <label className="tierlist-content-flag"><input type="checkbox" name="animeIsDonghua" defaultChecked={editingThemeItem.isDonghua} /> Donghua</label>
-            </div>
+            <>
+              <label className="notification-form-field"><span>Título</span><input className="modal-input" name="manualEntryTitle" defaultValue={editingThemeItem.title || ""} placeholder="Título del anime" required /></label>
+              <div className="tierlist-content-flags">
+                <label className="tierlist-content-flag"><input type="checkbox" name="animeIsAdult" defaultChecked={editingThemeItem.isAdult} /> Contenido adulto</label>
+                <label className="tierlist-content-flag"><input type="checkbox" name="animeIsDonghua" defaultChecked={editingThemeItem.isDonghua} /> Donghua</label>
+              </div>
+            </>
           ) : (
-            <div className="form-row">
-              <div className="notification-form-field">
-                <span>Contenido adulto</span>
-                <FormSelect
-                  value={editIsAdultOverride}
-                  onChange={setEditIsAdultOverride}
-                  options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+            <>
+              <label className="notification-form-field">
+                <span>Título</span>
+                <input
+                  className="modal-input"
+                  value={editTitleValue}
+                  onChange={(event) => { setEditTitleTouched(true); setEditTitleValue(event.target.value); }}
                 />
+              </label>
+              <div className="form-row">
+                <div className="notification-form-field">
+                  <span>Contenido adulto</span>
+                  <FormSelect
+                    value={editIsAdultOverride}
+                    onChange={setEditIsAdultOverride}
+                    options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+                  />
+                </div>
+                <div className="notification-form-field">
+                  <span>Donghua</span>
+                  <FormSelect
+                    value={editIsDonghuaOverride}
+                    onChange={setEditIsDonghuaOverride}
+                    options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
+                  />
+                </div>
               </div>
-              <div className="notification-form-field">
-                <span>Donghua</span>
-                <FormSelect
-                  value={editIsDonghuaOverride}
-                  onChange={setEditIsDonghuaOverride}
-                  options={[{ value: "", label: "Usar fuente" }, { value: "true", label: "Sí" }, { value: "false", label: "No" }]}
-                />
-              </div>
-            </div>
+            </>
           )}
           <div className="notification-form-field">
             <span>Poster</span>
@@ -1578,7 +2338,6 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           </div>
           {editingThemeItem.isManual ? (
             <>
-              <label className="notification-form-field"><span>Título</span><input className="modal-input" name="manualEntryTitle" defaultValue={editingThemeItem.title || ""} placeholder="Título del anime" /></label>
               <div className="form-row">
                 <div className="notification-form-field">
                   <span>Tipo</span>
@@ -1596,7 +2355,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
               <label className="notification-form-field"><span>Canción</span><input className="modal-input" name="songTitle" defaultValue={editingThemeItem.songTitle || ""} placeholder="Título de la canción" /></label>
               <label className="notification-form-field"><span>Artista</span><input className="modal-input" name="artist" defaultValue={editingThemeItem.artist || ""} placeholder="Artista o banda" /></label>
               <span className="notification-form-field-label">Fuentes</span>
-              <div className="form-row tierlist-source-row">
+              <div className="form-row tierlist-primary-source-row">
                 <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
                 <input className="modal-input" name="manualVideoUrl" defaultValue={editingThemeItem.rawVideoUrl || ""} required />
               </div>
@@ -1626,14 +2385,24 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   </div>
                   <label className="notification-form-field">
                     <span>Canción</span>
-                    <input key="song-title-editable" className="modal-input" name="manualSongTitle" defaultValue={editingThemeItem.manualSongTitle || ""} placeholder={editingThemeItem.rawSongTitle || ""} />
+                    <input
+                      key="song-title-editable"
+                      className="modal-input"
+                      value={editSongTitleValue}
+                      onChange={(event) => { setEditSongTitleTouched(true); setEditSongTitleValue(event.target.value); }}
+                    />
                   </label>
                   <label className="notification-form-field">
                     <span>Artista</span>
-                    <input key="artist-editable" className="modal-input" name="manualArtist" defaultValue={editingThemeItem.manualArtist || ""} placeholder={editingThemeItem.rawArtist || ""} />
+                    <input
+                      key="artist-editable"
+                      className="modal-input"
+                      value={editArtistValue}
+                      onChange={(event) => { setEditArtistTouched(true); setEditArtistValue(event.target.value); }}
+                    />
                   </label>
                   <span className="notification-form-field-label">Fuentes</span>
-                  <div className="form-row tierlist-source-row">
+                  <div className="form-row tierlist-primary-source-row">
                     <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
                     <input
                       key="video-url-editable"
@@ -1664,7 +2433,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                     <input key="artist-readonly" className="modal-input" readOnly value={editingThemeItem.artist || ""} />
                   </label>
                   <span className="notification-form-field-label">Fuentes</span>
-                  <div className="form-row tierlist-source-row">
+                  <div className="form-row tierlist-primary-source-row">
                     <input className="modal-input" name="primarySourceLabel" defaultValue={editingThemeItem.primarySourceLabel || "Fuente principal"} required />
                     <input key="video-url-readonly" className="modal-input" readOnly value={editingThemeItem.videoUrl || ""} />
                   </div>
@@ -1680,6 +2449,10 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                     setEditSequenceTouched(false);
                     setEditPrimaryUrlValue(editingThemeItem.videoUrl || "");
                     setEditPrimaryUrlTouched(false);
+                    setEditSongTitleValue(editingThemeItem.songTitle || "");
+                    setEditSongTitleTouched(false);
+                    setEditArtistValue(editingThemeItem.artist || "");
+                    setEditArtistTouched(false);
                   }
                   setIsEditOverrideOpen((current) => !current);
                 }}
@@ -1757,7 +2530,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   );
 }
 
-function PoolDroppable({ itemIds, itemsById, onOpenItem, canManageThemes, onEditItem, onDuplicate, onToggleVisibility }) {
+function PoolDroppable({ itemIds, itemsById, onOpenItem, canManageThemes, onEditItem, onDuplicate, onToggleVisibility, onMarkAsDraft, onPublish }) {
   const { setNodeRef } = useDroppable({ id: "_pool" });
   return (
     <div ref={setNodeRef} className="tierlist-row-drop tierlist-pool-drop">
@@ -1774,6 +2547,8 @@ function PoolDroppable({ itemIds, itemsById, onOpenItem, canManageThemes, onEdit
               onEditItem={onEditItem}
               onDuplicate={onDuplicate}
               onToggleVisibility={onToggleVisibility}
+              onMarkAsDraft={onMarkAsDraft}
+              onPublish={onPublish}
             />
           );
         })}
