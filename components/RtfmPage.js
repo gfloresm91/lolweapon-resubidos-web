@@ -36,6 +36,13 @@ import {
 
 const archiveLinks = [
   {
+    title: "Web de Piero",
+    href: "https://drive.kala-vods.com/",
+    icon: History,
+    description: "Nacimiento de los resubidos.",
+    note: "Creado y mantenido por el bueno de Piero, sin esta fuente original esta web no hubiese existido.",
+  },
+  {
     title: "Web de resubidos",
     href: "https://resubidos.lolweapon.com/",
     icon: Archive,
