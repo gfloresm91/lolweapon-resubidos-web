@@ -37,6 +37,8 @@ TWITCH_ARCHIVE_TIME_ZONE
 TWITCH_REQUIRE_ACTIVE_STREAM
 ```
 
+`NEXT_PUBLIC_TWITCH_EMBED_LOGIN` es un override opcional exclusivo para pruebas del player, chat, enlaces y estado público de Inicio. Si queda vacío, esas superficies usan `TWITCH_BROADCASTER_LOGIN`. No sustituye el broadcaster oficial de OAuth, EventSub ni archivado.
+
 ---
 
 ### YouTube
@@ -324,7 +326,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 
 | Ruta | Descripción |
 |---|---|
-| `/inicio` | Home: stream en vivo, últimos directos, últimos videos de YouTube |
+| `/inicio` | Home: stream en vivo, últimos directos y últimos videos de YouTube. `Twitch` es la vista predeterminada; `VK + Twitch` abre siempre un teatro de aplicación fijo de pantalla completa que bloquea el scroll exterior y conserva VK, Twitch y chat dentro del viewport. Una sola instancia del SDK oficial de Twitch se mueve entre Inicio y el mini player; al entrar al teatro solicita reproducción durante el clic y después de montar el ancla, y `PAUSE` intenta reanudarla mientras la pestaña siga visible. `PLAYBACK_BLOCKED` habilita una acción manual. Salir o pulsar `Escape` vuelve a Twitch. VK conserva su fullscreen nativo y se desmonta al salir. |
 | `/rtfm` | RTFM del archivo: origen de los resubidos, notas operativas, mapa de navegación con permisos por rol y enlaces principales. Controlado por permiso `rtfm.view` y asignado por defecto a todos los roles. |
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
@@ -333,7 +335,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/sugerencias-reclamos/[id]` | Conversación del ticket propio, enlazada desde notificaciones de respuesta |
 | `/rastreador` | Tracker: lista de todos los directos con filtros |
 | `/rastreador/calendario` | Calendario histórico de directos por año, mes y día. Controlado por permiso `tracker.calendar.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación y administración. |
-| `/rastreador/[id]` | Detalle de un directo (links, actividad) |
+| `/rastreador/[id]` | Detalle de un directo: reproductor con fuentes Piero/OK.RU y partes independientes, enlaces externos Telegram/Patreon y actividad. Piero usa Vidstack sobre MP4, conserva localmente progreso, volumen, silencio y velocidad, permite continuar al volver, ofrece avance automático opcional, doble toque/clic lateral, atajos, feedback visual y controles accesibles para saltos de 10 segundos, velocidad, PiP y fullscreen. El componente queda aislado para recibir HLS, calidades, poster, miniaturas, capítulos y subtítulos cuando el NAS publique esas fuentes. |
 | `/biblioteca-anime/viendo` | Anime en seguimiento: temporada entera, caps comprados o pendientes de compra |
 | `/biblioteca-anime/calendario` | Calendario semanal de emisiones subtituladas en la zona horaria del usuario |
 | `/biblioteca-anime/tier-list/animes` | Tier List de animes de temporada (drag & drop, tiers personalizables). Controlado por `anime.tierlist.animes.view`, asignado por defecto a tiers Twitch, miembros YouTube, moderación, administración e invitados. |

@@ -35,7 +35,9 @@ export default async function Page() {
     canViewAdmin ? listPlatformPermissions() : Promise.resolve([]),
   ]);
 
-  const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
+  const twitchLogin = process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN
+    || process.env.TWITCH_BROADCASTER_LOGIN
+    || "kalathraslolweapon";
   const youtubeChannelUrl =
     process.env.YOUTUBE_CHANNEL_URL ||
     (process.env.YOUTUBE_CHANNEL_ID

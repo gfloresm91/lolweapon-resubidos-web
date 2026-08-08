@@ -42,6 +42,7 @@ data/tag-settings.local.json
 data/spacedrum.local.json
 data/*.export.json
 backups/
+outputs/
 docker-compose.prod.yml
 
 # Logs

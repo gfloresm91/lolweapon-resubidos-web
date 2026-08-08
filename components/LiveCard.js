@@ -108,9 +108,12 @@ function LiveCard({
   const hiddenCount = Math.max(allTags.length - visibleTags.length, 0);
   const okruCount = Array.isArray(live.links?.okru) ? live.links.okru.length : 0;
   const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
-  const hasAnyLinks = okruCount > 0 || telegramCount > 0;
-  const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
-  const DetailIcon = okruCount > 0 ? CirclePlay : telegramCount > 0 ? Link2 : FileText;
+  const pieroCount = Array.isArray(live.links?.piero) ? live.links.piero.length : 0;
+  const patreonCount = Array.isArray(live.links?.patreon) ? live.links.patreon.length : 0;
+  const hasPlayerLinks = pieroCount > 0 || okruCount > 0;
+  const hasAnyLinks = hasPlayerLinks || telegramCount > 0 || patreonCount > 0;
+  const detailCtaLabel = hasPlayerLinks ? "Ver resubido" : hasAnyLinks ? "Ver links" : "Ver ficha";
+  const DetailIcon = hasPlayerLinks ? CirclePlay : hasAnyLinks ? Link2 : FileText;
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
   const showThumbnail = false;
@@ -176,8 +179,10 @@ function LiveCard({
         </div>
 
         <div className="availability-row live-compact-availability" aria-label="Disponibilidad del resubido">
+          {pieroCount > 0 ? <span className="availability-chip availability-chip-piero">Piero · {pieroCount}</span> : null}
           {okruCount > 0 ? <span className="availability-chip availability-chip-okru">OK.RU · {okruCount}</span> : null}
           {telegramCount > 0 ? <span className="availability-chip availability-chip-telegram">Telegram · {telegramCount}</span> : null}
+          {patreonCount > 0 ? <span className="availability-chip availability-chip-patreon">Patreon · {patreonCount}</span> : null}
           {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
         </div>
 
@@ -334,6 +339,11 @@ function LiveCard({
         </div>
 
         <div className="availability-row" aria-label="Disponibilidad del resubido">
+          {pieroCount > 0 ? (
+            <span className="availability-chip availability-chip-piero">
+              Piero · {pluralize(pieroCount, "parte", "partes")}
+            </span>
+          ) : null}
           {okruCount > 0 ? (
             <span className="availability-chip availability-chip-okru">
               OK.RU · {pluralize(okruCount, "parte", "partes")}
@@ -342,6 +352,11 @@ function LiveCard({
           {telegramCount > 0 ? (
             <span className="availability-chip availability-chip-telegram">
               Telegram · {pluralize(telegramCount, "link", "links")}
+            </span>
+          ) : null}
+          {patreonCount > 0 ? (
+            <span className="availability-chip availability-chip-patreon">
+              Patreon · {pluralize(patreonCount, "link", "links")}
             </span>
           ) : null}
           {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}

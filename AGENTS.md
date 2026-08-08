@@ -244,6 +244,7 @@ npm run db:restore
 ### Twitch Player
 
 - `PersistentTwitchPlayer` es delicado.
+- Usa una sola instancia del SDK oficial de Twitch entre Inicio y el mini player. En Inicio, `Twitch` es la vista predeterminada y `VK + Twitch` mantiene VK como video principal con Twitch visible, silenciado y junto a su chat. No forzar `play()` con intervalos, no reanudar pausas manuales y no mantener el embed activo cuando está oculto.
 - `/api/twitch/status` comparte durante 30 segundos el estado público del canal y deduplica refrescos simultáneos. `lib/twitch.js` reutiliza únicamente el token de aplicación, con expiración anticipada, timeout y un reintento ante `401`; no mezclar esta caché con los tokens OAuth de usuarios ni con la sincronización de roles Twitch.
 - El registro manual de EventSub mantiene suscripciones `stream.online` y `stream.offline`. Para cada tipo lista usando el único filtro permitido por Twitch, identifica localmente el broadcaster y reemplaza únicamente suscripciones coincidentes que no estén activas para el callback configurado. Las revocaciones deben registrar `type`, `status` e `id` sin incluir secretos.
 - Un `stream.online` con firma válida es evidencia suficiente para crear el card sin volver a depender inmediatamente de Helix; `TWITCH_REQUIRE_ACTIVE_STREAM` sigue aplicando a la creación manual. Las notificaciones EventSub se deduplican por ID del stream. `stream.offline` cambia el registro Twitch más reciente que siga `En directo` a `Subiendo`.

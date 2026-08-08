@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { CirclePlay, FileText, Link2 } from "lucide-react";
+import { ChevronDown, CirclePlay, FileText, Link2, X } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
+
+const DEFAULT_VK_LIVE_EMBED_URL = "https://live.vkvideo.ru/app/embed/redbreake";
+const VK_LIVE_EMBED_URL = process.env.NEXT_PUBLIC_VK_LIVE_EMBED_URL || DEFAULT_VK_LIVE_EMBED_URL;
+const IS_VK_MULTISTREAM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_VK_MULTISTREAM !== "false";
 
 function parseDate(value) {
   const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
@@ -24,8 +28,12 @@ function formatYoutubeDate(value) {
 function RecentLiveCard({ live }) {
   const okruCount = Array.isArray(live.links?.okru) ? live.links.okru.length : 0;
   const telegramCount = Array.isArray(live.links?.telegram) ? live.links.telegram.length : 0;
-  const detailCtaLabel = okruCount > 0 ? "Ver resubido" : telegramCount > 0 ? "Ver links" : "Ver ficha";
-  const DetailIcon = okruCount > 0 ? CirclePlay : telegramCount > 0 ? Link2 : FileText;
+  const pieroCount = Array.isArray(live.links?.piero) ? live.links.piero.length : 0;
+  const patreonCount = Array.isArray(live.links?.patreon) ? live.links.patreon.length : 0;
+  const hasPlayerLinks = pieroCount > 0 || okruCount > 0;
+  const hasAnyLinks = hasPlayerLinks || telegramCount > 0 || patreonCount > 0;
+  const detailCtaLabel = hasPlayerLinks ? "Ver resubido" : hasAnyLinks ? "Ver links" : "Ver ficha";
+  const DetailIcon = hasPlayerLinks ? CirclePlay : hasAnyLinks ? Link2 : FileText;
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const liveStatus = live.status || PENDING_LIVE_STATUS_LABEL;
 
@@ -86,12 +94,83 @@ export default function HomeDashboard({
   const [videos, setVideos] = useState(youtubeVideos || []);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(!(youtubeVideos || []).length);
   const [twitchParent, setTwitchParent] = useState("");
-  const twitchChannel = twitchLogin || "kalathraslolweapon";
+  const [streamMode, setStreamMode] = useState("twitch");
+  const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [twitchPlaybackState, setTwitchPlaybackState] = useState("loading");
+  const twitchChannel = twitchLogin || process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN || "kalathraslolweapon";
   const isOnline = Boolean(currentStream);
+  const isDualMode = IS_VK_MULTISTREAM_ENABLED && streamMode === "dual";
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("kala:twitch-anchor-change", { detail: { mode: streamMode } }));
+  }, [streamMode]);
+
+  useEffect(() => {
+    function handlePlaybackState(event) {
+      if (event.detail?.state) setTwitchPlaybackState(event.detail.state);
+    }
+
+    window.addEventListener("kala:twitch-playback-state", handlePlaybackState);
+    return () => window.removeEventListener("kala:twitch-playback-state", handlePlaybackState);
+  }, []);
+
+  useEffect(() => {
+    if (!isDualMode) {
+      setIsChatCollapsed(false);
+    }
+  }, [isDualMode]);
+
+  useEffect(() => {
+    if (!isDualMode) return undefined;
+    const previousScrollY = window.scrollY;
+    const previousBodyStyles = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+
+    document.body.classList.add("is-dual-theater-open");
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${previousScrollY}px`;
+    document.body.style.width = "100%";
+
+    const alignmentFrame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent("kala:twitch-anchor-change", { detail: { mode: "dual" } }));
+      });
+    });
+
+    function exitOnEscape(event) {
+      if (event.key === "Escape") setStreamMode("twitch");
+    }
+
+    window.addEventListener("keydown", exitOnEscape);
+    return () => {
+      window.cancelAnimationFrame(alignmentFrame);
+      window.removeEventListener("keydown", exitOnEscape);
+      document.body.classList.remove("is-dual-theater-open");
+      document.body.style.overflow = previousBodyStyles.overflow;
+      document.body.style.position = previousBodyStyles.position;
+      document.body.style.top = previousBodyStyles.top;
+      document.body.style.width = previousBodyStyles.width;
+      window.requestAnimationFrame(() => window.scrollTo({ top: previousScrollY, behavior: "instant" }));
+    };
+  }, [isDualMode]);
+
+  function activateDualMode() {
+    window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
+    setStreamMode("dual");
+  }
+
+  function retryTwitchPlayback() {
+    window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "blocked-retry" } }));
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -181,6 +260,13 @@ export default function HomeDashboard({
   const twitchChatUrl = twitchParent
     ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
     : "";
+  const twitchPlaybackLabel = !isOnline
+    ? "Offline"
+    : twitchPlaybackState === "blocked"
+      ? "Activar Twitch"
+    : twitchPlaybackState === "playing"
+      ? "Reproduciendo"
+      : "Reanudando";
   const dashboardClassName = [
     "home-dashboard",
     mode === "mini" ? "is-mini-player" : "",
@@ -191,19 +277,61 @@ export default function HomeDashboard({
   return (
     <main className={dashboardClassName}>
       <section className="home-section home-stream-section" aria-label="Transmisión en directo">
-        <div className="stream-block">
-          <div className="stream-layout">
+        <div
+          className={`stream-block ${isDualMode ? "is-dual-theater" : ""}`}
+          role={isDualMode ? "dialog" : undefined}
+          aria-modal={isDualMode ? "true" : undefined}
+          aria-label={isDualMode ? "Modo dual VK y Twitch" : undefined}
+        >
+          {isDualMode ? (
+            <div className="stream-theater-bar">
+              <strong>VK + Twitch</strong>
+              <button type="button" onClick={() => setStreamMode("twitch")} autoFocus>
+                <X aria-hidden="true" />
+                Salir del modo dual
+              </button>
+            </div>
+          ) : IS_VK_MULTISTREAM_ENABLED ? (
+            <div className="stream-source-switch" role="group" aria-label="Fuente de la transmisión">
+              <button
+                type="button"
+                className={streamMode === "twitch" ? "is-active" : ""}
+                aria-pressed={streamMode === "twitch"}
+                onClick={() => setStreamMode("twitch")}
+              >
+                Twitch
+              </button>
+              <button type="button" aria-pressed="false" onClick={activateDualMode}>
+                VK + Twitch
+              </button>
+            </div>
+          ) : null}
+
+          <div className={`stream-layout ${isDualMode ? "is-dual" : "is-twitch"}`}>
             <div className="stream-main-column">
-              <div className="stream-frame stream-player">
-                {twitchParent ? (
-                  <iframe
-                    src={`https://player.twitch.tv/?channel=${encodeURIComponent(twitchChannel)}&parent=${encodeURIComponent(twitchParent)}&autoplay=true`}
-                    allowFullScreen
-                    allow="autoplay; fullscreen"
-                    title="Directo de Twitch"
-                  />
-                ) : null}
-              </div>
+              {isDualMode ? (
+                <div className="stream-vk-wrap">
+                  <div className="stream-platform-heading">
+                    <strong>VK Video</strong>
+                  </div>
+                  <div className="stream-frame stream-player stream-vk-player">
+                    <iframe
+                      src={VK_LIVE_EMBED_URL}
+                      allowFullScreen
+                      allow="autoplay; fullscreen; picture-in-picture"
+                      loading="eager"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      title="Directo completo en VK Video"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="stream-frame stream-player twitch-player-anchor"
+                  data-twitch-player-anchor
+                  aria-label="Directo de Twitch"
+                />
+              )}
               <div className="stream-details">
                 <div className="stream-avatar">
                   {currentProfile?.profile_image_url ? (
@@ -220,11 +348,19 @@ export default function HomeDashboard({
                   </h2>
                   <div className="stream-details-meta">
                     <span>{channelName}</span>
-                    {isOnline && typeof currentStream.viewer_count === "number" ? (
-                      <span>{currentStream.viewer_count} viewers</span>
-                    ) : null}
                     {!isOnline && !isTwitchLoading ? <span className="stream-offline-state">Offline</span> : null}
                   </div>
+                  {isDualMode && isOnline ? (
+                    <div className="stream-audience-summary" aria-label="Audiencia simultánea por plataforma">
+                      <span><small>Twitch</small><strong>{currentStream.viewer_count?.toLocaleString("es-CL") ?? "—"}</strong></span>
+                      <span title="VK no ofrece aún una fuente oficial configurada"><small>VK</small><strong>—</strong></span>
+                      <span title="Se calculará cuando ambas plataformas entreguen datos oficiales"><small>Total</small><strong>—</strong></span>
+                    </div>
+                  ) : isOnline && typeof currentStream.viewer_count === "number" ? (
+                    <div className="stream-audience-summary is-single">
+                      <span><small>Espectadores en Twitch</small><strong>{currentStream.viewer_count.toLocaleString("es-CL")}</strong></span>
+                    </div>
+                  ) : null}
                   {currentCategory ? (
                     <div className="stream-category-line">
                       {categoryImage ? <img src={categoryImage} alt="" /> : null}
@@ -256,8 +392,38 @@ export default function HomeDashboard({
                 </div>
               </div>
             </div>
-            <div className="stream-frame stream-chat">
-              {twitchChatUrl ? <iframe src={twitchChatUrl} title="Chat de Twitch" /> : null}
+            <div className="stream-side-column">
+              {isDualMode ? (
+                <div className="stream-twitch-companion-wrap">
+                  <div className="stream-companion-heading">
+                    <strong>Twitch</strong>
+                    {twitchPlaybackState === "blocked" && isOnline ? (
+                      <button type="button" className="stream-playback-retry" onClick={retryTwitchPlayback}>
+                        <span className="stream-playback-state is-blocked">{twitchPlaybackLabel}</span>
+                      </button>
+                    ) : (
+                      <span className={`stream-playback-state is-${twitchPlaybackState}`}>{twitchPlaybackLabel}</span>
+                    )}
+                  </div>
+                  <div
+                    className="stream-frame stream-twitch-companion twitch-player-anchor"
+                    data-twitch-player-anchor
+                    aria-label="Directo de Twitch silenciado"
+                  />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className="stream-chat-toggle"
+                aria-expanded={!isChatCollapsed}
+                onClick={() => setIsChatCollapsed((value) => !value)}
+              >
+                Chat de Twitch
+                <ChevronDown aria-hidden="true" />
+              </button>
+              <div className={`stream-frame stream-chat ${isChatCollapsed ? "is-collapsed" : ""}`}>
+                {twitchChatUrl ? <iframe src={twitchChatUrl} title="Chat de Twitch" /> : null}
+              </div>
             </div>
           </div>
         </div>

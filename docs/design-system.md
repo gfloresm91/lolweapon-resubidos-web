@@ -254,6 +254,26 @@ Excepciones documentadas:
 - La página completa reutiliza tipos, severidades y estados visuales del panel; debe ofrecer filtros y acciones sin convertir cada aviso en una card excesivamente decorada.
 - El mantenedor administrativo sigue el estándar de tablas, modales, filtros, paginación, scroll horizontal y confirmaciones. Las eliminaciones son lógicas y las publicaciones programadas deben distinguirse claramente de publicadas, expiradas e inactivas.
 
+## Multistream En Inicio
+
+- La vista predeterminada es `Twitch`; `VK + Twitch` se activa únicamente por una acción explícita del usuario.
+- En modo dual, VK ocupa el reproductor principal y Twitch permanece visible, silenciado, con controles y junto a su chat. No ocultar, cubrir ni desplazar fuera del viewport el embed de Twitch para conservar una reproducción en segundo plano.
+- Desktop usa VK como área principal y apila Twitch sobre el chat en la columna lateral. Tablet y mobile apilan VK, Twitch y chat verticalmente.
+- En desktop, VK y la columna Twitch/chat forman una sola superficie sin separación. El companion de Twitch se une verticalmente al chat y este se estira hasta el final de la fila; los encabezados de ambas plataformas quedan fuera de los frames y alineados.
+- `VK + Twitch` siempre abre un teatro de aplicación fijo de `100dvh`: bloquea el scroll exterior y distribuye el viewport entre VK, una ficha inferior compacta, Twitch visible y el chat con scroll interno. No crear una segunda instancia de Twitch.
+- Salir mediante el botón, `Escape` o desmontaje restaura el scroll previo y vuelve a la vista Twitch; el modo dual no persiste al recargar.
+- VK se monta solo al activar el modo dual y se desmonta al volver a Twitch o abandonar Inicio. Al navegar a otra pantalla, únicamente Twitch puede continuar en el mini player.
+- VK conserva su fullscreen nativo. Al entrar en fullscreen, Twitch deja de estar visible y no debe asumirse que su reproducción seguirá contando durante ese intervalo.
+- Al seleccionar `VK + Twitch`, el gesto explícito del usuario solicita inmediatamente `play()` al SDK de Twitch con el audio silenciado y descarta cualquier pausa previa conservada por la interfaz.
+- Mientras `VK + Twitch` siga activo y visible, el evento `PAUSE` del SDK solicita nuevamente reproducción silenciada. Si la pestaña está oculta, no se fuerza reproducción; al volver, solo se reanuda si el reproductor quedó pausado. En modo Twitch y mini player se respetan las pausas manuales.
+- Al entrar al teatro se solicita reproducción tanto durante el clic como después de montar el ancla dual. `PLAYBACK_BLOCKED` muestra una acción explícita `Activar Twitch` para repetir el intento con gesto del usuario.
+- Mientras el teatro dual está visible y Twitch está online, comprobar `isPaused()` al entrar y periódicamente: si ya reproduce, confirmar el estado visual sin volver a llamar `play()`; si está pausado, solicitar reproducción silenciada. Detener esta comprobación al salir del modo dual, ocultar la pestaña o desmontar el player.
+- La instancia fija de Twitch no anima `top`, `left`, ancho ni alto mientras está anclada en Inicio: sigue al placeholder durante el scroll sin transición para evitar rebote visual. Las transiciones quedan reservadas para el mini player.
+- En la vista Twitch, el chat ocupa también la altura de la ficha inferior del directo; no debe terminar al mismo nivel que el video dejando una franja vacía en la columna derecha.
+- La ficha del directo permanece debajo de VK. Durante el directo puede mostrar audiencia separada de Twitch, VK y total, pero el total solo se calcula con cifras oficiales de ambas plataformas; no extraer la audiencia de VK mediante scraping de HTML o APIs internas no documentadas.
+- En tablet y mobile el chat de Twitch puede plegarse sin desmontar su iframe, para conservar la sesión del usuario.
+- Twitch usa una sola instancia del SDK oficial entre Inicio y el mini player. Respetar pausas manuales y no forzar `play()` mediante intervalos o al recuperar foco.
+
 ## Tickets / Sugerencias-Reclamos
 
 - La bandeja de usuario y el mantenedor administrativo usan superficies sólidas, bordes visibles y texto secundario de contraste medio-alto para evitar fatiga visual.

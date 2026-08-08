@@ -33,5 +33,9 @@ export default defineConfig({
         storageState: "./playwright/.auth/user.json",
       },
     },
+    {
+      name: "multistream-responsive",
+      testMatch: "**/multistream-responsive.spec.js",
+    },
   ],
 });
