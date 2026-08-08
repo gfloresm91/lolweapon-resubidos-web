@@ -1821,12 +1821,16 @@ body.is-dual-theater-open .persistent-twitch-player.is-home {
 .stream-layout {
   display: grid;
   grid-template-columns: minmax(0, 2.25fr) minmax(360px, 0.95fr);
-  gap: 0;
+  /* A real gap (not 0) between the Twitch video and chat frames is required:
+     Twitch's own anti-clickjacking check for the embedded chat's mod/owner
+     actions treats a flush shared edge as the chat being obscured and
+     disables moderation, even with no actual overlapping element. */
+  gap: 1.5rem;
 }
 
 .stream-layout.is-dual {
   grid-template-columns: minmax(0, 2.25fr) minmax(400px, 0.95fr);
-  gap: 0;
+  gap: 1.5rem;
 }
 
 .stream-main-column {
@@ -1844,7 +1848,11 @@ body.is-dual-theater-open .persistent-twitch-player.is-home {
 
 .stream-layout.is-dual .stream-side-column {
   height: 100%;
-  gap: 0;
+  /* Same fix as .stream-layout's gap: the Twitch video companion and chat
+     frames were flush (0 gap) in this column too. The companion has a fixed
+     min-height and doesn't grow, so this gap comes entirely out of the
+     chat's flexible height instead of resizing the video. */
+  gap: 1.5rem;
 }
 
 .stream-frame {
@@ -1874,8 +1882,7 @@ body.is-dual-theater-open .persistent-twitch-player.is-home {
   backface-visibility: hidden;
   contain: layout paint;
   transform: translateZ(0);
-  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
-  border-right: none;
+  border-radius: var(--radius-lg);
 }
 
 .stream-vk-player iframe {
@@ -1987,20 +1994,18 @@ body.is-dual-theater-open .persistent-twitch-player.is-home {
 .stream-twitch-companion {
   width: 100%;
   min-height: 300px;
-  border-radius: 0 var(--radius-lg) 0 0;
+  border-radius: var(--radius-lg);
 }
 
 .stream-chat {
   min-height: 650px;
   flex: 1 1 650px;
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  border-radius: var(--radius-lg);
 }
 
 .stream-layout.is-dual .stream-chat {
   min-height: 350px;
   flex: 1 1 350px;
-  border-top: 0;
-  border-radius: 0 0 var(--radius-lg) 0;
 }
 
 .stream-chat-toggle {
