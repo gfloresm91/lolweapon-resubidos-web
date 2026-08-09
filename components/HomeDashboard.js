@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { ChevronDown, CirclePlay, FileText, Link2, X } from "lucide-react";
+import { ChevronDown, CirclePlay, FileText, Info, Link2, MessageSquare, X } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
+import TwitchCompanionPlayer from "@/components/TwitchCompanionPlayer";
 
 const DEFAULT_VK_LIVE_EMBED_URL = "https://live.vkvideo.ru/app/embed/redbreake";
 const VK_LIVE_EMBED_URL = process.env.NEXT_PUBLIC_VK_LIVE_EMBED_URL || DEFAULT_VK_LIVE_EMBED_URL;
@@ -96,18 +98,63 @@ export default function HomeDashboard({
   const [twitchParent, setTwitchParent] = useState("");
   const [streamMode, setStreamMode] = useState("twitch");
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
+  const [isMobileTheaterLayout, setIsMobileTheaterLayout] = useState(false);
+  const [isTwitchChatTheaterEligible, setIsTwitchChatTheaterEligible] = useState(false);
+  const [isTwitchChatTheaterOpen, setIsTwitchChatTheaterOpen] = useState(false);
+  const [isStreamInfoOpen, setIsStreamInfoOpen] = useState(false);
   const [twitchPlaybackState, setTwitchPlaybackState] = useState("loading");
   const twitchChannel = twitchLogin || process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN || "kalathraslolweapon";
   const isOnline = Boolean(currentStream);
   const isDualMode = IS_VK_MULTISTREAM_ENABLED && streamMode === "dual";
+  const isTwitchChatTheater = !isDualMode && isTwitchChatTheaterOpen;
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
   }, []);
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("kala:twitch-anchor-change", { detail: { mode: streamMode } }));
-  }, [streamMode]);
+    const mediaQuery = window.matchMedia("(max-width: 1024px)");
+    const updateEligibility = () => {
+      setIsTwitchChatTheaterEligible(mediaQuery.matches);
+      if (!mediaQuery.matches) setIsTwitchChatTheaterOpen(false);
+    };
+    updateEligibility();
+    mediaQuery.addEventListener("change", updateEligibility);
+    return () => mediaQuery.removeEventListener("change", updateEligibility);
+  }, []);
+
+  useEffect(() => {
+    // Compact dual theater is shared by mobile, tablet and small laptops.
+    // Wide desktop keeps the permanent two-column arrangement.
+    const mediaQuery = window.matchMedia("(max-width: 1200px)");
+    const updateLayout = () => setIsMobileTheaterLayout(mediaQuery.matches);
+    updateLayout();
+    mediaQuery.addEventListener("change", updateLayout);
+    return () => mediaQuery.removeEventListener("change", updateLayout);
+  }, []);
+
+  useEffect(() => {
+    if (!IS_VK_MULTISTREAM_ENABLED) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("stream") === "dual") {
+      window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
+      setStreamMode("dual");
+    }
+  }, []);
+
+  useEffect(() => {
+    const notifyAnchorChange = () => {
+      window.dispatchEvent(new CustomEvent("kala:twitch-anchor-change", { detail: { mode: streamMode } }));
+    };
+    notifyAnchorChange();
+    const frame = window.requestAnimationFrame(notifyAnchorChange);
+    const settleTimer = window.setTimeout(notifyAnchorChange, 350);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(settleTimer);
+    };
+  }, [isMobileTheaterLayout, streamMode]);
 
   useEffect(() => {
     function handlePlaybackState(event) {
@@ -121,8 +168,22 @@ export default function HomeDashboard({
   useEffect(() => {
     if (!isDualMode) {
       setIsChatCollapsed(false);
+      setIsChatExpanded(false);
+      setIsStreamInfoOpen(false);
     }
   }, [isDualMode]);
+
+  useEffect(() => {
+    if (isDualMode) setIsTwitchChatTheaterOpen(false);
+  }, [isDualMode]);
+
+  useEffect(() => {
+    if (isDualMode && !isChatExpanded) {
+      // The companion sits underneath the expanded chat overlay; nudge it to
+      // resume in case it lost autoplay while covered.
+      window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "chat-collapsed" } }));
+    }
+  }, [isChatExpanded, isDualMode]);
 
   useEffect(() => {
     if (!isDualMode) return undefined;
@@ -146,14 +207,8 @@ export default function HomeDashboard({
       });
     });
 
-    function exitOnEscape(event) {
-      if (event.key === "Escape") setStreamMode("twitch");
-    }
-
-    window.addEventListener("keydown", exitOnEscape);
     return () => {
       window.cancelAnimationFrame(alignmentFrame);
-      window.removeEventListener("keydown", exitOnEscape);
       document.body.classList.remove("is-dual-theater-open");
       document.body.style.overflow = previousBodyStyles.overflow;
       document.body.style.position = previousBodyStyles.position;
@@ -162,6 +217,46 @@ export default function HomeDashboard({
       window.requestAnimationFrame(() => window.scrollTo({ top: previousScrollY, behavior: "instant" }));
     };
   }, [isDualMode]);
+
+  useEffect(() => {
+    if (!isTwitchChatTheater) return undefined;
+    const previousScrollY = window.scrollY;
+    const previousBodyStyles = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+    };
+
+    document.body.classList.add("is-twitch-chat-theater-open");
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${previousScrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.body.classList.remove("is-twitch-chat-theater-open");
+      document.body.style.overflow = previousBodyStyles.overflow;
+      document.body.style.position = previousBodyStyles.position;
+      document.body.style.top = previousBodyStyles.top;
+      document.body.style.width = previousBodyStyles.width;
+      window.requestAnimationFrame(() => window.scrollTo({ top: previousScrollY, behavior: "instant" }));
+    };
+  }, [isTwitchChatTheater]);
+
+  useEffect(() => {
+    if (!isDualMode && !isTwitchChatTheater && !isStreamInfoOpen) return undefined;
+
+    function handleEscape(event) {
+      if (event.key !== "Escape") return;
+      if (isStreamInfoOpen) setIsStreamInfoOpen(false);
+      else if (isDualMode) setStreamMode("twitch");
+      else if (isTwitchChatTheater) setIsTwitchChatTheaterOpen(false);
+    }
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isDualMode, isStreamInfoOpen, isTwitchChatTheater]);
 
   function activateDualMode() {
     window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
@@ -274,36 +369,204 @@ export default function HomeDashboard({
     .filter(Boolean)
     .join(" ");
 
+  const streamDetailsBlock = (
+    <div className="stream-details">
+      <div className="stream-avatar">
+        {currentProfile?.profile_image_url ? (
+          <img src={currentProfile.profile_image_url} alt="" />
+        ) : (
+          "LW"
+        )}
+      </div>
+      <div className="stream-details-copy">
+        <h2 aria-live="polite" aria-busy={isTwitchLoading}>
+          {isTwitchLoading
+            ? <span className="stream-title-skeleton" aria-hidden="true" />
+            : currentTitle}
+        </h2>
+        <div className="stream-details-meta">
+          <span>{channelName}</span>
+          {!isTwitchLoading ? (
+            <span className={`stream-status-label ${isOnline ? "is-online" : "is-offline"}`}>
+              {isOnline ? "En directo" : "Offline"}
+            </span>
+          ) : null}
+          {isOnline && typeof currentStream.viewer_count === "number" ? (
+            <span>{currentStream.viewer_count.toLocaleString("es-CL")} espectadores en Twitch</span>
+          ) : null}
+        </div>
+        {currentCategory ? (
+          <div className="stream-category-line">
+            {categoryImage ? <img src={categoryImage} alt="" /> : null}
+            <span>{currentCategory}</span>
+          </div>
+        ) : null}
+        {!isOnline && channelDescription ? (
+          <p className="stream-details-description">{channelDescription}</p>
+        ) : null}
+      </div>
+      <div className="stream-actions">
+        <a
+          href={`https://www.twitch.tv/${twitchChannel}`}
+          target="_blank"
+          rel="noreferrer"
+          className="home-twitch-link"
+        >
+          Apoyar en Twitch
+        </a>
+        <a
+          href={streamlabsUrl || "https://streamlabs.com/kalathraslolweapon/tip"}
+          target="_blank"
+          rel="noreferrer"
+          className="stream-tip-button"
+        >
+          <span className="paypal-icon" aria-hidden="true">P</span>
+          Apoyar por PayPal
+        </a>
+      </div>
+    </div>
+  );
+
+  const chatToggleButton = (
+    <button
+      type="button"
+      className="stream-chat-toggle"
+      aria-expanded={isDualMode ? isChatExpanded : !isChatCollapsed}
+      onClick={() => (
+        isDualMode
+          ? setIsChatExpanded((value) => !value)
+          : setIsChatCollapsed((value) => !value)
+      )}
+    >
+      {isDualMode
+        ? (isChatExpanded ? "Ocultar chat" : "Mostrar chat")
+        : (isChatCollapsed ? "Mostrar chat" : "Ocultar chat")}
+      <ChevronDown aria-hidden="true" />
+    </button>
+  );
+
+  const twitchCompanionBlock = isDualMode ? (
+    <div className="stream-twitch-companion-wrap">
+      <div className="stream-companion-heading">
+        <strong>Twitch</strong>
+        {twitchPlaybackState === "blocked" && isOnline ? (
+          <button type="button" className="stream-playback-retry" onClick={retryTwitchPlayback}>
+            <span className="stream-playback-state is-blocked">{twitchPlaybackLabel}</span>
+          </button>
+        ) : (
+          <span className={`stream-playback-state is-${twitchPlaybackState}`}>{twitchPlaybackLabel}</span>
+        )}
+      </div>
+      <TwitchCompanionPlayer channel={twitchChannel} parent={twitchParent} />
+    </div>
+  ) : null;
+
+  const twitchChatBlock = (
+    <div className={`stream-frame stream-chat ${isChatCollapsed ? "is-collapsed" : ""} ${isChatExpanded ? "is-expanded" : ""}`}>
+      {twitchChatUrl ? (
+        <iframe
+          src={twitchChatUrl}
+          title="Chat de Twitch"
+          width="100%"
+          height="100%"
+        />
+      ) : null}
+    </div>
+  );
+
+  const twitchTheaterChatPortal = isTwitchChatTheater && twitchChatUrl
+    ? createPortal(
+      <iframe
+        className="stream-chat-portal"
+        id="twitch-theater-chat-portal"
+        src={twitchChatUrl}
+        title="Chat de Twitch"
+        width="100%"
+        height="100%"
+      />,
+      document.body,
+    )
+    : null;
+
   return (
     <main className={dashboardClassName}>
       <section className="home-section home-stream-section" aria-label="Transmisión en directo">
         <div
-          className={`stream-block ${isDualMode ? "is-dual-theater" : ""}`}
-          role={isDualMode ? "dialog" : undefined}
-          aria-modal={isDualMode ? "true" : undefined}
-          aria-label={isDualMode ? "Modo dual VK y Twitch" : undefined}
+          className={`stream-block ${isDualMode ? "is-dual-theater" : ""} ${isTwitchChatTheater ? "is-twitch-chat-theater" : ""} ${!isDualMode && isMobileTheaterLayout ? "is-twitch-compact" : ""} ${!isDualMode && isTwitchChatTheaterEligible && !isTwitchChatTheater ? "has-twitch-chat-cta" : ""} ${isStreamInfoOpen ? "has-info-open" : ""} ${isDualMode && isChatExpanded ? "is-chat-expanded" : ""}`}
+          role={isDualMode || isTwitchChatTheater ? "dialog" : undefined}
+          aria-modal={isDualMode || isTwitchChatTheater ? "true" : undefined}
+          aria-label={isDualMode ? "Modo dual VK y Twitch" : isTwitchChatTheater ? "Twitch con chat" : undefined}
+          aria-owns={isTwitchChatTheater ? "twitch-theater-chat-portal" : undefined}
         >
           {isDualMode ? (
             <div className="stream-theater-bar">
               <strong>VK + Twitch</strong>
-              <button type="button" onClick={() => setStreamMode("twitch")} autoFocus>
-                <X aria-hidden="true" />
-                Salir del modo dual
-              </button>
+              <div className="stream-theater-actions">
+                {isMobileTheaterLayout ? (
+                  <button type="button" onClick={() => setIsStreamInfoOpen(true)} aria-label="Información del directo">
+                    <Info aria-hidden="true" />
+                    <span>Información</span>
+                  </button>
+                ) : null}
+                <button type="button" onClick={() => setStreamMode("twitch")} aria-label="Salir del modo dual">
+                  <X aria-hidden="true" />
+                  <span>Salir del modo dual</span>
+                </button>
+              </div>
+            </div>
+          ) : isTwitchChatTheater ? (
+            <div className="stream-theater-bar stream-twitch-chat-theater-bar">
+              <strong>Twitch con chat</strong>
+              <div className="stream-theater-actions">
+                <button type="button" onClick={() => setIsStreamInfoOpen(true)} aria-label="Información del directo">
+                  <Info aria-hidden="true" />
+                  <span>Información</span>
+                </button>
+                <button type="button" onClick={() => setIsTwitchChatTheaterOpen(false)} aria-label="Salir del modo chat">
+                  <X aria-hidden="true" />
+                  <span>Salir del modo chat</span>
+                </button>
+              </div>
             </div>
           ) : IS_VK_MULTISTREAM_ENABLED ? (
-            <div className="stream-source-switch" role="group" aria-label="Fuente de la transmisión">
-              <button
-                type="button"
-                className={streamMode === "twitch" ? "is-active" : ""}
-                aria-pressed={streamMode === "twitch"}
-                onClick={() => setStreamMode("twitch")}
-              >
-                Twitch
-              </button>
-              <button type="button" aria-pressed="false" onClick={activateDualMode}>
-                VK + Twitch
-              </button>
+            <div className="stream-source-toolbar">
+              <div className="stream-source-switch" role="group" aria-label="Fuente de la transmisión">
+                <button
+                  type="button"
+                  className={streamMode === "twitch" ? "is-active" : ""}
+                  aria-pressed={streamMode === "twitch"}
+                  onClick={() => setStreamMode("twitch")}
+                >
+                  Twitch
+                </button>
+                <button type="button" aria-pressed="false" onClick={activateDualMode}>
+                  VK + Twitch
+                </button>
+              </div>
+              <div className="stream-source-actions">
+                {isMobileTheaterLayout ? (
+                  <button
+                    type="button"
+                    className="stream-info-trigger"
+                    onClick={() => setIsStreamInfoOpen(true)}
+                    aria-label="Información del directo"
+                  >
+                    <Info aria-hidden="true" />
+                    <span>Información</span>
+                  </button>
+                ) : null}
+                {!isTwitchChatTheaterEligible ? (
+                  <button
+                    type="button"
+                    className="stream-info-trigger stream-desktop-theater-trigger"
+                    onClick={() => setIsTwitchChatTheaterOpen(true)}
+                    aria-label="Abrir modo teatro"
+                  >
+                    <MessageSquare aria-hidden="true" />
+                    <span>Modo teatro</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
@@ -322,111 +585,75 @@ export default function HomeDashboard({
                       loading="eager"
                       referrerPolicy="strict-origin-when-cross-origin"
                       title="Directo completo en VK Video"
+                      scrolling="no"
+                      style={{ overflow: "hidden" }}
                     />
                   </div>
                 </div>
               ) : (
-                <div
-                  className="stream-frame stream-player twitch-player-anchor"
-                  data-twitch-player-anchor
-                  aria-label="Directo de Twitch"
+                <TwitchCompanionPlayer
+                  channel={twitchChannel}
+                  parent={twitchParent}
+                  enforcePlayback
+                  respectManualPause
+                  className="stream-player stream-twitch-inline-player"
+                  ariaLabel="Directo de Twitch"
                 />
               )}
-              <div className="stream-details">
-                <div className="stream-avatar">
-                  {currentProfile?.profile_image_url ? (
-                    <img src={currentProfile.profile_image_url} alt="" />
-                  ) : (
-                    "LW"
-                  )}
-                </div>
-                <div className="stream-details-copy">
-                  <h2 aria-live="polite" aria-busy={isTwitchLoading}>
-                    {isTwitchLoading
-                      ? <span className="stream-title-skeleton" aria-hidden="true" />
-                      : currentTitle}
-                  </h2>
-                  <div className="stream-details-meta">
-                    <span>{channelName}</span>
-                    {!isOnline && !isTwitchLoading ? <span className="stream-offline-state">Offline</span> : null}
-                  </div>
-                  {isDualMode && isOnline ? (
-                    <div className="stream-audience-summary" aria-label="Audiencia simultánea por plataforma">
-                      <span><small>Twitch</small><strong>{currentStream.viewer_count?.toLocaleString("es-CL") ?? "—"}</strong></span>
-                      <span title="VK no ofrece aún una fuente oficial configurada"><small>VK</small><strong>—</strong></span>
-                      <span title="Se calculará cuando ambas plataformas entreguen datos oficiales"><small>Total</small><strong>—</strong></span>
-                    </div>
-                  ) : isOnline && typeof currentStream.viewer_count === "number" ? (
-                    <div className="stream-audience-summary is-single">
-                      <span><small>Espectadores en Twitch</small><strong>{currentStream.viewer_count.toLocaleString("es-CL")}</strong></span>
-                    </div>
-                  ) : null}
-                  {currentCategory ? (
-                    <div className="stream-category-line">
-                      {categoryImage ? <img src={categoryImage} alt="" /> : null}
-                      <span>{currentCategory}</span>
-                    </div>
-                  ) : null}
-                  {!isOnline && channelDescription ? (
-                    <p className="stream-details-description">{channelDescription}</p>
-                  ) : null}
-                </div>
-                <div className="stream-actions">
-                  <a
-                    href={`https://www.twitch.tv/${twitchChannel}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="home-twitch-link"
-                  >
-                    Abrir en Twitch
-                  </a>
-                  <a
-                    href={streamlabsUrl || "https://streamlabs.com/kalathraslolweapon/tip"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="stream-tip-button"
-                  >
-                    <span className="paypal-icon" aria-hidden="true">P</span>
-                    Apoyar al canal
-                  </a>
-                </div>
-              </div>
+              {isMobileTheaterLayout || isTwitchChatTheater ? null : streamDetailsBlock}
             </div>
             <div className="stream-side-column">
-              {isDualMode ? (
-                <div className="stream-twitch-companion-wrap">
-                  <div className="stream-companion-heading">
-                    <strong>Twitch</strong>
-                    {twitchPlaybackState === "blocked" && isOnline ? (
-                      <button type="button" className="stream-playback-retry" onClick={retryTwitchPlayback}>
-                        <span className="stream-playback-state is-blocked">{twitchPlaybackLabel}</span>
-                      </button>
-                    ) : (
-                      <span className={`stream-playback-state is-${twitchPlaybackState}`}>{twitchPlaybackLabel}</span>
-                    )}
-                  </div>
-                  <div
-                    className="stream-frame stream-twitch-companion twitch-player-anchor"
-                    data-twitch-player-anchor
-                    aria-label="Directo de Twitch silenciado"
-                  />
-                </div>
+              {isDualMode && isMobileTheaterLayout ? (
+                <>
+                  {chatToggleButton}
+                  {twitchChatBlock}
+                  {twitchCompanionBlock}
+                </>
+              ) : !isTwitchChatTheater && (isDualMode || !isTwitchChatTheaterEligible) ? (
+                <>
+                  {twitchCompanionBlock}
+                  {twitchChatBlock}
+                </>
               ) : null}
-              <button
-                type="button"
-                className="stream-chat-toggle"
-                aria-expanded={!isChatCollapsed}
-                onClick={() => setIsChatCollapsed((value) => !value)}
-              >
-                Chat de Twitch
-                <ChevronDown aria-hidden="true" />
-              </button>
-              <div className={`stream-frame stream-chat ${isChatCollapsed ? "is-collapsed" : ""}`}>
-                {twitchChatUrl ? <iframe src={twitchChatUrl} title="Chat de Twitch" /> : null}
-              </div>
             </div>
           </div>
+
+          {!isDualMode && !isTwitchChatTheater && isTwitchChatTheaterEligible ? (
+            <button
+              type="button"
+              className="stream-open-chat-theater"
+              onClick={() => setIsTwitchChatTheaterOpen(true)}
+            >
+              <MessageSquare aria-hidden="true" />
+              <span>
+                <strong>Ver con chat</strong>
+                <small>Abre Twitch y su chat en pantalla completa</small>
+              </span>
+            </button>
+          ) : null}
+
+          {(isMobileTheaterLayout || isTwitchChatTheater) && isStreamInfoOpen ? (
+            <div className="stream-info-backdrop" role="presentation" onMouseDown={() => setIsStreamInfoOpen(false)}>
+              <div
+                className="stream-info-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Información del directo"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <span className="stream-info-sheet-handle" aria-hidden="true" />
+                <div className="stream-info-sheet-header">
+                  <strong>Información del directo</strong>
+                  <button type="button" onClick={() => setIsStreamInfoOpen(false)} aria-label="Cerrar información">
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+                {streamDetailsBlock}
+              </div>
+            </div>
+          ) : null}
         </div>
+        {twitchTheaterChatPortal}
       </section>
 
       <section className="home-section" aria-label="Últimos directos registrados">

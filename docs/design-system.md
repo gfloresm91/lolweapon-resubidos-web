@@ -257,10 +257,17 @@ Excepciones documentadas:
 ## Multistream En Inicio
 
 - La vista predeterminada es `Twitch`; `VK + Twitch` se activa únicamente por una acción explícita del usuario.
-- En modo dual, VK ocupa el reproductor principal y Twitch permanece visible, silenciado, con controles y junto a su chat. No ocultar, cubrir ni desplazar fuera del viewport el embed de Twitch para conservar una reproducción en segundo plano.
-- Desktop usa VK como área principal y apila Twitch sobre el chat en la columna lateral. Tablet y mobile apilan VK, Twitch y chat verticalmente.
+- Hasta `1024px`, la vista Twitch normal muestra el player y la acción `Ver con chat`; no monta el chat debajo porque Twitch deshabilita las herramientas de propietario/moderación en esa distribución. La información continúa en un modal y no consume altura permanente.
+- `Ver con chat` abre un teatro Twitch independiente del modo dual. Hasta `900px` apila player y chat verticalmente; entre `901px` y `1199px` usa columnas con chat de `350px`. El mismo player permanece montado durante la transición.
+- Desde `1200px`, el chat lateral normal se conserva y la barra ofrece `Modo teatro` como opción. En teatro, el chat usa `clamp(400px, 30vw, 520px)` y el reproductor recibe todo el ancho restante.
+- El teatro Twitch elimina sidebar, topbar y footer, bloquea el scroll exterior y renderiza el iframe del chat mediante portal como hijo directo de `body`, sin los ancestros del shell que activan la protección antiobstrucción de Twitch. El chat no lleva bordes, radios, sombras ni recortes. Al salir vuelve a Twitch normal y no reabre el teatro automáticamente.
+- Mientras la vista Twitch compacta esté montada, ocultar completamente el footer persistente. Twitch puede deshabilitar moderación cuando detecta elementos pegados o superpuestos, aunque visualmente parezcan no cubrir el chat.
+- Desde `1201px`, Twitch usa video/ficha en la columna principal y chat permanente en una columna `clamp(400px, 30vw, 520px)`. El bloque completo se limita a `1680px` para evitar crecimiento excesivo en ultrawide.
+- En modo dual, VK ocupa el reproductor principal y Twitch permanece visible, silenciado, con controles y junto a su chat mientras el chat móvil está plegado. La expansión del chat es la excepción explícita: prioriza moderación y cubre temporalmente el player de Twitch, por lo que no debe asumirse que esa reproducción contabilice mientras esté cubierta.
+- Desktop ancho usa VK como área principal y apila Twitch sobre el chat en la columna lateral. Hasta `1200px`, mobile, tablet y laptop compacto comparten el apilado vertical: VK arriba, control del chat y Twitch visible en el estado plegado.
 - En desktop, VK y la columna Twitch/chat forman una sola superficie sin separación. El companion de Twitch se une verticalmente al chat y este se estira hasta el final de la fila; los encabezados de ambas plataformas quedan fuera de los frames y alineados.
-- `VK + Twitch` siempre abre un teatro de aplicación fijo de `100dvh`: bloquea el scroll exterior y distribuye el viewport entre VK, una ficha inferior compacta, Twitch visible y el chat con scroll interno. No crear una segunda instancia de Twitch.
+- Desde `1201px`, la columna Twitch/chat usa `clamp(400px, 30vw, 520px)`: protege el mínimo oficial del player y limita su crecimiento en monitores ultrawide para entregar el espacio adicional a VK. El video conserva un mínimo explícito de `400x300px`.
+- `VK + Twitch` siempre abre un teatro de aplicación fijo de `100dvh`: bloquea el scroll exterior y distribuye el viewport entre VK, Twitch visible y el chat. Hasta `1200px`, la información del directo no consume altura permanente: se abre desde la cabecera mediante un bottom sheet con scroll interno.
 - Salir mediante el botón, `Escape` o desmontaje restaura el scroll previo y vuelve a la vista Twitch; el modo dual no persiste al recargar.
 - VK se monta solo al activar el modo dual y se desmonta al volver a Twitch o abandonar Inicio. Al navegar a otra pantalla, únicamente Twitch puede continuar en el mini player.
 - VK conserva su fullscreen nativo. Al entrar en fullscreen, Twitch deja de estar visible y no debe asumirse que su reproducción seguirá contando durante ese intervalo.
@@ -268,11 +275,12 @@ Excepciones documentadas:
 - Mientras `VK + Twitch` siga activo y visible, el evento `PAUSE` del SDK solicita nuevamente reproducción silenciada. Si la pestaña está oculta, no se fuerza reproducción; al volver, solo se reanuda si el reproductor quedó pausado. En modo Twitch y mini player se respetan las pausas manuales.
 - Al entrar al teatro se solicita reproducción tanto durante el clic como después de montar el ancla dual. `PLAYBACK_BLOCKED` muestra una acción explícita `Activar Twitch` para repetir el intento con gesto del usuario.
 - Mientras el teatro dual está visible y Twitch está online, comprobar `isPaused()` al entrar y periódicamente: si ya reproduce, confirmar el estado visual sin volver a llamar `play()`; si está pausado, solicitar reproducción silenciada. Detener esta comprobación al salir del modo dual, ocultar la pestaña o desmontar el player.
-- La instancia fija de Twitch no anima `top`, `left`, ancho ni alto mientras está anclada en Inicio: sigue al placeholder durante el scroll sin transición para evitar rebote visual. Las transiciones quedan reservadas para el mini player.
+- En la vista Twitch de Inicio, el player oficial vive dentro del flujo y cambia de geometría mediante CSS al abrir el teatro de chat; no usar una segunda instancia ni una capa fija sobre un placeholder. `PersistentTwitchPlayer` queda oculto en Inicio y se reserva para el mini player fuera de esa ruta.
 - En la vista Twitch, el chat ocupa también la altura de la ficha inferior del directo; no debe terminar al mismo nivel que el video dejando una franja vacía en la columna derecha.
 - La ficha del directo permanece debajo de VK. Durante el directo puede mostrar audiencia separada de Twitch, VK y total, pero el total solo se calcula con cifras oficiales de ambas plataformas; no extraer la audiencia de VK mediante scraping de HTML o APIs internas no documentadas.
-- En tablet y mobile el chat de Twitch puede plegarse sin desmontar su iframe, para conservar la sesión del usuario.
-- Twitch usa una sola instancia del SDK oficial entre Inicio y el mini player. Respetar pausas manuales y no forzar `play()` mediante intervalos o al recuperar foco.
+- Hasta `1200px`, el chat de Twitch puede plegarse sin desmontar su iframe, para conservar la sesión del usuario.
+- En mobile, tablet y laptop compacto, al expandir el chat, VK permanece arriba y el chat ocupa íntegramente el espacio inferior disponible como una capa emergente sin scroll del teatro. El chat cubre temporalmente el player de Twitch, nunca VK; al plegarlo, Twitch vuelve a quedar visible sin remontar su instancia.
+- Inicio Twitch, el companion dual y el mini player usan instancias oficiales con responsabilidades separadas. Twitch solo y el companion dual solicitan autoplay silenciado, reaccionan a `PAUSE`, regreso de visibilidad/foco y verifican periódicamente `isPaused()`. Twitch solo considera manual una pausa emitida mientras su iframe tiene el foco y suspende la recuperación hasta que Twitch emita `PLAY`/`PLAYING`; el companion dual no conserva pausas manuales.
 
 ## Tickets / Sugerencias-Reclamos
 

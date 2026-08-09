@@ -213,6 +213,8 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
   useEffect(() => {
     function handlePlayRequest(event) {
+      if (playerModeRef.current === "hidden") return;
+
       if (event.detail?.muted !== false) {
         try {
           playerRef.current?.setMuted?.(true);
