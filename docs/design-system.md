@@ -281,6 +281,7 @@ Excepciones documentadas:
 - Hasta `1200px`, el chat de Twitch puede plegarse sin desmontar su iframe, para conservar la sesión del usuario.
 - En mobile, tablet y laptop compacto, al expandir el chat, VK permanece arriba y el chat ocupa íntegramente el espacio inferior disponible como una capa emergente sin scroll del teatro. El chat cubre temporalmente el player de Twitch, nunca VK; al plegarlo, Twitch vuelve a quedar visible sin remontar su instancia.
 - Inicio Twitch, el companion dual y el mini player usan instancias oficiales con responsabilidades separadas. Twitch solo y el companion dual solicitan autoplay silenciado, reaccionan a `PAUSE`, regreso de visibilidad/foco y verifican periódicamente `isPaused()`. Twitch solo considera manual una pausa emitida mientras su iframe tiene el foco y suspende la recuperación hasta que Twitch emita `PLAY`/`PLAYING`; el companion dual no conserva pausas manuales.
+- Si `/api/twitch/status` cambia de offline a online mientras Inicio ya está abierto, notificar al player con `refreshChannel`: ejecutar `setChannel()` antes de la secuencia de reproducción silenciada. Un `play()` aislado no siempre reemplaza la pantalla offline del SDK y puede dejar el estado visual en `Reanudando` hasta recargar la página.
 
 ## Tickets / Sugerencias-Reclamos
 

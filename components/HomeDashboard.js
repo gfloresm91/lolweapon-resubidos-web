@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ChevronDown, CirclePlay, FileText, Info, Link2, MessageSquare, X } from "lucide-react";
@@ -104,6 +104,7 @@ export default function HomeDashboard({
   const [isTwitchChatTheaterOpen, setIsTwitchChatTheaterOpen] = useState(false);
   const [isStreamInfoOpen, setIsStreamInfoOpen] = useState(false);
   const [twitchPlaybackState, setTwitchPlaybackState] = useState("loading");
+  const wasTwitchOnlineRef = useRef(Boolean(twitchStream));
   const twitchChannel = twitchLogin || process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN || "kalathraslolweapon";
   const isOnline = Boolean(currentStream);
   const isDualMode = IS_VK_MULTISTREAM_ENABLED && streamMode === "dual";
@@ -184,6 +185,20 @@ export default function HomeDashboard({
       window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "chat-collapsed" } }));
     }
   }, [isChatExpanded, isDualMode]);
+
+  useEffect(() => {
+    const wasOnline = wasTwitchOnlineRef.current;
+    wasTwitchOnlineRef.current = isOnline;
+    if (!isOnline || wasOnline) return;
+
+    window.dispatchEvent(new CustomEvent("kala:twitch-play-request", {
+      detail: {
+        muted: true,
+        refreshChannel: true,
+        source: "stream-went-online",
+      },
+    }));
+  }, [isOnline]);
 
   useEffect(() => {
     if (!isDualMode) return undefined;

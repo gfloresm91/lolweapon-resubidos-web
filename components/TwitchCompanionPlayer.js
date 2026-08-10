@@ -157,6 +157,17 @@ export default function TwitchCompanionPlayer({
       resumeRef.current();
     }
 
+    function handlePlayRequest(event) {
+      if (event.detail?.refreshChannel) {
+        manualPauseRef.current = false;
+        cancelResumeRef.current();
+        try {
+          playerRef.current?.setChannel?.(channel);
+        } catch {}
+      }
+      resume();
+    }
+
     function handleFullscreenChange() {
       if (!document.fullscreenElement) resume();
     }
@@ -165,7 +176,7 @@ export default function TwitchCompanionPlayer({
       if (!document.hidden) resume();
     }
 
-    window.addEventListener("kala:twitch-play-request", resume);
+    window.addEventListener("kala:twitch-play-request", handlePlayRequest);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -179,14 +190,14 @@ export default function TwitchCompanionPlayer({
     }, 2500);
 
     return () => {
-      window.removeEventListener("kala:twitch-play-request", resume);
+      window.removeEventListener("kala:twitch-play-request", handlePlayRequest);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", resume);
       window.clearInterval(playbackMonitor);
     };
-  }, [enforcePlayback, respectManualPause]);
+  }, [channel, enforcePlayback, respectManualPause]);
 
   return (
     <div
