@@ -1,6 +1,6 @@
 {
   "name": "lolweapon-resubidos-web",
-  "version": "2.14.2",
+  "version": "2.15.0",
   "private": true,
   "type": "module",
   "description": "Web de resubidos para el streamer/youtuber Lolweapon",
@@ -40,6 +40,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/react-virtual": "^3.13.24",
+    "@vidstack/react": "^1.15.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "flatpickr": "^4.6.13",

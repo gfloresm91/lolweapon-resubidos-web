@@ -8,7 +8,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://localhost:3000",
     headless: true,
     locale: "es",
   },
@@ -32,6 +32,10 @@ export default defineConfig({
       use: {
         storageState: "./playwright/.auth/user.json",
       },
+    },
+    {
+      name: "multistream-responsive",
+      testMatch: "**/multistream-responsive.spec.js",
     },
   ],
 });

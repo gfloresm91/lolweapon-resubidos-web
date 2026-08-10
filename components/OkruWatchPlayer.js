@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { Play, RotateCcw, SkipForward } from "lucide-react";
+
+const PieroVideoPlayer = dynamic(() => import("@/components/PieroVideoPlayer"), { ssr: false });
+
+const AUTO_ADVANCE_SECONDS = 7;
+const PROGRESS_EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000;
 
 function getOkruEmbedUrl(href) {
   try {
@@ -29,7 +37,14 @@ function clampPartIndex(index, total) {
 
 function isTypingTarget(target) {
   const tagName = target?.tagName?.toLowerCase();
-  return tagName === "input" || tagName === "textarea" || tagName === "select" || target?.isContentEditable;
+  return (
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select" ||
+    tagName === "button" ||
+    tagName === "a" ||
+    target?.isContentEditable
+  );
 }
 
 function buildSafeFilename(title, partNumber) {
@@ -44,40 +59,96 @@ function buildSafeFilename(title, partNumber) {
   return `${base || "resubido"}-parte-${partNumber}.mp4`;
 }
 
-export default function OkruWatchPlayer({ links, liveId, title, telegramFallbackHref }) {
+function formatPlaybackTime(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainder = seconds % 60;
+
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
+    : `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }) {
+  const progressSaveRef = useRef(0);
+  const videoRef = useRef(null);
+  const autoplayNextRef = useRef(false);
+  const completedPartRef = useRef(false);
+  const hasRestoredProgressRef = useRef(false);
+  const resumeNoticeTimerRef = useRef(null);
+  const completionOverlayRef = useRef(null);
+  const completionPrimaryActionRef = useRef(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const storageKey = `kala_okru_part_${liveId || pathname}`;
-  const playableLinks = useMemo(
+  const playableOkruLinks = useMemo(
     () =>
-      (Array.isArray(links) ? links : [])
+      (Array.isArray(okruLinks) ? okruLinks : [])
         .map((href, index) => ({
           href,
           index,
           embedUrl: getOkruEmbedUrl(href),
         }))
         .filter((item) => item.embedUrl),
-    [links],
+    [okruLinks],
   );
-  const [activeIndex, setActiveIndex] = useState(() => {
+  const playablePieroLinks = useMemo(
+    () => (Array.isArray(pieroLinks) ? pieroLinks : []).filter(Boolean).map((href, index) => ({ href, index })),
+    [pieroLinks],
+  );
+  const availableSources = useMemo(() => {
+    const sources = [];
+    if (playablePieroLinks.length) sources.push({ id: "piero", label: "Piero", links: playablePieroLinks });
+    if (playableOkruLinks.length) sources.push({ id: "okru", label: "OK.RU", links: playableOkruLinks });
+    return sources;
+  }, [playableOkruLinks, playablePieroLinks]);
+  const requestedSource = searchParams.get("fuente");
+  const initialSource = availableSources.some((source) => source.id === requestedSource)
+    ? requestedSource
+    : availableSources[0]?.id || "piero";
+  const [activeSourceId, setActiveSourceId] = useState(initialSource);
+  const [activeIndices, setActiveIndices] = useState(() => {
     const requestedPart = Number(searchParams.get("parte"));
-    return Number.isFinite(requestedPart) && requestedPart > 0 ? requestedPart - 1 : 0;
+    return { [initialSource]: Number.isFinite(requestedPart) && requestedPart > 0 ? requestedPart - 1 : 0 };
   });
   const [isTheaterMode, setIsTheaterMode] = useState(false);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Cargando parte...");
+  const [playerError, setPlayerError] = useState(false);
+  const [playerRetryKey, setPlayerRetryKey] = useState(0);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [shareLabel, setShareLabel] = useState("Compartir");
   const [cobaltLabel, setCobaltLabel] = useState("Copiar y abrir Cobalt");
   const [copyCommandLabel, setCopyCommandLabel] = useState("Copiar comando");
   const [copyOkruLabel, setCopyOkruLabel] = useState("Copiar link OK.RU");
-  const activeLink = playableLinks[activeIndex] || null;
+  const [resumeMessage, setResumeMessage] = useState("");
+  const [nextPartCountdown, setNextPartCountdown] = useState(null);
+  const [isAutoAdvanceEnabled, setIsAutoAdvanceEnabled] = useState(false);
+  const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
+  const [isFinalPartComplete, setIsFinalPartComplete] = useState(false);
+  const isCompletionOverlayOpen = nextPartCountdown !== null || isFinalPartComplete;
+  const activeSource = availableSources.find((source) => source.id === activeSourceId) || availableSources[0] || null;
+  const activeIndex = clampPartIndex(activeIndices[activeSource?.id] || 0, activeSource?.links.length || 0);
+  const activeLink = activeSource?.links[activeIndex] || null;
   const activePartLabel = activeLink ? `Parte ${activeIndex + 1}` : "";
-  const activePartSummary = activeLink ? `${activePartLabel} de ${playableLinks.length}` : "Sin parte seleccionada";
+  const activePartSummary = activeLink ? `${activePartLabel} de ${activeSource.links.length}` : "Sin parte seleccionada";
   const downloadFilename = buildSafeFilename(title, activeIndex + 1);
   const streamlinkCommand = activeLink ? `streamlink "${activeLink.href}" best -o "${downloadFilename}"` : "";
+  const alternateSource = availableSources.find((source) => source.id !== activeSource?.id) || null;
+  const hasNextPieroPart = activeSource?.id === "piero" && activeIndex < activeSource.links.length - 1;
+
+  function getProgressStorageKey(index = activeIndex) {
+    return `kala_piero_progress_${liveId || pathname}_${index + 1}`;
+  }
 
   useEffect(() => {
     function handleKeyDown(event) {
+      if (event.key === "Escape" && isCompletionOverlayOpen) {
+        event.preventDefault();
+        dismissCompletionOverlay();
+        return;
+      }
+
       if (isTypingTarget(event.target)) {
         return;
       }
@@ -95,12 +166,12 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
       } else if (event.key.toLowerCase() === "t") {
         event.preventDefault();
         setIsTheaterMode((current) => !current);
-      } else if (event.key === "ArrowLeft" && playableLinks.length) {
+      } else if (event.key === "ArrowLeft" && activeSource?.id === "okru" && activeSource.links.length) {
         event.preventDefault();
-        updateActivePart(clampPartIndex(activeIndex - 1, playableLinks.length));
-      } else if (event.key === "ArrowRight" && playableLinks.length) {
+        updateActivePart(clampPartIndex(activeIndex - 1, activeSource.links.length));
+      } else if (event.key === "ArrowRight" && activeSource?.id === "okru" && activeSource.links.length) {
         event.preventDefault();
-        updateActivePart(clampPartIndex(activeIndex + 1, playableLinks.length));
+        updateActivePart(clampPartIndex(activeIndex + 1, activeSource.links.length));
       } else if (event.key.toLowerCase() === "c") {
         event.preventDefault();
         copyPartUrl();
@@ -109,47 +180,432 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeIndex, playableLinks.length, isTheaterMode, isDownloadModalOpen, searchParams]);
+  }, [activeIndex, activeSource, isTheaterMode, isDownloadModalOpen, isCompletionOverlayOpen, searchParams]);
 
   useEffect(() => {
+    if (!isCompletionOverlayOpen) return undefined;
+    const focusFrame = window.requestAnimationFrame(() => completionPrimaryActionRef.current?.focus());
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      window.requestAnimationFrame(() => videoRef.current?.focus?.());
+    };
+  }, [isCompletionOverlayOpen]);
+
+  useEffect(() => {
+    if (!availableSources.length) return;
+    const source = availableSources.some((item) => item.id === requestedSource)
+      ? requestedSource
+      : availableSources[0].id;
     const requestedPart = Number(searchParams.get("parte"));
     let savedPart = 0;
 
     try {
-      savedPart = Number(window.localStorage.getItem(storageKey));
+      savedPart = Number(window.localStorage.getItem(`kala_${source}_part_${liveId || pathname}`));
     } catch {
       savedPart = 0;
     }
     const hasRequestedPart = Number.isFinite(requestedPart) && requestedPart > 0;
     const hasSavedPart = Number.isFinite(savedPart) && savedPart > 0;
     const nextIndex = hasRequestedPart ? requestedPart - 1 : hasSavedPart ? savedPart - 1 : 0;
-    const clampedIndex = clampPartIndex(nextIndex, playableLinks.length);
+    const sourceLinks = availableSources.find((item) => item.id === source)?.links || [];
+    const clampedIndex = clampPartIndex(nextIndex, sourceLinks.length);
 
-    setActiveIndex(clampedIndex);
-  }, [playableLinks, searchParams, storageKey]);
+    setActiveSourceId(source);
+    setActiveIndices((current) => ({ ...current, [source]: clampedIndex }));
+  }, [availableSources, liveId, pathname, requestedSource, searchParams]);
+
+  useEffect(() => {
+    try {
+      setIsAutoAdvanceEnabled(window.localStorage.getItem("kala_piero_auto_advance") === "true");
+    } catch {
+      setIsAutoAdvanceEnabled(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!activeLink) {
       setIsPlayerLoading(false);
+      setPlayerError(false);
       return undefined;
     }
 
     setIsPlayerLoading(true);
+    setPlayerError(false);
     const fallbackTimeout = window.setTimeout(() => {
       setIsPlayerLoading(false);
     }, 8000);
 
     return () => window.clearTimeout(fallbackTimeout);
-  }, [activeLink]);
+  }, [activeLink, playerRetryKey]);
 
-  function updateActivePart(index) {
-    const params = new URLSearchParams(searchParams.toString());
-    const clampedIndex = clampPartIndex(index, playableLinks.length);
+  useEffect(() => {
+    if (nextPartCountdown === null) return undefined;
+    if (nextPartCountdown < 0) return undefined;
+    if (nextPartCountdown <= 0) {
+      updateActivePart(activeIndex + 1, activeSource?.id, { autoplay: true });
+      return undefined;
+    }
 
-    params.set("parte", String(clampedIndex + 1));
-    setActiveIndex(clampedIndex);
+    const timer = window.setTimeout(() => {
+      setNextPartCountdown((current) => (current === null ? null : current - 1));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, nextPartCountdown]);
+
+  useEffect(() => {
+    setNextPartCountdown(null);
+    setResumeMessage("");
+    setIsAutoplayBlocked(false);
+    setIsFinalPartComplete(false);
+    completedPartRef.current = false;
+    hasRestoredProgressRef.current = false;
+    progressSaveRef.current = 0;
+  }, [activeLink?.href]);
+
+  useEffect(() => {
+    function saveCurrentPlayback() {
+      if (activeSource?.id !== "piero" || !videoRef.current) return;
+      savePieroProgress(videoRef.current.currentTime);
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") saveCurrentPlayback();
+    }
+
+    window.addEventListener("pagehide", saveCurrentPlayback);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", saveCurrentPlayback);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [activeIndex, activeSource?.id, activeLink?.href]);
+
+  useEffect(() => () => {
+    if (resumeNoticeTimerRef.current) window.clearTimeout(resumeNoticeTimerRef.current);
+  }, []);
+
+  function retryPlayer() {
+    setPlayerError(false);
+    setIsPlayerLoading(true);
+    setPlayerRetryKey((current) => current + 1);
+  }
+
+  function handlePlayerError() {
+    setIsPlayerLoading(false);
+    setPlayerError(true);
+  }
+
+  function restorePieroProgress(player) {
+    if (!player || hasRestoredProgressRef.current) return;
+    hasRestoredProgressRef.current = true;
+    let savedTime = 0;
+
     try {
-      window.localStorage.setItem(storageKey, String(clampedIndex + 1));
+      const rawProgress = window.localStorage.getItem(getProgressStorageKey());
+      if (rawProgress) {
+        const parsedProgress = JSON.parse(rawProgress);
+        if (typeof parsedProgress === "number") {
+          savedTime = parsedProgress;
+        } else if (
+          Number.isFinite(parsedProgress?.time) &&
+          Number.isFinite(parsedProgress?.updatedAt) &&
+          Date.now() - parsedProgress.updatedAt <= PROGRESS_EXPIRATION_MS
+        ) {
+          savedTime = parsedProgress.time;
+        } else {
+          window.localStorage.removeItem(getProgressStorageKey());
+        }
+      }
+    } catch {
+      savedTime = 0;
+    }
+
+    if (
+      Number.isFinite(savedTime) &&
+      savedTime >= 10 &&
+      savedTime < player.duration - 1
+    ) {
+      player.currentTime = savedTime;
+      progressSaveRef.current = savedTime;
+      setResumeMessage(`Continuando desde ${formatPlaybackTime(savedTime)}`);
+      if (resumeNoticeTimerRef.current) window.clearTimeout(resumeNoticeTimerRef.current);
+      resumeNoticeTimerRef.current = window.setTimeout(() => setResumeMessage(""), 6000);
+    }
+
+  }
+
+  function handlePieroCanPlay(player) {
+    setIsPlayerLoading(false);
+    restorePieroProgress(player);
+    tryPieroAutoplay(player);
+  }
+
+  function handlePieroTimeUpdate(currentTime, duration) {
+    if (!Number.isFinite(currentTime) || currentTime - progressSaveRef.current < 5) return;
+
+    savePieroProgress(currentTime, duration);
+  }
+
+  function savePieroProgress(currentTime) {
+    if (!Number.isFinite(currentTime) || completedPartRef.current || !hasRestoredProgressRef.current) return;
+    progressSaveRef.current = currentTime;
+    try {
+      window.localStorage.setItem(
+        getProgressStorageKey(),
+        JSON.stringify({ time: Math.floor(currentTime), updatedAt: Date.now() }),
+      );
+    } catch {
+      // Some browser privacy modes can block localStorage.
+    }
+  }
+
+  function restartPieroPlayback() {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = 0;
+    setResumeMessage("");
+    if (resumeNoticeTimerRef.current) window.clearTimeout(resumeNoticeTimerRef.current);
+    try {
+      window.localStorage.removeItem(getProgressStorageKey());
+    } catch {
+      // Some browser privacy modes can block localStorage.
+    }
+  }
+
+  async function tryPieroAutoplay(video) {
+    setIsPlayerLoading(false);
+    if (!autoplayNextRef.current) return;
+    autoplayNextRef.current = false;
+
+    try {
+      await video.play();
+      setIsAutoplayBlocked(false);
+    } catch {
+      setIsAutoplayBlocked(true);
+    }
+  }
+
+  async function playBlockedPieroPart() {
+    if (!videoRef.current) return;
+    try {
+      await videoRef.current.play();
+      setIsAutoplayBlocked(false);
+    } catch {
+      setIsAutoplayBlocked(true);
+    }
+  }
+
+  function handlePieroEnded() {
+    completedPartRef.current = true;
+    try {
+      window.localStorage.removeItem(getProgressStorageKey());
+    } catch {
+      // Some browser privacy modes can block localStorage.
+    }
+
+    if (hasNextPieroPart) {
+      setNextPartCountdown(isAutoAdvanceEnabled ? AUTO_ADVANCE_SECONDS : -1);
+    } else {
+      setIsFinalPartComplete(true);
+    }
+  }
+
+  async function replayFinalPieroPart() {
+    const player = videoRef.current;
+    if (!player) return;
+    completedPartRef.current = false;
+    setIsFinalPartComplete(false);
+    player.currentTime = 0;
+    try {
+      await player.play();
+    } catch {
+      setIsAutoplayBlocked(true);
+    }
+  }
+
+  function dismissCompletionOverlay() {
+    setNextPartCountdown(null);
+    setIsFinalPartComplete(false);
+  }
+
+  function trapCompletionOverlayFocus(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      dismissCompletionOverlay();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const focusableElements = Array.from(
+      completionOverlayRef.current?.querySelectorAll("button:not([disabled]), a[href]") || [],
+    );
+    if (!focusableElements.length) return;
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  }
+
+  function renderPlayerOverlays() {
+    return (
+      <>
+        {isPlayerLoading ? (
+          <div className="watch-loading-overlay">
+            <span className="watch-loading-spinner" aria-hidden="true" />
+            <span>{loadingMessage}</span>
+          </div>
+        ) : null}
+        {resumeMessage ? (
+          <div className="watch-resume-notice" role="status">
+            <span>{resumeMessage}</span>
+            <button type="button" onClick={restartPieroPlayback}>
+              <RotateCcw size={14} aria-hidden="true" />
+              Empezar de nuevo
+            </button>
+          </div>
+        ) : null}
+        {nextPartCountdown !== null ? (
+          <div
+            ref={completionOverlayRef}
+            className="watch-next-part-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="watch-next-part-title"
+            onKeyDown={trapCompletionOverlayFocus}
+          >
+            <div className="watch-next-part-card">
+              <span className="watch-next-part-kicker">Parte completada</span>
+              <strong id="watch-next-part-title">Siguiente: Parte {activeIndex + 2}</strong>
+              {nextPartCountdown >= 0 ? (
+                <span>La Parte {activeIndex + 2} comenzará automáticamente en {nextPartCountdown} s</span>
+              ) : (
+                <span>La siguiente parte está lista.</span>
+              )}
+              {nextPartCountdown >= 0 ? (
+                <div
+                  className="watch-next-part-progress is-running"
+                  role="progressbar"
+                  aria-label="Tiempo para reproducir la siguiente parte"
+                  aria-valuemin="0"
+                  aria-valuemax={AUTO_ADVANCE_SECONDS}
+                  aria-valuenow={AUTO_ADVANCE_SECONDS - nextPartCountdown}
+                >
+                  <span style={{ animationDuration: `${AUTO_ADVANCE_SECONDS}s` }} />
+                </div>
+              ) : null}
+              <div className="watch-next-part-actions">
+                <button
+                  ref={completionPrimaryActionRef}
+                  type="button"
+                  onClick={() => updateActivePart(activeIndex + 1, activeSource?.id, { autoplay: true })}
+                >
+                  <Play size={15} fill="currentColor" aria-hidden="true" />
+                  {nextPartCountdown >= 0 ? "Reproducir ahora" : `Reproducir Parte ${activeIndex + 2}`}
+                </button>
+                <button type="button" className="is-secondary" onClick={dismissCompletionOverlay}>
+                  Quedarme aquí
+                </button>
+              </div>
+              {nextPartCountdown >= 0 ? (
+                <button type="button" className="watch-next-disable" onClick={disableAutoAdvance}>
+                  Desactivar reproducción automática
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {isFinalPartComplete ? (
+          <div
+            ref={completionOverlayRef}
+            className="watch-next-part-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="watch-final-part-title"
+            onKeyDown={trapCompletionOverlayFocus}
+          >
+            <div className="watch-next-part-card is-final">
+              <span className="watch-next-part-kicker">Resubido completado</span>
+              <strong id="watch-final-part-title">Terminaste la última parte</strong>
+              <span>Puedes volver a reproducirla o regresar al rastreador.</span>
+              <div className="watch-next-part-actions">
+                <button ref={completionPrimaryActionRef} type="button" onClick={replayFinalPieroPart}>
+                  <RotateCcw size={15} aria-hidden="true" />
+                  Reproducir nuevamente
+                </button>
+                <Link className="watch-next-part-link" href="/rastreador">Volver al rastreador</Link>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {isAutoplayBlocked ? (
+          <div className="watch-autoplay-blocked" role="status">
+            <span>Parte {activeIndex + 1} lista</span>
+            <strong>El navegador necesita tu confirmación para continuar.</strong>
+            <button type="button" onClick={playBlockedPieroPart}>
+              <Play size={16} fill="currentColor" aria-hidden="true" />
+              Reproducir
+            </button>
+          </div>
+        ) : null}
+        {playerError ? (
+          <div className="watch-player-error" role="alert">
+            <strong>No se pudo reproducir esta parte desde {activeSource.label}.</strong>
+            <div className="watch-player-error-actions">
+              <button type="button" onClick={retryPlayer}>Reintentar</button>
+              <a href={activeLink.href} target="_blank" rel="noreferrer">Abrir archivo</a>
+              {alternateSource ? (
+                <button type="button" onClick={() => updateActivePart(activeIndices[alternateSource.id] || 0, alternateSource.id)}>
+                  Probar {alternateSource.label}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  function disableAutoAdvance() {
+    setIsAutoAdvanceEnabled(false);
+    setNextPartCountdown(-1);
+    try {
+      window.localStorage.setItem("kala_piero_auto_advance", "false");
+    } catch {
+      // Some browser privacy modes can block localStorage.
+    }
+  }
+
+  function toggleAutoAdvance() {
+    setIsAutoAdvanceEnabled((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem("kala_piero_auto_advance", String(next));
+      } catch {
+        // Some browser privacy modes can block localStorage.
+      }
+      return next;
+    });
+  }
+
+  function updateActivePart(index, sourceId = activeSource?.id, options = {}) {
+    const source = availableSources.find((item) => item.id === sourceId);
+    if (!source) return;
+    const params = new URLSearchParams(searchParams.toString());
+    const clampedIndex = clampPartIndex(index, source.links.length);
+
+    autoplayNextRef.current = Boolean(options.autoplay && source.id === "piero");
+    setIsAutoplayBlocked(false);
+
+    params.set("fuente", source.id);
+    params.set("parte", String(clampedIndex + 1));
+    setActiveSourceId(source.id);
+    setActiveIndices((current) => ({ ...current, [source.id]: clampedIndex }));
+    try {
+      window.localStorage.setItem(`kala_${source.id}_part_${liveId || pathname}`, String(clampedIndex + 1));
     } catch {
       // Some browser privacy modes can block localStorage.
     }
@@ -165,6 +621,7 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
 
   function buildPartUrl() {
     const url = new URL(window.location.href);
+    url.searchParams.set("fuente", activeSource.id);
     url.searchParams.set("parte", String(activeIndex + 1));
     return url.toString();
   }
@@ -236,81 +693,177 @@ export default function OkruWatchPlayer({ links, liveId, title, telegramFallback
       </div>
 
       <div className="watch-player-topline">
-        <span>{activeLink ? `Reproduciendo ${activePartSummary}` : "Sin parte seleccionada"}</span>
+        <div className="watch-source-tabs" role="tablist" aria-label="Fuentes con reproductor">
+          {availableSources.map((source) => (
+            <button
+              key={source.id}
+              type="button"
+              role="tab"
+              aria-controls="resubido-player"
+              aria-selected={source.id === activeSource?.id}
+              className={`watch-source-tab is-${source.id} ${source.id === activeSource?.id ? "is-active" : ""}`}
+              onClick={() => updateActivePart(activeIndices[source.id] || 0, source.id)}
+            >
+              <span>{source.label}</span>
+              <span className="watch-source-count watch-source-count-full">
+                · {source.links.length} {source.links.length === 1 ? "parte" : "partes"}
+              </span>
+              <span className="watch-source-count watch-source-count-compact">· {source.links.length}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {activeLink ? (
-        <div className="watch-player-wrap">
-          <iframe
-            key={activeLink.embedUrl}
-            src={activeLink.embedUrl}
-            title={`Player OK.RU - ${title || "Resubido"} - ${activePartLabel}`}
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            onLoad={() => setIsPlayerLoading(false)}
-          />
-          {isPlayerLoading ? <div className="watch-loading-overlay">Cargando parte...</div> : null}
+        <div className="watch-player-wrap" id="resubido-player">
+          {activeSource.id === "piero" ? (
+            <PieroVideoPlayer
+              ref={videoRef}
+              key={`${activeLink.href}-${playerRetryKey}`}
+              src={activeLink.href}
+              title={`${title || "Resubido"} - ${activePartLabel}`}
+              onLoadStart={() => {
+                setLoadingMessage("Conectando con Piero...");
+                setIsPlayerLoading(true);
+              }}
+              onLoadedMetadata={() => setLoadingMessage("Preparando reproducción...")}
+              onCanPlay={handlePieroCanPlay}
+              onPlaying={() => {
+                setIsPlayerLoading(false);
+                setIsAutoplayBlocked(false);
+              }}
+              onWaiting={(player) => {
+                if (player?.paused) {
+                  setIsPlayerLoading(false);
+                  return;
+                }
+                setLoadingMessage("Almacenando búfer...");
+                setIsPlayerLoading(true);
+              }}
+              onStalled={(player) => {
+                if (player?.paused) {
+                  setIsPlayerLoading(false);
+                  return;
+                }
+                setLoadingMessage("La conexión está tardando más de lo esperado...");
+                setIsPlayerLoading(true);
+              }}
+              onTimeUpdate={handlePieroTimeUpdate}
+              onPause={(player) => {
+                setIsPlayerLoading(false);
+                savePieroProgress(player?.currentTime);
+              }}
+              onEnded={handlePieroEnded}
+              onError={handlePlayerError}
+            >
+              <span className="piero-fullscreen-part-label">{activePartSummary}</span>
+              {renderPlayerOverlays()}
+            </PieroVideoPlayer>
+          ) : (
+            <>
+              <iframe
+                key={`${activeLink.embedUrl}-${playerRetryKey}`}
+                src={activeLink.embedUrl}
+                title={`Player OK.RU - ${title || "Resubido"} - ${activePartLabel}`}
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+                onLoad={() => setIsPlayerLoading(false)}
+                onError={handlePlayerError}
+              />
+              {renderPlayerOverlays()}
+            </>
+          )}
         </div>
       ) : (
-        <div className="watch-player-placeholder is-telegram-fallback">
+        <div className="watch-player-placeholder">
           <span className="watch-placeholder-label">Player no disponible</span>
-          <p>Este resubido no tiene un link OK.RU reproducible.</p>
-          {telegramFallbackHref ? (
-            <a href={telegramFallbackHref} target="_blank" rel="noreferrer" className="platform-btn platform-telegram">
-              Ver en Telegram
-            </a>
-          ) : null}
+          <p>Este resubido no tiene links Piero u OK.RU reproducibles.</p>
         </div>
       )}
 
       <div className="watch-link-group">
-        <div className="watch-link-group-header">
-          <h3>{activeLink ? `OK.RU · ${activePartSummary}` : "OK.RU"}</h3>
-          {activeLink ? (
-            <div className="watch-link-actions">
+        {activeSource?.links.length ? (
+          <div className="watch-parts-toolbar">
+            <ol
+              className="detail-link-list watch-parts-list"
+              aria-label={`Partes de ${activeSource.label}`}
+              style={{ "--watch-parts-columns": Math.min(activeSource.links.length, 3) }}
+            >
+              {activeSource.links.map((item, index) => (
+                <li key={`${item.href}-${index}`}>
+                  <button
+                    type="button"
+                    className={`platform-btn platform-${activeSource.id} ${index === activeIndex ? "is-active" : ""}`}
+                    aria-pressed={index === activeIndex}
+                    onClick={() => updateActivePart(index)}
+                  >
+                    {index === activeIndex ? <Play className="watch-active-part-icon" size={13} fill="currentColor" aria-hidden="true" /> : null}
+                    Parte {index + 1}
+                  </button>
+                </li>
+              ))}
+            </ol>
+            {activeSource.id === "piero" && activeSource.links.length > 1 ? (
+              <button
+                type="button"
+                className={`watch-auto-advance ${isAutoAdvanceEnabled ? "is-active" : ""}`}
+                role="switch"
+                aria-checked={isAutoAdvanceEnabled}
+                title="Al terminar una parte, intenta iniciar la siguiente"
+                onClick={toggleAutoAdvance}
+              >
+                <SkipForward size={15} aria-hidden="true" />
+                <span>Reproducción automática</span>
+                <span className="watch-auto-advance-control" aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <p className="detail-empty">Sin links cargados.</p>
+        )}
+        {activeLink ? (
+          <>
+            <hr className="watch-player-actions-divider" />
+            <div className="watch-link-actions watch-player-actions">
               <a
                 href={activeLink.href}
                 target="_blank"
                 rel="noreferrer"
-                className="watch-link-action watch-link-action-okru"
+                className={`watch-link-action watch-link-action-open watch-link-action-${activeSource.id}`}
               >
-                Abrir OK.RU
+                Abrir {activeSource.label}
               </a>
+              {activeSource.id === "piero" ? (
+                <a
+                  href={activeLink.href}
+                  download={downloadFilename}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="watch-link-action watch-link-action-download"
+                >
+                  Descargar Piero
+                </a>
+              ) : null}
               <button type="button" className="watch-link-action watch-link-action-share" onClick={copyPartUrl}>
                 {shareLabel}
               </button>
-              <button
-                type="button"
-                className="watch-link-action watch-link-action-danger"
-                onClick={() => setIsDownloadModalOpen(true)}
-              >
-                Opciones para descargar
-              </button>
-            </div>
-          ) : null}
-        </div>
-        {playableLinks.length ? (
-          <ol className="detail-link-list">
-            {playableLinks.map((item, index) => (
-              <li key={`${item.href}-${index}`}>
+              {activeSource.id === "okru" ? (
                 <button
                   type="button"
-                  className={`platform-btn platform-okru ${index === activeIndex ? "is-active" : ""}`}
-                  onClick={() => updateActivePart(index)}
+                  className="watch-link-action watch-link-action-danger"
+                  onClick={() => setIsDownloadModalOpen(true)}
                 >
-                  Parte {index + 1} de {playableLinks.length}
+                  Opciones para descargar
                 </button>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="detail-empty">Sin links cargados.</p>
-        )}
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </div>
 
-      {isDownloadModalOpen && activeLink ? (
+      {isDownloadModalOpen && activeLink && activeSource?.id === "okru" ? (
         <div className="modal-backdrop download-modal-backdrop" onClick={() => setIsDownloadModalOpen(false)}>
           <div
             className="modal-content download-modal"

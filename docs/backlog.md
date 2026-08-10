@@ -128,6 +128,21 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## Pendiente
 
+### Piero/NAS — automatizar faststart para archivos nuevos
+
+- **Qué es:** integrar `ffmpeg -c copy -movflags +faststart` en la herramienta que subirá o moverá los nuevos MP4 hacia `/archive/drive/`, de modo que el átomo `moov` quede antes de `mdat` sin recodificar el contenido.
+- **Estado actual:** el procedimiento se validó manualmente con un archivo de aproximadamente 2,36 GB; conservó duración, bitrate y pistas, respondió correctamente a rangos HTTP y se reprodujo bien desde `drive.kala-vods.com`.
+- **Flujo pendiente:** recibir el archivo fuera de la carpeta pública, esperar que termine la transferencia, generar una salida temporal, validar duración y cantidad/tipo de pistas, publicar mediante un movimiento atómico y registrar el resultado.
+- **Dependencia:** definir e integrar la otra herramienta que automatizará la carga al NAS. Mientras tanto, las cargas continuarán siendo manuales.
+- **Motivo del diferimiento:** el usuario necesita terminar primero la automatización externa de carga; no corresponde implementar un watcher paralelo que pueda competir con esa herramienta.
+
+### Piero/NAS — generar HLS, calidades, navegación y metadata visual
+
+- **Qué es:** generar en el NAS un `master.m3u8` con rendiciones adaptativas, pistas WebVTT de subtítulos y capítulos, sprites/VTT de miniaturas para la línea de tiempo y una imagen poster asociada a cada parte.
+- **Estado web:** `PieroVideoPlayer` ya encapsula la reproducción con Vidstack, menús, controles, gestos y estados preparados; actualmente recibe MP4 directo y no se instala `hls.js` ni se declaran tracks/posters inexistentes hasta disponer de URLs definitivas para validar el flujo completo.
+- **Pendiente operativo:** definir convención de carpetas/URLs, escalera de resoluciones y bitrates, política de conservación de MP4, extracción/generación de posters y miniaturas, formato de capítulos, generación de segmentos y publicación atómica en el NAS.
+- **Motivo del diferimiento:** el usuario continuará publicando archivos manualmente y primero debe cerrar la automatización externa del NAS.
+
 ### Importación XLSX del Rastreador — creación de registros nuevos
 
 - **Qué es:** extender la importación XLSX del mantenedor Rastreador para que las filas que no correspondan a un directo existente puedan crear registros nuevos.

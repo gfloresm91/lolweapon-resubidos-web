@@ -1,3 +1,5 @@
+import "@vidstack/react/player/styles/base.css";
+import "@vidstack/react/player/styles/plyr/theme.css";
 import "./globals.css";
 
 import PersistentTwitchPlayer from "@/components/PersistentTwitchPlayer";
@@ -9,7 +11,9 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
-  const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
+  const twitchLogin = process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN
+    || process.env.TWITCH_BROADCASTER_LOGIN
+    || "kalathraslolweapon";
 
   return (
     <html lang="es" data-theme="dark">

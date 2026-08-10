@@ -46,7 +46,7 @@ function ExternalLinkList({ links, platform }) {
       {links.map((href, index) => (
         <li key={`${platform}-${href}-${index}`}>
           <a href={href} target="_blank" rel="noreferrer" className={`platform-btn platform-${platform}`}>
-            {platform === "telegram" ? `Telegram ${index + 1}` : `OK.RU ${index + 1}`}
+            {platform === "telegram" ? `Telegram ${index + 1}` : `Patreon ${index + 1}`}
           </a>
         </li>
       ))}
@@ -89,6 +89,8 @@ export default async function LiveDetailPage({ params }) {
   const tags = Array.isArray(live.tags) ? live.tags : [];
   const telegramLinks = Array.isArray(live.links?.telegram) ? live.links.telegram : [];
   const okruLinks = Array.isArray(live.links?.okru) ? live.links.okru : [];
+  const pieroLinks = Array.isArray(live.links?.piero) ? live.links.piero : [];
+  const patreonLinks = Array.isArray(live.links?.patreon) ? live.links.patreon : [];
   const reportSubject = `Link caido: ${live.title || live.id}`;
   const reportBody = [
     "Hola, quiero reportar un link caido.",
@@ -188,10 +190,10 @@ export default async function LiveDetailPage({ params }) {
               <div className="watch-layout">
                 <section className="watch-main-column" aria-label="Detalle del resubido">
                   <OkruWatchPlayer
-                    links={okruLinks}
+                    okruLinks={okruLinks}
+                    pieroLinks={pieroLinks}
                     liveId={live.id}
                     title={live.title}
-                    telegramFallbackHref={telegramLinks[0]}
                   />
 
                   <div className="watch-title-block">
@@ -243,10 +245,25 @@ export default async function LiveDetailPage({ params }) {
                       <h2>Enlaces</h2>
                     </div>
 
-                    <div className="watch-link-group">
-                      <h3>Telegram</h3>
-                      <ExternalLinkList links={telegramLinks} platform="telegram" />
-                    </div>
+                    {telegramLinks.length ? (
+                      <div className="watch-link-group">
+                        <h3>Telegram</h3>
+                        <ExternalLinkList links={telegramLinks} platform="telegram" />
+                      </div>
+                    ) : null}
+
+                    {patreonLinks.length ? (
+                      <div className="watch-link-group">
+                        <h3>Patreon</h3>
+                        <ExternalLinkList links={patreonLinks} platform="patreon" />
+                      </div>
+                    ) : null}
+
+                    {!telegramLinks.length && !patreonLinks.length ? (
+                      <p className="detail-empty">Sin enlaces externos cargados.</p>
+                    ) : null}
+
+                    <div className="watch-report-divider" aria-hidden="true" />
 
                     <a href={reportHref} className="watch-report-link">
                       Reportar link caido

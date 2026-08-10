@@ -67,7 +67,9 @@ function refreshStatus(twitchLogin) {
 }
 
 export async function GET() {
-  const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
+  const twitchLogin = process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN
+    || process.env.TWITCH_BROADCASTER_LOGIN
+    || "kalathraslolweapon";
   const cacheAge = statusCache?.twitchLogin === twitchLogin
     ? Date.now() - statusCache.updatedAt
     : Number.POSITIVE_INFINITY;

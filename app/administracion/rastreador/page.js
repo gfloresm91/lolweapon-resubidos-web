@@ -34,7 +34,9 @@ export default async function PlatformTrackerAdminPage() {
     readLives(),
     getLiveStatuses(),
   ]);
-  const twitchLogin = process.env.TWITCH_BROADCASTER_LOGIN || "kalathraslolweapon";
+  const twitchLogin = process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN
+    || process.env.TWITCH_BROADCASTER_LOGIN
+    || "kalathraslolweapon";
 
   return (
     <HomePage
