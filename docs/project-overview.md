@@ -366,7 +366,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/notifications` | GET/POST | Centro de notificaciones: listar, marcar leído, marcar todo leído y descartar |
 | `/api/admin/notifications` | GET/POST | Listado, creación, edición, programación, activación y eliminación lógica de notificaciones |
 | `/api/notifications/ws` | WebSocket | Canal realtime para avisar a clientes que deben refrescar notificaciones |
-| `/api/presence/ws` | WebSocket | Presencia concurrente aproximada en Inicio; deduplica navegadores, exige 15 segundos visibles, usa heartbeat cada 20 segundos y expira tras 40 segundos sin actividad |
+| `/api/presence/ws` | WebSocket | Presencia concurrente aproximada en Inicio; deduplica navegadores, exige 15 segundos visibles, usa heartbeat cada 20 segundos y expira tras 40 segundos sin actividad. Las actualizaciones se agrupan durante 500 ms, solo se emiten cuando cambia el total efectivo y las conexiones con más de 256 KB pendientes se descartan para proteger memoria y event loop. |
 | `/api/support-tickets` | GET/POST | Lista tickets propios y crea sugerencias/reclamos |
 | `/api/support-tickets/[id]` | GET | Detalle de ticket propio |
 | `/api/support-tickets/[id]/messages` | POST | Agrega mensaje del usuario al ticket |
