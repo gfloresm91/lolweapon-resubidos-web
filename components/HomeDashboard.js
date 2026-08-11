@@ -3,13 +3,117 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { ChevronDown, CirclePlay, FileText, Info, Link2, MessageSquare, X } from "lucide-react";
+import { ChevronDown, CirclePlay, Eye, FileText, Info, Link2, MessageSquare, X } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import TwitchCompanionPlayer from "@/components/TwitchCompanionPlayer";
+import Tooltip from "@/components/Tooltip";
 
 const DEFAULT_VK_LIVE_EMBED_URL = "https://live.vkvideo.ru/app/embed/redbreake";
 const VK_LIVE_EMBED_URL = process.env.NEXT_PUBLIC_VK_LIVE_EMBED_URL || DEFAULT_VK_LIVE_EMBED_URL;
 const IS_VK_MULTISTREAM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_VK_MULTISTREAM !== "false";
+const PRESENCE_CLIENT_STORAGE_KEY = "kala_presence_client_id";
+const PRESENCE_HEARTBEAT_MS = 20_000;
+const PRESENCE_CLIENT_ID_PATTERN = /^[a-zA-Z0-9_-]{8,128}$/;
+
+function getPresenceClientId() {
+  try {
+    const storedId = window.localStorage.getItem(PRESENCE_CLIENT_STORAGE_KEY);
+    if (storedId && PRESENCE_CLIENT_ID_PATTERN.test(storedId)) return storedId;
+
+    const clientId = window.crypto?.randomUUID?.()
+      || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(PRESENCE_CLIENT_STORAGE_KEY, clientId);
+    return clientId;
+  } catch {
+    return window.crypto?.randomUUID?.()
+      || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+  }
+}
+
+function openTwitchSubscription(event) {
+  if (
+    event.defaultPrevented
+    || event.button !== 0
+    || event.metaKey
+    || event.ctrlKey
+    || event.shiftKey
+    || event.altKey
+  ) {
+    return;
+  }
+
+  const shouldUseNativeTab = window.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
+  if (shouldUseNativeTab) return;
+
+  const popupWidth = Math.min(520, window.screen.availWidth - 32);
+  const popupHeight = Math.min(760, window.screen.availHeight - 48);
+  const popupLeft = Math.max(0, window.screenX + (window.outerWidth - popupWidth) / 2);
+  const popupTop = Math.max(0, window.screenY + (window.outerHeight - popupHeight) / 2);
+  const popup = window.open(
+    "",
+    "twitch-subscription",
+    `popup=yes,width=${Math.round(popupWidth)},height=${Math.round(popupHeight)},left=${Math.round(popupLeft)},top=${Math.round(popupTop)},resizable=yes,scrollbars=yes`,
+  );
+
+  // If the popup was blocked, keep the anchor's native target=_blank behavior.
+  if (!popup) return;
+
+  event.preventDefault();
+  popup.opener = null;
+  popup.location.replace(event.currentTarget.href);
+  popup.focus();
+}
+
+function StreamTitle({ isLoading, title }) {
+  const titleRef = useRef(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    const element = titleRef.current;
+    if (!element || isLoading) {
+      setIsTruncated(false);
+      return undefined;
+    }
+
+    const measureOverflow = () => {
+      setIsTruncated(
+        element.scrollWidth > element.clientWidth + 1
+        || element.scrollHeight > element.clientHeight + 1,
+      );
+    };
+    const frameId = window.requestAnimationFrame(measureOverflow);
+    const resizeObserver = new ResizeObserver(measureOverflow);
+    resizeObserver.observe(element);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
+  }, [isLoading, title]);
+
+  const heading = (
+    <h2
+      ref={titleRef}
+      aria-live="polite"
+      aria-busy={isLoading}
+      tabIndex={isTruncated ? 0 : undefined}
+    >
+      {isLoading
+        ? <span className="stream-title-skeleton" aria-hidden="true" />
+        : title}
+    </h2>
+  );
+
+  return isTruncated ? (
+    <Tooltip
+      label={title}
+      align="start"
+      contentClassName="stream-title-tooltip"
+    >
+      {heading}
+    </Tooltip>
+  ) : heading;
+}
 
 function parseDate(value) {
   const [day = "01", month = "01", year = "1900"] = String(value || "").split("/");
@@ -104,14 +208,74 @@ export default function HomeDashboard({
   const [isTwitchChatTheaterOpen, setIsTwitchChatTheaterOpen] = useState(false);
   const [isStreamInfoOpen, setIsStreamInfoOpen] = useState(false);
   const [twitchPlaybackState, setTwitchPlaybackState] = useState("loading");
+  const [isOnlinePreview, setIsOnlinePreview] = useState(false);
+  const [pageViewerCount, setPageViewerCount] = useState(null);
+  const [isPagePresenceMeasuring, setIsPagePresenceMeasuring] = useState(false);
+  const streamInfoSheetRef = useRef(null);
+  const streamInfoDragRef = useRef({ active: false, startY: 0, startedAt: 0, offset: 0 });
   const wasTwitchOnlineRef = useRef(Boolean(twitchStream));
   const twitchChannel = twitchLogin || process.env.NEXT_PUBLIC_TWITCH_EMBED_LOGIN || "kalathraslolweapon";
-  const isOnline = Boolean(currentStream);
+  const isTwitchActuallyOnline = Boolean(currentStream);
+  const isOnline = isTwitchActuallyOnline || isOnlinePreview;
   const isDualMode = IS_VK_MULTISTREAM_ENABLED && streamMode === "dual";
   const isTwitchChatTheater = !isDualMode && isTwitchChatTheaterOpen;
 
+  function resetStreamInfoDrag() {
+    const sheet = streamInfoSheetRef.current;
+    if (!sheet) return;
+    sheet.classList.remove("is-dragging");
+    sheet.style.transform = "";
+  }
+
+  function handleStreamInfoDragStart(event) {
+    if (event.pointerType === "mouse") return;
+    streamInfoDragRef.current = {
+      active: true,
+      startY: event.clientY,
+      startedAt: performance.now(),
+      offset: 0,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    streamInfoSheetRef.current?.classList.add("is-dragging");
+  }
+
+  function handleStreamInfoDragMove(event) {
+    const drag = streamInfoDragRef.current;
+    if (!drag.active) return;
+    const offset = Math.max(0, event.clientY - drag.startY);
+    drag.offset = offset;
+    if (streamInfoSheetRef.current) {
+      streamInfoSheetRef.current.style.transform = `translateY(${offset}px)`;
+    }
+  }
+
+  function finishStreamInfoDrag(event) {
+    const drag = streamInfoDragRef.current;
+    if (!drag.active) return;
+    drag.active = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    const elapsed = Math.max(1, performance.now() - drag.startedAt);
+    const velocity = drag.offset / elapsed;
+    const sheetHeight = streamInfoSheetRef.current?.offsetHeight || 0;
+    const shouldClose = drag.offset >= Math.min(110, sheetHeight * 0.24)
+      || (drag.offset >= 32 && velocity >= 0.55);
+
+    if (shouldClose) {
+      setIsStreamInfoOpen(false);
+      return;
+    }
+    resetStreamInfoDrag();
+  }
+
   useEffect(() => {
     setTwitchParent(window.location.hostname);
+    if (process.env.NODE_ENV !== "production") {
+      const params = new URLSearchParams(window.location.search);
+      setIsOnlinePreview(params.get("preview") === "online");
+    }
   }, []);
 
   useEffect(() => {
@@ -188,8 +352,8 @@ export default function HomeDashboard({
 
   useEffect(() => {
     const wasOnline = wasTwitchOnlineRef.current;
-    wasTwitchOnlineRef.current = isOnline;
-    if (!isOnline || wasOnline) return;
+    wasTwitchOnlineRef.current = isTwitchActuallyOnline;
+    if (!isTwitchActuallyOnline || wasOnline) return;
 
     window.dispatchEvent(new CustomEvent("kala:twitch-play-request", {
       detail: {
@@ -198,7 +362,7 @@ export default function HomeDashboard({
         source: "stream-went-online",
       },
     }));
-  }, [isOnline]);
+  }, [isTwitchActuallyOnline]);
 
   useEffect(() => {
     if (!isDualMode) return undefined;
@@ -329,6 +493,110 @@ export default function HomeDashboard({
   }, []);
 
   useEffect(() => {
+    if (!isOnline || mode === "mini") {
+      setPageViewerCount(null);
+      setIsPagePresenceMeasuring(false);
+      return undefined;
+    }
+
+    let isMounted = true;
+    let socket = null;
+    let heartbeatTimer = null;
+    let reconnectTimer = null;
+    let qualificationTimer = null;
+    let reconnectAttempt = 0;
+    const clientId = getPresenceClientId();
+
+    function send(type) {
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ type, clientId, page: "home" }));
+    }
+
+    function clearHeartbeat() {
+      if (heartbeatTimer) window.clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+
+    function startHeartbeat() {
+      clearHeartbeat();
+      if (document.visibilityState !== "visible") return;
+      heartbeatTimer = window.setInterval(() => send("heartbeat"), PRESENCE_HEARTBEAT_MS);
+    }
+
+    function scheduleReconnect() {
+      if (!isMounted || reconnectTimer) return;
+      setPageViewerCount(null);
+      const delays = [1000, 2000, 5000, 10_000, 30_000];
+      const delay = delays[Math.min(reconnectAttempt, delays.length - 1)];
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    }
+
+    function connect() {
+      if (!isMounted || socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) return;
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      socket = new WebSocket(`${protocol}//${window.location.host}/api/presence/ws`);
+
+      socket.addEventListener("open", () => {
+        reconnectAttempt = 0;
+        if (document.visibilityState === "visible") send("join");
+        startHeartbeat();
+      });
+      socket.addEventListener("message", (event) => {
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (payload?.type === "presence:ready" || payload?.type === "presence:update") {
+          const nextCount = Number(payload.count);
+          if (Number.isInteger(nextCount) && nextCount >= 0) setPageViewerCount(nextCount);
+        }
+        if (payload?.type === "presence:joined") {
+          setIsPagePresenceMeasuring(true);
+          if (qualificationTimer) window.clearTimeout(qualificationTimer);
+          const qualificationMs = Number(payload.qualificationMs);
+          qualificationTimer = window.setTimeout(
+            () => setIsPagePresenceMeasuring(false),
+            (Number.isFinite(qualificationMs) ? qualificationMs : 15_000) + 6_000,
+          );
+        }
+      });
+      socket.addEventListener("close", scheduleReconnect);
+      socket.addEventListener("error", () => socket?.close());
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        if (socket?.readyState === WebSocket.OPEN) send("join");
+        else connect();
+        startHeartbeat();
+      } else {
+        send("leave");
+        clearHeartbeat();
+      }
+    }
+
+    connect();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearHeartbeat();
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (qualificationTimer) window.clearTimeout(qualificationTimer);
+      send("leave");
+      socket?.close();
+    };
+  }, [isOnline, mode]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadYoutubeVideos() {
@@ -362,19 +630,31 @@ export default function HomeDashboard({
   }, [lives]);
   const channelName = currentProfile?.display_name || twitchChannel;
   const channelDescription = currentProfile?.description || "";
-  const currentTitle = currentStream?.title || currentChannelInfo?.title || "Sin título configurado";
-  const currentCategory = currentStream?.game_name || currentChannelInfo?.game_name || "";
+  const currentTitle = currentStream?.title
+    || currentChannelInfo?.title
+    || (isOnlinePreview ? "Directo de prueba para ajustar la vista online" : "Sin título configurado");
+  const currentCategory = currentStream?.game_name
+    || currentChannelInfo?.game_name
+    || (isOnlinePreview ? "Just Chatting" : "");
+  const viewerCount = typeof currentStream?.viewer_count === "number"
+    ? currentStream.viewer_count
+    : isOnlinePreview
+      ? 1234
+      : null;
   const categoryImage = currentGame?.box_art_url
     ? currentGame.box_art_url.replace("{width}", "96").replace("{height}", "128")
     : "";
   const twitchChatUrl = twitchParent
     ? `https://www.twitch.tv/embed/${encodeURIComponent(twitchChannel)}/chat?parent=${encodeURIComponent(twitchParent)}&darkpopout`
     : "";
+  const visiblePlaybackState = isOnlinePreview && !isTwitchActuallyOnline
+    ? "playing"
+    : twitchPlaybackState;
   const twitchPlaybackLabel = !isOnline
     ? "Offline"
-    : twitchPlaybackState === "blocked"
+    : visiblePlaybackState === "blocked"
       ? "Activar Twitch"
-    : twitchPlaybackState === "playing"
+    : visiblePlaybackState === "playing"
       ? "Reproduciendo"
       : "Reanudando";
   const dashboardClassName = [
@@ -394,22 +674,15 @@ export default function HomeDashboard({
         )}
       </div>
       <div className="stream-details-copy">
-        <h2 aria-live="polite" aria-busy={isTwitchLoading}>
-          {isTwitchLoading
-            ? <span className="stream-title-skeleton" aria-hidden="true" />
-            : currentTitle}
-        </h2>
         <div className="stream-details-meta">
-          <span>{channelName}</span>
+          <span className="stream-channel-name">{channelName}</span>
           {!isTwitchLoading ? (
             <span className={`stream-status-label ${isOnline ? "is-online" : "is-offline"}`}>
               {isOnline ? "En directo" : "Offline"}
             </span>
           ) : null}
-          {isOnline && typeof currentStream.viewer_count === "number" ? (
-            <span>{currentStream.viewer_count.toLocaleString("es-CL")} espectadores en Twitch</span>
-          ) : null}
         </div>
+        <StreamTitle isLoading={isTwitchLoading} title={currentTitle} />
         {currentCategory ? (
           <div className="stream-category-line">
             {categoryImage ? <img src={categoryImage} alt="" /> : null}
@@ -420,14 +693,51 @@ export default function HomeDashboard({
           <p className="stream-details-description">{channelDescription}</p>
         ) : null}
       </div>
+      {isOnline ? (
+        <div className="stream-audience-summary" aria-label="Audiencia del directo">
+          {typeof viewerCount === "number" ? (
+            <span className="stream-viewers">
+              <Eye aria-hidden="true" />
+              <strong>{viewerCount.toLocaleString("es-CL")}</strong>
+              <small>Twitch</small>
+            </span>
+          ) : null}
+          <Tooltip
+            label="Usuarios activos con la página visible durante al menos 15 segundos. Este conteo es independiente de Twitch."
+            align="start"
+            contentClassName="stream-page-viewers-tooltip"
+          >
+            <span
+              className={`stream-viewers stream-page-viewers ${isPagePresenceMeasuring && pageViewerCount === 0 ? "is-measuring" : ""}`.trim()}
+              tabIndex={0}
+            >
+              <span className="stream-page-viewers-dot" aria-hidden="true" />
+              {isPagePresenceMeasuring && pageViewerCount === 0 ? (
+                <small>Midiendo…</small>
+              ) : (
+                <>
+                  <strong>{pageViewerCount == null ? "—" : pageViewerCount.toLocaleString("es-CL")}</strong>
+                  <small>en esta página</small>
+                </>
+              )}
+            </span>
+          </Tooltip>
+        </div>
+      ) : null}
       <div className="stream-actions">
         <a
-          href={`https://www.twitch.tv/${twitchChannel}`}
+          href={`https://subs.twitch.tv/${encodeURIComponent(twitchChannel)}`}
           target="_blank"
           rel="noreferrer"
           className="home-twitch-link"
+          onClick={openTwitchSubscription}
         >
-          Apoyar en Twitch
+          <span className="twitch-subscribe-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M4 2h18v12.4L17.4 19H13l-2.6 2.6V19H6V5.5L4 2Zm4 3v10h4v2l2-2h3.6l2.4-2.4V5H8Zm3 2h2v5h-2V7Zm4 0h2v5h-2V7Z" />
+            </svg>
+          </span>
+          Suscribirse en Twitch
         </a>
         <a
           href={streamlabsUrl || "https://streamlabs.com/kalathraslolweapon/tip"}
@@ -464,12 +774,12 @@ export default function HomeDashboard({
     <div className="stream-twitch-companion-wrap">
       <div className="stream-companion-heading">
         <strong>Twitch</strong>
-        {twitchPlaybackState === "blocked" && isOnline ? (
+        {visiblePlaybackState === "blocked" && isOnline ? (
           <button type="button" className="stream-playback-retry" onClick={retryTwitchPlayback}>
             <span className="stream-playback-state is-blocked">{twitchPlaybackLabel}</span>
           </button>
         ) : (
-          <span className={`stream-playback-state is-${twitchPlaybackState}`}>{twitchPlaybackLabel}</span>
+          <span className={`stream-playback-state is-${visiblePlaybackState}`}>{twitchPlaybackLabel}</span>
         )}
       </div>
       <TwitchCompanionPlayer channel={twitchChannel} parent={twitchParent} />
@@ -591,6 +901,7 @@ export default function HomeDashboard({
                 <div className="stream-vk-wrap">
                   <div className="stream-platform-heading">
                     <strong>VK Video</strong>
+                    <span>Video principal</span>
                   </div>
                   <div className="stream-frame stream-player stream-vk-player">
                     <iframe
@@ -650,13 +961,21 @@ export default function HomeDashboard({
           {(isMobileTheaterLayout || isTwitchChatTheater) && isStreamInfoOpen ? (
             <div className="stream-info-backdrop" role="presentation" onMouseDown={() => setIsStreamInfoOpen(false)}>
               <div
+                ref={streamInfoSheetRef}
                 className="stream-info-sheet"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Información del directo"
                 onMouseDown={(event) => event.stopPropagation()}
               >
-                <span className="stream-info-sheet-handle" aria-hidden="true" />
+                <span
+                  className="stream-info-sheet-handle"
+                  aria-hidden="true"
+                  onPointerDown={handleStreamInfoDragStart}
+                  onPointerMove={handleStreamInfoDragMove}
+                  onPointerUp={finishStreamInfoDrag}
+                  onPointerCancel={finishStreamInfoDrag}
+                />
                 <div className="stream-info-sheet-header">
                   <strong>Información del directo</strong>
                   <button type="button" onClick={() => setIsStreamInfoOpen(false)} aria-label="Cerrar información">

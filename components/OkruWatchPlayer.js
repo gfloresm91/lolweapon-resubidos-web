@@ -59,6 +59,19 @@ function buildSafeFilename(title, partNumber) {
   return `${base || "resubido"}-parte-${partNumber}.mp4`;
 }
 
+function getSidecarSubtitleUrl(videoUrl) {
+  try {
+    const url = new URL(videoUrl);
+    if (!/\.mp4$/i.test(url.pathname)) return "";
+    url.pathname = url.pathname.replace(/\.mp4$/i, ".vtt");
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
 function formatPlaybackTime(totalSeconds) {
   const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
   const hours = Math.floor(seconds / 3600);
@@ -126,6 +139,7 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   const [isAutoAdvanceEnabled, setIsAutoAdvanceEnabled] = useState(false);
   const [isAutoplayBlocked, setIsAutoplayBlocked] = useState(false);
   const [isFinalPartComplete, setIsFinalPartComplete] = useState(false);
+  const [activeSubtitleSrc, setActiveSubtitleSrc] = useState("");
   const isCompletionOverlayOpen = nextPartCountdown !== null || isFinalPartComplete;
   const activeSource = availableSources.find((source) => source.id === activeSourceId) || availableSources[0] || null;
   const activeIndex = clampPartIndex(activeIndices[activeSource?.id] || 0, activeSource?.links.length || 0);
@@ -136,6 +150,21 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   const streamlinkCommand = activeLink ? `streamlink "${activeLink.href}" best -o "${downloadFilename}"` : "";
   const alternateSource = availableSources.find((source) => source.id !== activeSource?.id) || null;
   const hasNextPieroPart = activeSource?.id === "piero" && activeIndex < activeSource.links.length - 1;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const candidate = activeSource?.id === "piero" ? getSidecarSubtitleUrl(activeLink?.href) : "";
+    setActiveSubtitleSrc("");
+    if (!candidate) return () => controller.abort();
+
+    fetch(candidate, { method: "HEAD", signal: controller.signal })
+      .then((response) => {
+        if (response.ok) setActiveSubtitleSrc(candidate);
+      })
+      .catch(() => {});
+
+    return () => controller.abort();
+  }, [activeLink?.href, activeSource?.id]);
 
   function getProgressStorageKey(index = activeIndex) {
     return `kala_piero_progress_${liveId || pathname}_${index + 1}`;
@@ -721,6 +750,7 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
               ref={videoRef}
               key={`${activeLink.href}-${playerRetryKey}`}
               src={activeLink.href}
+              subtitleSrc={activeSubtitleSrc}
               title={`${title || "Resubido"} - ${activePartLabel}`}
               onLoadStart={() => {
                 setLoadingMessage("Conectando con Piero...");
