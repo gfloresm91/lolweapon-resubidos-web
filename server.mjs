@@ -4,6 +4,7 @@ import { WebSocketServer } from "ws";
 
 import { syncContentNotifications } from "./lib/contentNotificationSync.js";
 import { registerNotificationSocket } from "./lib/notificationRealtime.js";
+import { registerPagePresenceSocket } from "./lib/pagePresence.js";
 import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/youtubeVideoRepository.js";
 import { publishDueNotifications } from "./lib/repositories/notificationRepository.js";
 
@@ -101,9 +102,30 @@ const server = createServer((request, response) => {
   handle(request, response);
 });
 const notificationWss = new WebSocketServer({ noServer: true });
+const presenceWss = new WebSocketServer({ noServer: true, maxPayload: 2048, perMessageDeflate: false });
 
 server.on("upgrade", (request, socket, head) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+
+  if (url.pathname === "/api/presence/ws") {
+    const origin = request.headers.origin;
+    if (origin) {
+      try {
+        if (new URL(origin).host !== request.headers.host) {
+          socket.destroy();
+          return;
+        }
+      } catch {
+        socket.destroy();
+        return;
+      }
+    }
+
+    presenceWss.handleUpgrade(request, socket, head, (client) => {
+      registerPagePresenceSocket(client);
+    });
+    return;
+  }
 
   if (url.pathname !== "/api/notifications/ws") {
     handleUpgrade(request, socket, head);
