@@ -163,11 +163,54 @@ model Live {
   tags           LiveTag[]
   links          LiveLink[]
   userActivity   PlatformUserLive[]
+  audienceSessions StreamAudienceSession[]
 
   @@index([statusId])
   @@index([year])
   @@index([date])
   @@index([notifiedAt])
+}
+
+model StreamAudienceSession {
+  id                    Int                    @id @default(autoincrement())
+  liveId                Int?
+  twitchStreamId        String                 @unique
+  twitchLogin           String
+  title                 String
+  categoryName          String?
+  startedAt             DateTime
+  endedAt               DateTime?
+  peakConcurrent        Int                    @default(0)
+  averageConcurrent     Float                  @default(0)
+  lastConcurrent        Int                    @default(0)
+  peakTwitchConcurrent  Int?
+  averageTwitchConcurrent Float?
+  audienceMinutes       Int                    @default(0)
+  sampleCount           Int                    @default(0)
+  lastSampleAt          DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  live                  Live?                  @relation(fields: [liveId], references: [id], onDelete: SetNull)
+  samples               StreamAudienceSample[]
+
+  @@index([liveId])
+  @@index([startedAt])
+  @@index([endedAt])
+}
+
+model StreamAudienceSample {
+  id                    Int                   @id @default(autoincrement())
+  sessionId             Int
+  capturedAt            DateTime
+  concurrentCount       Int
+  twitchConcurrentCount Int?
+  createdAt             DateTime              @default(now())
+
+  session               StreamAudienceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, capturedAt])
+  @@index([capturedAt])
 }
 
 model LiveStatus {

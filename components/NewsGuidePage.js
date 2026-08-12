@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AppLink from "@/components/AppLink";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
   BellRing,
@@ -52,6 +53,7 @@ const ADMIN_NAV_LINKS = [
   { code: "users.read", label: "Usuarios", href: "/administracion/usuarios", icon: UserRoundCog },
   { code: "roles.read", label: "Roles", href: "/administracion/roles", icon: ShieldCheck },
   { code: "admin.notifications.view", label: "Notificaciones", href: "/administracion/notificaciones", icon: BellRing },
+  { code: "admin.audience.view", label: "Audiencia web", href: "/administracion/audiencia", icon: Activity },
   { code: "admin.tickets.view", label: "Tickets", href: "/administracion/tickets", icon: MessageCircle },
   { code: "admin.tracker.view", label: "Rastreador", href: "/administracion/rastreador", icon: History },
   { code: "admin.tags.view", label: "Tags", href: "/administracion/tags", icon: BadgeCheck },

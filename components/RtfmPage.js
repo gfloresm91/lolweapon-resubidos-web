@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppLink from "@/components/AppLink";
 import {
   AlertTriangle,
+  Activity,
   Archive,
   Bell,
   BookOpenText,
@@ -186,6 +187,7 @@ const navigationTree = [
       { title: "Usuarios", href: "/administracion/usuarios", permission: "users.read", adminArea: true, icon: Users },
       { title: "Roles", href: "/administracion/roles", permission: "roles.read", adminArea: true, icon: ShieldCheck },
       { title: "Notificaciones", href: "/administracion/notificaciones", permission: "admin.notifications.view", adminArea: true, icon: Bell },
+      { title: "Audiencia web", href: "/administracion/audiencia", permission: "admin.audience.view", adminArea: true, icon: Activity },
       { title: "Tickets", href: "/administracion/tickets", permission: "admin.tickets.view", adminArea: true, icon: MessageCircle },
       { title: "Rastreador", href: "/administracion/rastreador", permission: "admin.tracker.view", adminArea: true, icon: Archive },
       { title: "Tags", href: "/administracion/tags", permission: "admin.tags.view", adminArea: true, icon: Tags },

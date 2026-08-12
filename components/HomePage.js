@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { BookOpen, Plus, Radio, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 
@@ -45,6 +46,10 @@ import SeasonalAnimeCalendarPage from "@/components/SeasonalAnimeCalendarPage";
 import { LIVE_STATUS_OPTIONS, normalizeCatalogCode } from "@/lib/animeDbMapping";
 import { formatPlatformDateTime } from "@/lib/dateTime";
 import { normalizeTag } from "@/lib/tags";
+
+const PlatformAudiencePage = dynamic(() => import("@/components/PlatformAudiencePage"), {
+  loading: () => <div className="route-loading"><span className="route-loading-spinner" /> Cargando audiencia web...</div>,
+});
 
 const CARD_DENSITY_STORAGE_KEY = "kala_card_density";
 const CARD_DENSITY_VERSION_KEY = "kala_card_density_version";
@@ -144,6 +149,7 @@ const VIEW_LABELS = {
   platformUsers: "Usuarios",
   platformRoles: "Roles",
   platformNotifications: "Mantenedor Notificaciones",
+  platformAudience: "Audiencia web",
   platformTickets: "Tickets",
   platformTicketThread: "Ticket administrativo",
   spacedrum: "SpaceDrum",
@@ -170,6 +176,7 @@ const VIEW_SECTIONS = {
   platformUsers: "Administración",
   platformRoles: "Administración",
   platformNotifications: "Administración",
+  platformAudience: "Administración",
   platformTickets: "Administración",
   platformTicketThread: "Administración",
   platformTracker: "Administración",
@@ -215,6 +222,7 @@ const VIEW_PATHS = {
   platformUsers: "/administracion/usuarios",
   platformRoles: "/administracion/roles",
   platformNotifications: "/administracion/notificaciones",
+  platformAudience: "/administracion/audiencia",
   platformTickets: "/administracion/tickets",
   spacedrum: "/spacedrum",
 };
@@ -390,6 +398,7 @@ export default function HomePage({
   initialUserRatings = EMPTY_OBJECT,
   initialNotificationsResult = null,
   initialAdminNotificationsResult = null,
+  initialAudienceResult = null,
   initialSupportTicketsResult = null,
   initialAdminSupportTicketsResult = null,
   initialSupportTicket = null,
@@ -408,6 +417,7 @@ export default function HomePage({
   const canViewSupportTickets = hasPermission("support.tickets.view");
   const canCreateSupportTickets = hasPermission("support.tickets.create");
   const canViewNotificationMaintainer = hasPermission("admin.notifications.view");
+  const canViewAudience = hasPermission("admin.audience.view");
   const canCreateNotifications = hasPermission("admin.notifications.create");
   const canUpdateNotifications = hasPermission("admin.notifications.update");
   const canDeleteNotifications = hasPermission("admin.notifications.delete");
@@ -1553,6 +1563,7 @@ export default function HomePage({
       platformUsers: "users.read",
       platformRoles: "roles.read",
       platformNotifications: "admin.notifications.view",
+      platformAudience: "admin.audience.view",
       platformTickets: "admin.tickets.view",
       platformTicketThread: "admin.tickets.view",
       spacedrum: "spacedrum.view",
@@ -2137,6 +2148,10 @@ export default function HomePage({
                 canUpdate={canUpdateNotifications}
                 canDelete={canDeleteNotifications}
               />
+            ) : null}
+
+            {currentView === "platformAudience" && canViewAudience ? (
+              <PlatformAudiencePage initialResult={initialAudienceResult} />
             ) : null}
 
             {currentView === "platformTickets" && canViewTicketsMaintainer ? (
