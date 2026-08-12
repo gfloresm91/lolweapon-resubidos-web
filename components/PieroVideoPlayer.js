@@ -3,18 +3,24 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import {
   Gesture,
+  Menu,
   MediaPlayer,
   MediaProvider,
+  RadioGroup,
   TextTrack,
+  useCaptionOptions,
   useMediaContext,
   useMediaRemote,
   useMediaState,
+  usePlaybackRateOptions,
 } from "@vidstack/react";
 import { PlyrLayout, plyrLayoutIcons } from "@vidstack/react/player/layouts/plyr";
 import {
   ArrowLeft,
   ArrowRight,
   Cast,
+  Check,
+  Captions,
   Expand,
   Keyboard,
   MonitorPlay,
@@ -42,6 +48,84 @@ const PLYR_CONTROLS = [
 
 const PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 const PIERO_PREFERENCES_KEY = "kala_piero_player_preferences";
+const DEFAULT_SUBTITLE_PREFERENCES = {
+  fontFamily: "proportional-sans",
+  fontSize: 150,
+  textColor: "#FFFFFF",
+  textOpacity: 100,
+  backgroundColor: "#000000",
+  backgroundOpacity: 75,
+  windowColor: "#000000",
+  windowOpacity: 0,
+  edgeStyle: "drop-shadow",
+  edgeColor: "#000000",
+  position: "bottom",
+};
+
+const SUBTITLE_FONT_OPTIONS = [
+  { value: "proportional-sans", label: "Sans serif proporcional", css: "Arial, Helvetica, sans-serif", cast: "SANS_SERIF" },
+  { value: "proportional-serif", label: "Serif proporcional", css: "Georgia, 'Times New Roman', serif", cast: "SERIF" },
+  { value: "monospace-sans", label: "Monoespaciada sans serif", css: "'Roboto Mono', Consolas, monospace", cast: "MONOSPACED_SANS_SERIF" },
+  { value: "monospace-serif", label: "Monoespaciada serif", css: "'Courier New', Courier, monospace", cast: "MONOSPACED_SERIF" },
+  { value: "casual", label: "Casual", css: "'Comic Sans MS', cursive", cast: "CASUAL" },
+  { value: "cursive", label: "Cursiva", css: "cursive", cast: "CURSIVE" },
+  { value: "small-caps", label: "Versalitas", css: "Arial, Helvetica, sans-serif", cast: "SMALL_CAPITALS" },
+];
+const SUBTITLE_SIZE_OPTIONS = [50, 75, 100, 125, 150, 200, 300, 400];
+const SUBTITLE_OPACITY_OPTIONS = [0, 25, 50, 75, 100];
+const SUBTITLE_COLORS = ["#FFFFFF", "#FFFF00", "#00FF00", "#00FFFF", "#FF0000", "#FF00FF", "#0000FF", "#000000"];
+const SUBTITLE_EDGE_OPTIONS = [
+  { value: "none", label: "Ninguno" },
+  { value: "drop-shadow", label: "Sombra" },
+  { value: "raised", label: "Relieve" },
+  { value: "depressed", label: "Hundido" },
+  { value: "outline", label: "Contorno" },
+];
+const SUBTITLE_PRESETS = [
+  { label: "Predeterminado", value: DEFAULT_SUBTITLE_PREFERENCES },
+  { label: "Alto contraste", value: { ...DEFAULT_SUBTITLE_PREFERENCES, textColor: "#FFFF00", backgroundOpacity: 100, edgeStyle: "outline" } },
+  { label: "Extra grande", value: { ...DEFAULT_SUBTITLE_PREFERENCES, fontSize: 200, backgroundOpacity: 85 } },
+  { label: "Sin fondo", value: { ...DEFAULT_SUBTITLE_PREFERENCES, backgroundOpacity: 0, edgeStyle: "outline" } },
+];
+const SUBTITLE_COLOR_NAMES = {
+  "#FFFFFF": "Blanco", "#FFFF00": "Amarillo", "#00FF00": "Verde", "#00FFFF": "Cian",
+  "#FF0000": "Rojo", "#FF00FF": "Magenta", "#0000FF": "Azul", "#000000": "Negro",
+};
+
+function normalizeSubtitlePreferences(value) {
+  return { ...DEFAULT_SUBTITLE_PREFERENCES, ...(value || {}) };
+}
+
+function hexToRgba(hex, opacity) {
+  const normalized = String(hex || "#000000").replace("#", "");
+  const red = parseInt(normalized.slice(0, 2), 16) || 0;
+  const green = parseInt(normalized.slice(2, 4), 16) || 0;
+  const blue = parseInt(normalized.slice(4, 6), 16) || 0;
+  return `rgba(${red}, ${green}, ${blue}, ${Math.max(0, Math.min(100, opacity)) / 100})`;
+}
+
+function toCastColor(hex, opacity) {
+  const alpha = Math.round(Math.max(0, Math.min(100, opacity)) * 2.55)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+  return `${hex}${alpha}`;
+}
+
+function getSubtitleFont(preferences) {
+  return SUBTITLE_FONT_OPTIONS.find((option) => option.value === preferences.fontFamily) || SUBTITLE_FONT_OPTIONS[0];
+}
+
+function getSubtitleEdgeStyles(preferences) {
+  const color = hexToRgba(preferences.edgeColor, 100);
+  switch (preferences.edgeStyle) {
+    case "raised": return { shadow: `-1px -1px 0 ${color}, 1px 1px 0 rgba(255,255,255,.45)`, outline: "none" };
+    case "depressed": return { shadow: `1px 1px 0 ${color}, -1px -1px 0 rgba(255,255,255,.35)`, outline: "none" };
+    case "outline": return { shadow: `-1px -1px 0 ${color}, 1px -1px 0 ${color}, -1px 1px 0 ${color}, 1px 1px 0 ${color}`, outline: "none" };
+    case "drop-shadow": return { shadow: `2px 2px 3px ${color}`, outline: "none" };
+    default: return { shadow: "none", outline: "none" };
+  }
+}
 
 function readPieroPreferences() {
   try {
@@ -132,6 +216,147 @@ function PieroSubtitleTrack({ src }) {
   }, [media, src]);
 
   return null;
+}
+
+function SubtitleChoiceGroup({ label, value, options, onChange, formatLabel = (option) => option.label ?? String(option) }) {
+  return (
+    <fieldset className="piero-subtitle-choice-group">
+      <legend>{label}</legend>
+      <div role="radiogroup" aria-label={label}>
+        {options.map((option) => {
+          const optionValue = option.value ?? option;
+          const isSelected = optionValue === value;
+          return (
+            <button
+              key={optionValue}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              className={isSelected ? "is-selected" : ""}
+              onClick={() => onChange(optionValue)}
+            >
+              {isSelected ? <Check size={14} aria-hidden="true" /> : <span aria-hidden="true" />}
+              {formatLabel(option)}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+function SubtitleColorPicker({ label, value, onChange }) {
+  return (
+    <fieldset className="piero-subtitle-colors">
+      <legend>{label}</legend>
+      <div role="radiogroup" aria-label={label}>
+        {SUBTITLE_COLORS.map((color) => (
+          <button
+            key={color}
+            type="button"
+            role="radio"
+            aria-label={color}
+            aria-checked={value === color}
+            className={value === color ? "is-selected" : ""}
+            style={{ "--subtitle-swatch": color }}
+            onClick={() => onChange(color)}
+          >
+            {value === color ? <Check size={15} aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function PieroSubtitleSettings({ preferences, onChange, onReset, onBack, onClose, panelRef }) {
+  const edge = getSubtitleEdgeStyles(preferences);
+  const previewStyle = {
+    color: hexToRgba(preferences.textColor, preferences.textOpacity),
+    backgroundColor: hexToRgba(preferences.backgroundColor, preferences.backgroundOpacity),
+    fontFamily: getSubtitleFont(preferences).css,
+    fontSize: `${Math.max(0.7, preferences.fontSize / 100)}rem`,
+    fontVariant: preferences.fontFamily === "small-caps" ? "small-caps" : "normal",
+    textShadow: edge.shadow,
+  };
+
+  const update = (key) => (value) => onChange({ ...preferences, [key]: value });
+  const fontLabel = getSubtitleFont(preferences).label;
+  const edgeLabel = SUBTITLE_EDGE_OPTIONS.find((option) => option.value === preferences.edgeStyle)?.label;
+
+  return (
+    <section
+      ref={panelRef}
+      id="piero-subtitle-settings"
+      className="piero-subtitle-settings"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="piero-subtitle-settings-title"
+    >
+      <header>
+        <button type="button" className="piero-subtitle-settings-back" onClick={onBack}>
+          <ArrowLeft size={19} aria-hidden="true" />
+          <span>
+            <small>Volver a configuración</small>
+            <strong id="piero-subtitle-settings-title">Personalizar apariencia</strong>
+          </span>
+        </button>
+      </header>
+
+      <div className="piero-subtitle-preview" style={{ backgroundColor: hexToRgba(preferences.windowColor, preferences.windowOpacity) }}>
+        <span style={previewStyle}>Así se verán tus subtítulos</span>
+      </div>
+
+      <div className="piero-subtitle-settings-scroll">
+        <div className="piero-subtitle-presets" aria-label="Estilos rápidos">
+          <strong>Estilos rápidos</strong>
+          <div>{SUBTITLE_PRESETS.map((preset) => (
+            <button key={preset.label} type="button" onClick={() => onChange(preset.value)}>{preset.label}</button>
+          ))}</div>
+        </div>
+
+        <details className="piero-subtitle-section" open>
+          <summary><span>Texto</span><small>{fontLabel} · {preferences.fontSize}% · {SUBTITLE_COLOR_NAMES[preferences.textColor]}</small></summary>
+          <div>
+            <SubtitleChoiceGroup label="Familia tipográfica" value={preferences.fontFamily} options={SUBTITLE_FONT_OPTIONS} onChange={update("fontFamily")} />
+            <SubtitleChoiceGroup label="Tamaño de fuente" value={preferences.fontSize} options={SUBTITLE_SIZE_OPTIONS} formatLabel={(option) => `${option}%`} onChange={update("fontSize")} />
+            <SubtitleColorPicker label="Color del texto" value={preferences.textColor} onChange={update("textColor")} />
+            <SubtitleChoiceGroup label="Opacidad del texto" value={preferences.textOpacity} options={SUBTITLE_OPACITY_OPTIONS.filter((value) => value > 0)} formatLabel={(option) => `${option}%`} onChange={update("textOpacity")} />
+          </div>
+        </details>
+
+        <details className="piero-subtitle-section">
+          <summary><span>Fondo</span><small>{SUBTITLE_COLOR_NAMES[preferences.backgroundColor]} · {preferences.backgroundOpacity}%</small></summary>
+          <div>
+            <SubtitleColorPicker label="Color del fondo" value={preferences.backgroundColor} onChange={update("backgroundColor")} />
+            <SubtitleChoiceGroup label="Opacidad del fondo" value={preferences.backgroundOpacity} options={SUBTITLE_OPACITY_OPTIONS} formatLabel={(option) => `${option}%`} onChange={update("backgroundOpacity")} />
+          </div>
+        </details>
+
+        <details className="piero-subtitle-section">
+          <summary><span>Ventana</span><small>{SUBTITLE_COLOR_NAMES[preferences.windowColor]} · {preferences.windowOpacity}%</small></summary>
+          <div>
+            <SubtitleColorPicker label="Color de la ventana" value={preferences.windowColor} onChange={update("windowColor")} />
+            <SubtitleChoiceGroup label="Opacidad de la ventana" value={preferences.windowOpacity} options={SUBTITLE_OPACITY_OPTIONS} formatLabel={(option) => `${option}%`} onChange={update("windowOpacity")} />
+          </div>
+        </details>
+
+        <details className="piero-subtitle-section">
+          <summary><span>Bordes y posición</span><small>{edgeLabel} · {preferences.position === "top" ? "Arriba" : "Abajo"}</small></summary>
+          <div>
+            <SubtitleChoiceGroup label="Estilo del borde" value={preferences.edgeStyle} options={SUBTITLE_EDGE_OPTIONS} onChange={update("edgeStyle")} />
+            <SubtitleColorPicker label="Color del borde" value={preferences.edgeColor} onChange={update("edgeColor")} />
+            <SubtitleChoiceGroup label="Posición" value={preferences.position} options={[{ value: "bottom", label: "Abajo" }, { value: "top", label: "Arriba" }]} onChange={update("position")} />
+          </div>
+        </details>
+      </div>
+
+      <footer>
+        <button type="button" onClick={onReset}>Restablecer</button>
+        <button type="button" className="is-primary" onClick={onClose}>Listo</button>
+      </footer>
+    </section>
+  );
 }
 
 const PIERO_KEY_SHORTCUTS = {
@@ -237,7 +462,7 @@ function formatRemoteTime(totalSeconds) {
     : `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
-function PieroRemotePlaybackView({ title, onStop, onPlayHere, onRetry }) {
+function PieroRemotePlaybackView({ title, subtitleSettingsControl, onStop, onPlayHere, onRetry }) {
   const remote = useMediaRemote();
   const remotePlaybackState = useMediaState("remotePlaybackState");
   const remotePlaybackType = useMediaState("remotePlaybackType");
@@ -413,6 +638,7 @@ function PieroRemotePlaybackView({ title, onStop, onPlayHere, onRetry }) {
             >
               <Expand aria-hidden="true" />
             </button>
+            {subtitleSettingsControl}
             <PieroCastControl />
           </div>
         </div>
@@ -421,12 +647,98 @@ function PieroRemotePlaybackView({ title, onStop, onPlayHere, onRetry }) {
   );
 }
 
-function PieroPlayerChrome({ title, shortcutsControl, onStartRemote, onStopRemote, onPlayHere, onRetryRemote }) {
+function PieroNestedSettingsMenu({ label, hint, children }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Menu.Root onOpen={() => setOpen(true)} onClose={() => setOpen(false)}>
+      <Menu.Button
+        className={`plyr__control plyr__control--${open ? "back" : "forward"}`}
+        data-plyr="settings"
+      >
+        <span className="plyr__menu__label" aria-hidden={open ? "true" : undefined}>{label}</span>
+        {!open ? <span className="plyr__menu__value">{hint}</span> : null}
+        {open ? <span className="plyr__sr-only">Volver al menú anterior</span> : null}
+      </Menu.Button>
+      <Menu.Items>{children}</Menu.Items>
+    </Menu.Root>
+  );
+}
+
+function PieroSettingsAction({ label, hint, onSelect }) {
+  const menuRef = useRef(null);
+
+  const handleOpen = () => {
+    window.requestAnimationFrame(() => {
+      menuRef.current?.close();
+      onSelect();
+    });
+  };
+
+  return (
+    <Menu.Root ref={menuRef} onOpen={handleOpen}>
+      <Menu.Button className="plyr__control plyr__control--forward" data-plyr="settings">
+        <span className="plyr__menu__label">{label}</span>
+        <span className="plyr__menu__value">{hint}</span>
+      </Menu.Button>
+      <Menu.Items>
+        <span className="plyr__sr-only">Abriendo {label.toLowerCase()}</span>
+      </Menu.Items>
+    </Menu.Root>
+  );
+}
+
+function PieroSettingsMenu({ onOpenSubtitleSettings }) {
+  const captionOptions = useCaptionOptions({ off: "Desactivado" });
+  const speedOptions = usePlaybackRateOptions({ rates: PLAYBACK_SPEEDS, normalLabel: "1×" });
+  const captionHint = captionOptions.selectedTrack?.label || "Desactivado";
+  const speedHint = speedOptions.selectedValue === "1" ? "1×" : `${speedOptions.selectedValue}×`;
+
+  return (
+    <>
+      <PieroNestedSettingsMenu label="Subtítulos" hint={captionHint}>
+          <RadioGroup.Root className="piero-caption-menu-options" value={captionOptions.selectedValue}>
+            {captionOptions.map(({ label, value, select }) => (
+              <RadioGroup.Item className="plyr__control" value={value} onSelect={select} key={value}>
+                <span>{label}</span>
+              </RadioGroup.Item>
+            ))}
+          </RadioGroup.Root>
+      </PieroNestedSettingsMenu>
+
+      <PieroSettingsAction
+        label="Opciones de subtítulos"
+        hint="Personalizar"
+        onSelect={onOpenSubtitleSettings}
+      />
+
+      <PieroNestedSettingsMenu label="Velocidad de reproducción" hint={speedHint}>
+          <RadioGroup.Root value={speedOptions.selectedValue}>
+            {speedOptions.map(({ label, value, select }) => (
+              <RadioGroup.Item className="plyr__control" value={value} onSelect={select} key={value}>
+                <span>{label}</span>
+              </RadioGroup.Item>
+            ))}
+          </RadioGroup.Root>
+      </PieroNestedSettingsMenu>
+    </>
+  );
+}
+
+function PieroPlayerChrome({ title, shortcutsControl, subtitleSettingsControl, subtitleSettingsMenu, onStartRemote, onStopRemote, onPlayHere, onRetryRemote }) {
   const remotePlaybackState = useMediaState("remotePlaybackState");
   const isRemote = remotePlaybackState !== "disconnected";
 
   if (isRemote) {
-    return <PieroRemotePlaybackView title={title} onStop={onStopRemote} onPlayHere={onPlayHere} onRetry={onRetryRemote} />;
+    return (
+      <PieroRemotePlaybackView
+        title={title}
+        subtitleSettingsControl={subtitleSettingsControl}
+        onStop={onStopRemote}
+        onPlayHere={onPlayHere}
+        onRetry={onRetryRemote}
+      />
+    );
   }
 
   return (
@@ -443,6 +755,7 @@ function PieroPlayerChrome({ title, shortcutsControl, onStartRemote, onStopRemot
             {shortcutsControl}
           </>
         ),
+        settingsMenu: subtitleSettingsMenu,
       }}
       clickToPlay
       clickToFullscreen={false}
@@ -512,6 +825,8 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
   const remoteDisconnectTimerRef = useRef(null);
   const shortcutsButtonRef = useRef(null);
   const shortcutsPanelRef = useRef(null);
+  const subtitleSettingsButtonRef = useRef(null);
+  const subtitleSettingsPanelRef = useRef(null);
   const lastVolumeStateRef = useRef(null);
   const isPlayerReadyRef = useRef(false);
   const [seekFeedback, setSeekFeedback] = useState(null);
@@ -519,6 +834,16 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
   const [rateToast, setRateToast] = useState("");
   const [castToast, setCastToast] = useState("");
   const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
+  const [isSubtitleSettingsOpen, setIsSubtitleSettingsOpen] = useState(false);
+  const [subtitlePreferences, setSubtitlePreferences] = useState(DEFAULT_SUBTITLE_PREFERENCES);
+
+  useEffect(() => {
+    setSubtitlePreferences(normalizeSubtitlePreferences(readPieroPreferences().subtitles));
+  }, []);
+
+  useEffect(() => {
+    writePieroPreference("subtitles", subtitlePreferences);
+  }, [subtitlePreferences]);
 
   const showCastToast = useCallback((message) => {
     setRateToast("");
@@ -535,6 +860,18 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     },
     [forwardedRef],
   );
+
+  const returnToSettingsMenu = useCallback(() => {
+    setIsSubtitleSettingsOpen(false);
+
+    window.requestAnimationFrame(() => {
+      const settingsButton = playerRef.current?.el?.querySelector(
+        '.plyr__controls__item.plyr__menu > [data-plyr="settings"]',
+      );
+
+      if (settingsButton?.getAttribute("aria-expanded") !== "true") settingsButton?.click();
+    });
+  }, []);
 
   useEffect(() => () => {
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current);
@@ -638,6 +975,32 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     };
   }, [isShortcutsOpen]);
 
+  useEffect(() => {
+    if (!isSubtitleSettingsOpen) return undefined;
+    const focusFrame = window.requestAnimationFrame(() => {
+      subtitleSettingsPanelRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    });
+    function handlePointerDown(event) {
+      if (
+        subtitleSettingsPanelRef.current?.contains(event.target) ||
+        subtitleSettingsButtonRef.current?.contains(event.target)
+      ) return;
+      setIsSubtitleSettingsOpen(false);
+    }
+    function handleKeyDown(event) {
+      if (event.key !== "Escape") return;
+      setIsSubtitleSettingsOpen(false);
+      window.requestAnimationFrame(() => subtitleSettingsButtonRef.current?.focus());
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSubtitleSettingsOpen]);
+
   function showSeekFeedback(targetTime) {
     const difference = targetTime - lastPlaybackTimeRef.current;
     if (Math.abs(Math.abs(difference) - 10) > 1.5) return;
@@ -707,6 +1070,42 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     return provider.player || null;
   }
 
+  function buildCastTextTrackStyle(preferences) {
+    const castMedia = window.chrome?.cast?.media;
+    if (!castMedia?.TextTrackStyle) return null;
+    const style = new castMedia.TextTrackStyle();
+    const font = getSubtitleFont(preferences);
+    style.foregroundColor = toCastColor(preferences.textColor, preferences.textOpacity);
+    style.backgroundColor = toCastColor(preferences.backgroundColor, preferences.backgroundOpacity);
+    style.edgeColor = toCastColor(preferences.edgeColor, 100);
+    style.windowColor = toCastColor(preferences.windowColor, preferences.windowOpacity);
+    style.fontScale = preferences.fontSize / 100;
+    style.fontGenericFamily = castMedia.TextTrackFontGenericFamily?.[font.cast] || font.cast;
+    style.fontStyle = castMedia.TextTrackFontStyle?.NORMAL || "NORMAL";
+    style.edgeType = castMedia.TextTrackEdgeType?.[preferences.edgeStyle.replace("-", "_").toUpperCase()]
+      || preferences.edgeStyle.replace("-", "_").toUpperCase();
+    style.windowType = castMedia.TextTrackWindowType?.NORMAL || "NORMAL";
+    return style;
+  }
+
+  function syncCastSubtitleStyle(preferences = subtitlePreferences) {
+    const provider = playerRef.current?.provider || remoteProviderRef.current;
+    if (provider?.type !== "google-cast") return;
+    const castContext = provider.cast || window.cast?.framework?.CastContext?.getInstance?.();
+    const session = provider.session || castContext?.getCurrentSession?.();
+    const mediaSession = provider.media || session?.getMediaSession?.();
+    const castMedia = window.chrome?.cast?.media;
+    const style = buildCastTextTrackStyle(preferences);
+    if (!mediaSession?.editTracksInfo || !castMedia?.EditTracksInfoRequest || !style) return;
+    const activeTrackIds = Array.isArray(mediaSession.activeTrackIds) ? mediaSession.activeTrackIds : null;
+    const request = new castMedia.EditTracksInfoRequest(activeTrackIds, style);
+    mediaSession.editTracksInfo(request, () => {}, () => {});
+  }
+
+  useEffect(() => {
+    syncCastSubtitleStyle(subtitlePreferences);
+  }, [subtitlePreferences]);
+
   function persistVidstackRemoteState(player, transition) {
     player?.$state?.savedState?.set?.({
       // The default Cast receiver can remain at 0:00 without loading metadata
@@ -762,6 +1161,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     window.setTimeout(() => {
       const shouldBePaused = !transition.shouldPlay;
       if (castPlayer.isPaused !== shouldBePaused) castPlayer.controller?.playOrPause();
+      syncCastSubtitleStyle();
       if (remoteTransitionRef.current === transition) remoteTransitionRef.current = null;
     }, 250);
   }
@@ -886,10 +1286,55 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     </button>
   );
 
+  const subtitleSettingsControl = subtitleSrc ? (
+    <button
+      ref={subtitleSettingsButtonRef}
+      type="button"
+      className="plyr__controls__item plyr__control piero-subtitle-settings-button"
+      aria-label="Personalizar subtítulos"
+      aria-haspopup="dialog"
+      aria-expanded={isSubtitleSettingsOpen}
+      aria-controls="piero-subtitle-settings"
+      onClick={() => {
+        setIsShortcutsOpen(false);
+        setIsSubtitleSettingsOpen((current) => !current);
+      }}
+    >
+      <Captions aria-hidden="true" />
+      <span className="plyr__tooltip">Opciones de subtítulos</span>
+    </button>
+  ) : undefined;
+
+  const subtitleSettingsMenu = subtitleSrc ? (
+    <PieroSettingsMenu onOpenSubtitleSettings={() => {
+      setIsShortcutsOpen(false);
+      setIsSubtitleSettingsOpen(true);
+    }} />
+  ) : undefined;
+
+  const subtitleEdge = getSubtitleEdgeStyles(subtitlePreferences);
+  const subtitleFont = getSubtitleFont(subtitlePreferences);
+  const subtitlePlayerStyles = {
+    "--media-user-text-color": hexToRgba(subtitlePreferences.textColor, subtitlePreferences.textOpacity),
+    "--media-user-text-bg": hexToRgba(subtitlePreferences.backgroundColor, subtitlePreferences.backgroundOpacity),
+    "--media-user-display-bg": hexToRgba(subtitlePreferences.windowColor, subtitlePreferences.windowOpacity),
+    "--media-user-font-size": subtitlePreferences.fontSize / 100,
+    "--media-user-font-family": subtitleFont.css,
+    "--media-user-font-variant": subtitlePreferences.fontFamily === "small-caps" ? "small-caps" : "normal",
+    "--media-user-text-shadow": subtitleEdge.shadow,
+    "--cue-outline": subtitleEdge.outline,
+    "--piero-caption-size": subtitlePreferences.fontSize / 100,
+    "--piero-caption-window": hexToRgba(subtitlePreferences.windowColor, subtitlePreferences.windowOpacity),
+    "--piero-caption-outline": subtitleEdge.outline,
+  };
+
   return (
     <MediaPlayer
       ref={setPlayerRef}
       className="piero-media-player"
+      style={subtitlePlayerStyles}
+      data-subtitle-position={subtitlePreferences.position}
+      data-subtitle-settings-open={isSubtitleSettingsOpen ? "true" : undefined}
       src={{ src, type: "video/mp4" }}
       crossOrigin="anonymous"
       title={title || "Resubido de Piero"}
@@ -952,11 +1397,26 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
       <PieroPlayerChrome
         title={title || "Resubido de Piero"}
         shortcutsControl={shortcutsControl}
+        subtitleSettingsControl={subtitleSettingsControl}
+        subtitleSettingsMenu={subtitleSettingsMenu}
         onStartRemote={prepareRemotePlayback}
         onStopRemote={(remoteType) => leaveRemotePlayback({ playLocally: false, remoteType })}
         onPlayHere={(remoteType) => leaveRemotePlayback({ playLocally: true, remoteType })}
         onRetryRemote={retryRemotePlayback}
       />
+      {isSubtitleSettingsOpen ? (
+        <PieroSubtitleSettings
+          panelRef={subtitleSettingsPanelRef}
+          preferences={subtitlePreferences}
+          onChange={setSubtitlePreferences}
+          onReset={() => setSubtitlePreferences(DEFAULT_SUBTITLE_PREFERENCES)}
+          onBack={returnToSettingsMenu}
+          onClose={() => {
+            setIsSubtitleSettingsOpen(false);
+            window.requestAnimationFrame(() => subtitleSettingsButtonRef.current?.focus());
+          }}
+        />
+      ) : null}
       {isShortcutsOpen ? (
         <section
           ref={shortcutsPanelRef}
