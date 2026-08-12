@@ -4,9 +4,11 @@ import { WebSocketServer } from "ws";
 
 import { syncContentNotifications } from "./lib/contentNotificationSync.js";
 import { registerNotificationSocket } from "./lib/notificationRealtime.js";
-import { registerPagePresenceSocket } from "./lib/pagePresence.js";
+import { getHomePresenceCount, registerPagePresenceSocket } from "./lib/pagePresence.js";
 import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/youtubeVideoRepository.js";
 import { publishDueNotifications } from "./lib/repositories/notificationRepository.js";
+import { closeActiveStreamAudienceSessions, recordStreamAudienceSample } from "./lib/repositories/streamAudienceRepository.js";
+import { fetchCurrentTwitchStream } from "./lib/twitch.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -14,6 +16,7 @@ const port = Number(process.env.PORT || 3000);
 const DEFAULT_YOUTUBE_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const MIN_YOUTUBE_SYNC_INTERVAL_MS = 60 * 1000;
 const NOTIFICATION_PUBLISH_INTERVAL_MS = 30 * 1000;
+const AUDIENCE_SAMPLE_INTERVAL_MS = 60 * 1000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
@@ -86,6 +89,36 @@ function startScheduledNotificationPublisher() {
   console.log(`> Scheduled notification publisher every ${NOTIFICATION_PUBLISH_INTERVAL_MS / 1000}s`);
 }
 
+function startStreamAudienceSampler() {
+  if (process.env.DATA_SOURCE !== "postgres" || process.env.STREAM_AUDIENCE_ANALYTICS_ENABLED === "false") {
+    console.log("> Stream audience analytics disabled");
+    return;
+  }
+
+  let isSampling = false;
+  async function sample() {
+    if (isSampling) return;
+    isSampling = true;
+    try {
+      const stream = await fetchCurrentTwitchStream({ broadcasterLogin: process.env.TWITCH_BROADCASTER_LOGIN });
+      if (stream) {
+        await recordStreamAudienceSample({ stream, concurrentCount: getHomePresenceCount() });
+      } else {
+        await closeActiveStreamAudienceSessions();
+      }
+    } catch (error) {
+      // A remote/API failure must not close a valid session or affect Inicio.
+      console.error("> Stream audience sample failed:", error);
+    } finally {
+      isSampling = false;
+    }
+  }
+
+  setTimeout(sample, 15_000);
+  setInterval(sample, AUDIENCE_SAMPLE_INTERVAL_MS);
+  console.log(`> Stream audience sample every ${AUDIENCE_SAMPLE_INTERVAL_MS / 1000}s`);
+}
+
 async function syncStartupNotifications() {
   try {
     const result = await syncContentNotifications();
@@ -142,4 +175,5 @@ server.listen(port, hostname, () => {
   void syncStartupNotifications();
   startYoutubeNotificationSync();
   startScheduledNotificationPublisher();
+  startStreamAudienceSampler();
 });

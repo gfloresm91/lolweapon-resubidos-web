@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ListOrdered, MessageSquare, Music2, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
+import { Activity, Archive, Bell, Bookmark, BookOpenText, CalendarDays, CheckCircle2, ChevronDown, CircleDot, DownloadCloud, FileText, History, House, Library, ListOrdered, MessageSquare, Music2, ShieldCheck, Sparkles, Tags, Users } from "lucide-react";
 
 import SocialLinks from "@/components/SocialLinks";
 
@@ -146,6 +146,13 @@ const ADMIN_TREE_ITEMS = [
     label: "Notificaciones",
     icon: Bell,
     permission: "admin.notifications.view",
+  },
+  {
+    key: "platformAudience",
+    href: "/administracion/audiencia",
+    label: "Audiencia web",
+    icon: Activity,
+    permission: "admin.audience.view",
   },
   {
     key: "platformTickets",
