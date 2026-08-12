@@ -178,6 +178,8 @@ ANIME_THEMES_API_BASE_URL=https://graphql.animethemes.moe/
 | `LoginAttempt` | Auditoría de intentos de login |
 | `AuditLog` | Historial de acciones administrativas por mantenedor |
 | `PlatformNotification` | Notificaciones persistentes por audiencia, origen y ciclo de publicación; soporta programación, expiración, activación y eliminación lógica |
+| `StreamAudienceSession` | Resumen agregado de audiencia web por directo Twitch: promedio, pico, minutos-persona, estado y metadatos del stream |
+| `StreamAudienceSample` | Muestra por minuto de presencia concurrente en Inicio y audiencia oficial informada por Twitch |
 | `PlatformUserNotification` | Estado por usuario de lectura y descarte de notificaciones |
 | `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
 | `SupportTicket` | Sugerencias/reclamos creados por usuarios registrados, con tipo, asunto, estado y última actividad |
@@ -212,6 +214,8 @@ El topbar incluye un centro de notificaciones persistente para usuarios autentic
 Las notificaciones se guardan en `PlatformNotification` y el estado individual en `PlatformUserNotification`. La API `/api/notifications` lista notificaciones visibles para el usuario actual y permite marcar una, marcar todas o descartar. Si `DATA_SOURCE` no es `postgres`, el repositorio devuelve lista vacía.
 
 El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling suave queda como respaldo. La presencia concurrente de Inicio usa un canal independiente en `/api/presence/ws` para no mezclar sus mensajes con notificaciones o tickets.
+
+`server.mjs` toma una muestra de audiencia cada minuto mientras el broadcaster oficial está online. Guarda únicamente agregados en PostgreSQL: presencia web concurrente y `viewer_count` oficial de Twitch, agrupados por `twitchStreamId`. Los fallos de Twitch o de persistencia se registran sin cerrar una sesión válida ni afectar Inicio. `STREAM_AUDIENCE_ANALYTICS_ENABLED=false` permite desactivar el agregador; con una fuente distinta de PostgreSQL queda desactivado automáticamente.
 
 La campana, protegida por `notifications.view`, muestra avisos rápidos y permite a invitados consultar únicamente notificaciones públicas; su estado leído/descartado se conserva en `localStorage`. La página `/notificaciones`, protegida separadamente por `notifications.full.view`, permite a usuarios autenticados buscar, filtrar, marcar como leída/no leída, descartar y restaurar. El mantenedor `/administracion/notificaciones` gestiona notificaciones manuales y automáticas, incluyendo publicación inmediata o programada. `server.mjs` revisa publicaciones pendientes cada 30 segundos, fija `publishedAt` una sola vez y emite la actualización WebSocket.
 
@@ -309,6 +313,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | Administración: Usuarios | `users.read`, `users.create`, `users.update`, `users.delete` |
 | Administración: Roles | `roles.read`, `roles.create`, `roles.update` |
 | Administración: Notificaciones | `admin.notifications.view/create/update/delete` |
+| Administración: Audiencia web | `admin.audience.view` |
 | Administración: Tickets | `admin.tickets.view/update` |
 | Administración: Rastreador | `admin.tracker.view`, `admin.lives.notify` |
 | Administración: Tags | `admin.tags.view`, `tags.create`, `tags.update`, `tags.delete` |
@@ -353,6 +358,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/administracion/biblioteca-anime/openings` | Mantenedor CRUD de Openings/Endings del Tier List (sync AnimeThemes.moe, crear/editar/eliminar/restaurar) |
 | `/administracion/notificaciones` | Mantenedor de notificaciones manuales y automáticas, protegido por permisos `admin.notifications.*` |
 | `/administracion/tickets` | Mantenedor administrativo de sugerencias/reclamos, protegido por `admin.tickets.view` |
+| `/administracion/audiencia` | Dashboard de solo lectura para presencia web concurrente, evolución por minuto, comparación con Twitch e historial por directo; requiere `admin.audience.view` |
 | `/administracion/tickets/[id]` | Conversación administrativa del ticket, permite responder con `admin.tickets.update` |
 
 ### API Routes
@@ -388,6 +394,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/admin/anime-calendar` | GET/POST | Previsualización, sincronización, activación y overrides del calendario |
 | `/api/anime-tier-list` | GET/POST | Tablero del Tier List (animes/openings/endings): `GET` con `kind` y `seasonId` devuelve roster y tablero guardado del usuario; `POST` con `action: "save"` autoguarda tiers/colocaciones, `"reset"` reinicia el tablero y `"set-public"` genera/retira el link compartido. Mutaciones requieren sesión. |
 | `/api/admin/anime-tier-list-animes` | GET/POST | Roster de Animes del Tier List: sync preview/apply desde AniList y CRUD (`create-entry`, `update-entry`, `delete-entry`, `restore-entry`) |
+| `/api/admin/audience` | GET | Resumen, historial y muestras por minuto de audiencia web; requiere `admin.audience.view` |
 | `/api/admin/anime-tier-list-openings` | GET/POST | Openings/Endings del Tier List: sync preview/apply desde AnimeThemes.moe (requiere Animes ya sincronizado) y CRUD (`create-theme`, `update-theme`, `delete-theme`, `restore-theme`) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
