@@ -140,7 +140,15 @@ const navigationTree = [
         permission: "tracker.view",
         icon: Archive,
         children: [
-          { title: "Detalle de directo", href: "/rastreador/[id]", permission: "tracker.view", icon: File },
+          {
+            title: "Detalle de directo",
+            href: "/rastreador/[id]",
+            permission: "tracker.view",
+            icon: File,
+            children: [
+              { title: "Reproductor Piero: controles, Cast y subtítulos", href: "/rastreador/[id]", permission: "tracker.view", icon: PlayCircle },
+            ],
+          },
         ],
       },
       { title: "Calendario de directos", href: "/rastreador/calendario", permission: "tracker.calendar.view", icon: CalendarDays },

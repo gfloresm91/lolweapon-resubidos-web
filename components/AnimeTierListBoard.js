@@ -97,6 +97,7 @@ function normalizeRosterItem(kind, item) {
     isDonghua: item.isDonghua,
     isNsfw: item.isNsfw,
     isHidden: item.isHidden,
+    isEntryHidden: Boolean(item.isEntryHidden),
     isDeletedByAdmin: Boolean(item.isDeletedByAdmin),
     isDraft: Boolean(item.isDraft),
     videoUrl: item.videoUrl,
@@ -590,6 +591,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const [viewMode, setViewMode] = useState("user");
   const [entriesWithoutTheme, setEntriesWithoutTheme] = useState([]);
   const [isCreateThemeOpen, setIsCreateThemeOpen] = useState(false);
+  const [isCreatingTheme, setIsCreatingTheme] = useState(false);
+  const [createRequestKey, setCreateRequestKey] = useState("");
   const [isAniListSearchOpen, setIsAniListSearchOpen] = useState(false);
   const [createSelectedAnime, setCreateSelectedAnime] = useState(null);
   const [createTitleValue, setCreateTitleValue] = useState("");
@@ -640,6 +643,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
   const skipNextFilterSaveRef = useRef(false);
   const dragOverRafRef = useRef(null);
   const pendingDragOverEventRef = useRef(null);
+  const isCreatingThemeRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -1098,6 +1102,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     setCreateIsAdultOverride("");
     setCreateIsDonghuaOverride("");
     setDuplicateSourceItemId(null);
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateThemeOpen(true);
   }
 
@@ -1114,6 +1119,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     setCreateThemeType(kind === "ed" ? "ED" : "OP");
     setCreateSequence(String(entryDuplicatePositions.get(entry.id) || 1));
     setDuplicateSourceItemId(null);
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateThemeOpen(true);
   }
 
@@ -1131,6 +1137,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     setCreateThemeType(kind === "ed" ? "ED" : "OP");
     setCreateSequence(String(currentSequence + 1));
     setDuplicateSourceItemId(item.id);
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateThemeOpen(true);
   }
 
@@ -1156,10 +1163,12 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
     setCreateSelectedAnime({ isManual: true });
     setCreateSequence("1");
     setDuplicateSourceItemId(null);
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateThemeOpen(true);
   }
 
   function closeCreateTheme() {
+    if (isCreatingThemeRef.current) return;
     setIsCreateThemeOpen(false);
     setCreateSelectedAnime(null);
     setCreateImageFile(null);
@@ -1169,10 +1178,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
 
   async function createTheme(event) {
     event.preventDefault();
+    if (isCreatingThemeRef.current) return;
+    isCreatingThemeRef.current = true;
+    setIsCreatingTheme(true);
     const form = new FormData(event.currentTarget);
     const submitterVisible = event.nativeEvent.submitter?.dataset.visible;
     const payload = {
       action: "create-theme",
+      createRequestKey,
       kind,
       seasonId,
       type: createThemeType,
@@ -1190,6 +1203,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       const animeTitle = String(form.get("animeTitle") || "").trim();
       if (!animeTitle) {
         toast.error("Escribe el título del anime.");
+        isCreatingThemeRef.current = false;
+        setIsCreatingTheme(false);
         return;
       }
       payload.animeTitle = animeTitle;
@@ -1202,6 +1217,8 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       if (createTitleTouched) payload.manualEntryTitle = createTitleValue;
     } else {
       toast.error("Busca y selecciona un anime en AniList.");
+      isCreatingThemeRef.current = false;
+      setIsCreatingTheme(false);
       return;
     }
     try {
@@ -1234,6 +1251,9 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
       toast.success("Opening/Ending agregado.");
     } catch (error) {
       toast.error(error.message || "No se pudo agregar el tema.");
+    } finally {
+      isCreatingThemeRef.current = false;
+      setIsCreatingTheme(false);
     }
   }
 
@@ -1324,23 +1344,29 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
 
   function handleToggleVisibility(item) {
     if (item.isHidden) {
-      restoreTheme(item.id);
+      restoreTheme(item);
     } else {
       setPendingDeleteTheme(item);
     }
   }
 
-  async function restoreTheme(id) {
+  async function restoreTheme(item) {
     try {
       const response = await fetch("/api/anime-tier-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restore-theme", kind, id }),
+        body: JSON.stringify({ action: "restore-theme", kind, id: item.id }),
       });
       const data = await readJson(response);
       if (!response.ok || !data.success) throw new Error(data.error);
       await loadBoard(seasonId, { silent: true });
-      toast.success("Tema visible de nuevo.");
+      const hiddenByContentFilter = (item.isDonghua && filters.hideDonghua && filters.focusMode !== "donghua")
+        || (item.isAdult && filters.hideAdult && filters.focusMode !== "adult");
+      toast.success(item.isEntryHidden
+        ? "Tema publicado, pero el anime asociado continúa oculto por administración."
+        : hiddenByContentFilter
+          ? `Tema publicado. Sigue oculto por el filtro ${item.isDonghua && filters.hideDonghua ? "Ocultar donghua" : "Ocultar adulto"}.`
+          : "Tema publicado y visible de nuevo.");
     } catch (error) {
       toast.error(error.message || "No se pudo mostrar el tema.");
     }
@@ -1597,7 +1623,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   const item = itemsById.get(id);
                   if (!item) return null;
                   return (
-                    <div key={id} className="tierlist-card is-draft">
+                    <div
+                      key={id}
+                      className="tierlist-card is-draft"
+                      onClick={() => item.videoUrl && setOpenItem(item)}
+                      onKeyDown={(event) => { if (item.videoUrl && (event.key === "Enter" || event.key === " ")) setOpenItem(item); }}
+                      role={item.videoUrl ? "button" : undefined}
+                      tabIndex={item.videoUrl ? 0 : undefined}
+                    >
                       <div className="tierlist-card-media">
                         <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
                         {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
@@ -1607,19 +1640,20 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                             {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
                           </div>
                         ) : null}
+                        {item.videoUrl ? <span className="tierlist-card-play"><Play size={22} /></span> : null}
                       </div>
                       <span className="tierlist-card-title">{item.title}</span>
                       <div className="tierlist-card-actions tierlist-card-actions-grid">
-                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={() => setEditingThemeItem(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={(event) => { event.stopPropagation(); setEditingThemeItem(item); }}>
                           <Edit3 size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={() => duplicateTheme(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={(event) => { event.stopPropagation(); duplicateTheme(item); }}>
                           <Copy size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={() => setPendingDeleteTheme(item)}>
+                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={(event) => { event.stopPropagation(); setPendingDeleteTheme(item); }}>
                           <EyeOff size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button" aria-label="Publicar tema" onClick={() => requestPublishTheme(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Publicar tema" onClick={(event) => { event.stopPropagation(); requestPublishTheme(item); }}>
                           <Globe size={14} />
                         </button>
                       </div>
@@ -1653,7 +1687,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   const item = itemsById.get(id);
                   if (!item) return null;
                   return (
-                    <div key={id} className="tierlist-card is-hidden-by-admin">
+                    <div
+                      key={id}
+                      className="tierlist-card is-hidden-by-admin"
+                      onClick={() => item.videoUrl && setOpenItem(item)}
+                      onKeyDown={(event) => { if (item.videoUrl && (event.key === "Enter" || event.key === " ")) setOpenItem(item); }}
+                      role={item.videoUrl ? "button" : undefined}
+                      tabIndex={item.videoUrl ? 0 : undefined}
+                    >
                       <div className="tierlist-card-media">
                         <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
                         {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
@@ -1663,16 +1704,17 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                             {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
                           </div>
                         ) : null}
+                        {item.videoUrl ? <span className="tierlist-card-play"><Play size={22} /></span> : null}
                       </div>
                       <span className="tierlist-card-title">{item.title}</span>
                       <div className="tierlist-card-actions">
-                        <button type="button" className="icon-tool-button" aria-label="Mostrar tema" onClick={() => handleToggleVisibility(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Mostrar tema" onClick={(event) => { event.stopPropagation(); handleToggleVisibility(item); }}>
                           <Eye size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={() => setPendingDraftTheme(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={(event) => { event.stopPropagation(); setPendingDraftTheme(item); }}>
                           <FileEdit size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button danger" aria-label="Eliminar tema" onClick={() => setPendingRemoveTheme(item)}>
+                        <button type="button" className="icon-tool-button danger" aria-label="Eliminar tema" onClick={(event) => { event.stopPropagation(); setPendingRemoveTheme(item); }}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -1706,7 +1748,14 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                   const item = itemsById.get(id);
                   if (!item) return null;
                   return (
-                    <div key={id} className="tierlist-card">
+                    <div
+                      key={id}
+                      className="tierlist-card"
+                      onClick={() => item.videoUrl && setOpenItem(item)}
+                      onKeyDown={(event) => { if (item.videoUrl && (event.key === "Enter" || event.key === " ")) setOpenItem(item); }}
+                      role={item.videoUrl ? "button" : undefined}
+                      tabIndex={item.videoUrl ? 0 : undefined}
+                    >
                       <div className="tierlist-card-media">
                         <AnimePosterImage src={item.imageUrl} title={item.title} className="tierlist-card-poster" decorative />
                         {item.badge ? <span className="tierlist-card-badge">{item.badge}</span> : null}
@@ -1716,19 +1765,20 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
                             {item.isDonghua ? <span className="tierlist-card-flag is-donghua">Donghua</span> : null}
                           </div>
                         ) : null}
+                        {item.videoUrl ? <span className="tierlist-card-play"><Play size={22} /></span> : null}
                       </div>
                       <span className="tierlist-card-title">{item.title}</span>
                       <div className="tierlist-card-actions tierlist-card-actions-grid">
-                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={() => setEditingThemeItem(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Editar tema" onClick={(event) => { event.stopPropagation(); setEditingThemeItem(item); }}>
                           <Edit3 size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={() => duplicateTheme(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Duplicar tema" onClick={(event) => { event.stopPropagation(); duplicateTheme(item); }}>
                           <Copy size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={() => setPendingDeleteTheme(item)}>
+                        <button type="button" className="icon-tool-button danger" aria-label="Ocultar tema" onClick={(event) => { event.stopPropagation(); setPendingDeleteTheme(item); }}>
                           <EyeOff size={14} />
                         </button>
-                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={() => setPendingDraftTheme(item)}>
+                        <button type="button" className="icon-tool-button" aria-label="Pasar a borrador" onClick={(event) => { event.stopPropagation(); setPendingDraftTheme(item); }}>
                           <FileEdit size={14} />
                         </button>
                       </div>
@@ -2142,9 +2192,9 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
           noValidate
           actions={(
             <>
-              <button type="button" className="tracker-action-secondary" onClick={closeCreateTheme}>Cancelar</button>
-              <button type="submit" data-visible="false" className="tracker-action-secondary">Guardar como borrador</button>
-              <button type="submit" data-visible="true" className="tracker-action-primary">Publicar</button>
+              <button type="button" className="tracker-action-secondary" disabled={isCreatingTheme} onClick={closeCreateTheme}>Cancelar</button>
+              <button type="submit" data-visible="false" className="tracker-action-secondary" disabled={isCreatingTheme}>{isCreatingTheme ? "Guardando…" : "Guardar como borrador"}</button>
+              <button type="submit" data-visible="true" className="tracker-action-primary" disabled={isCreatingTheme}>{isCreatingTheme ? "Publicando…" : "Publicar"}</button>
             </>
           )}
         >
@@ -2480,6 +2530,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
             {openItem.songTitle ? (
               <p className="tierlist-video-song"><Music2 size={14} aria-hidden="true" /> {openItem.songTitle}</p>
             ) : null}
+            {openItem.artist ? <p className="tierlist-video-artist" title={openItem.artist}>Artista: {openItem.artist}</p> : null}
             {videoSources.length > 1 ? (
               <div className="tracker-calendar-view-toggle tierlist-video-source-toggle" role="tablist" aria-label="Fuente del video">
                 {videoSources.map((source) => (

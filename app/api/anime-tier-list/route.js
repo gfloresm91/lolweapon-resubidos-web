@@ -88,7 +88,7 @@ export async function POST(request) {
 
       if (payload.action === "create-theme") {
         const theme = await createAnimeTierListTheme(payload);
-        await createAuditLog({
+        if (!theme.wasAlreadyCreated) await createAuditLog({
           actor: authorization.user,
           action: "create",
           module: "admin.anime.tierlist.openings",
