@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSync, Edit3, EyeOff, History, Plus, Power, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -75,6 +75,9 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
   const [isApplyOpen, setIsApplyOpen] = useState(false);
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreatingTheme, setIsCreatingTheme] = useState(false);
+  const [createRequestKey, setCreateRequestKey] = useState("");
+  const isCreatingThemeRef = useRef(false);
   const [isAniListSearchOpen, setIsAniListSearchOpen] = useState(false);
   const [createSelectedAnime, setCreateSelectedAnime] = useState(null);
   const [createImageFile, setCreateImageFile] = useState(null);
@@ -258,6 +261,7 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
     setCreateSequence("1");
     setCreateIsAdultOverride("");
     setCreateIsDonghuaOverride("");
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateOpen(true);
   }
 
@@ -265,10 +269,12 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
     setIsAniListSearchOpen(false);
     setCreateSelectedAnime({ isManual: true });
     setCreateSequence("1");
+    setCreateRequestKey(crypto.randomUUID());
     setIsCreateOpen(true);
   }
 
   function closeCreateTheme() {
+    if (isCreatingThemeRef.current) return;
     setIsCreateOpen(false);
     setCreateSelectedAnime(null);
     setCreateImageFile(null);
@@ -277,9 +283,13 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
 
   async function createTheme(event) {
     event.preventDefault();
+    if (isCreatingThemeRef.current) return;
+    isCreatingThemeRef.current = true;
+    setIsCreatingTheme(true);
     const form = new FormData(event.currentTarget);
     const payload = {
       action: "create-theme",
+      createRequestKey,
       seasonId: selectedSeasonId,
       type: createType,
       sequence: form.get("sequence"),
@@ -293,6 +303,8 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       const animeTitle = String(form.get("animeTitle") || "").trim();
       if (!animeTitle) {
         toast.error("Escribe el título del anime.");
+        isCreatingThemeRef.current = false;
+        setIsCreatingTheme(false);
         return;
       }
       payload.animeTitle = animeTitle;
@@ -304,6 +316,8 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       payload.animeIsDonghuaOverride = createIsDonghuaOverride;
     } else {
       toast.error("Busca y selecciona un anime en AniList.");
+      isCreatingThemeRef.current = false;
+      setIsCreatingTheme(false);
       return;
     }
     try {
@@ -318,6 +332,9 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
       toast.success("Opening/Ending agregado.");
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      isCreatingThemeRef.current = false;
+      setIsCreatingTheme(false);
     }
   }
 
@@ -565,7 +582,7 @@ export default function PlatformAnimeTierListOpeningsPage({ initialSeasons = [],
           onClose={closeCreateTheme}
           onSubmit={createTheme}
           noValidate
-          actions={<><button type="button" className="tracker-action-secondary" onClick={closeCreateTheme}>Cancelar</button><button type="submit" className="tracker-action-primary">Guardar</button></>}
+          actions={<><button type="button" className="tracker-action-secondary" disabled={isCreatingTheme} onClick={closeCreateTheme}>Cancelar</button><button type="submit" className="tracker-action-primary" disabled={isCreatingTheme}>{isCreatingTheme ? "Guardando…" : "Guardar"}</button></>}
         >
           <div className="notification-form-field">
             <span>Anime</span>

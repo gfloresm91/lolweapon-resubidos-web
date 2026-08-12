@@ -830,6 +830,7 @@ model AnimeTierListEntry {
 
 model AnimeTierListTheme {
   id              Int                @id @default(autoincrement())
+  createRequestKey String?           @unique
   tierListEntryId Int
   animeThemeId    Int?
   isManual        Boolean            @default(false)
