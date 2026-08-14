@@ -16,7 +16,7 @@ export default function RootLayout({ children }) {
     || "kalathraslolweapon";
 
   return (
-    <html lang="es" data-theme="dark">
+    <html lang="es" data-theme="dark" suppressHydrationWarning>
       <body>
         <PersistentTwitchPlayer twitchLogin={twitchLogin} />
         {children}
