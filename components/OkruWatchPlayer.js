@@ -90,6 +90,8 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   const completedPartRef = useRef(false);
   const hasRestoredProgressRef = useRef(false);
   const resumeNoticeTimerRef = useRef(null);
+  const stalledNoticeTimerRef = useRef(null);
+  const lastPlaybackActivityRef = useRef(0);
   const completionOverlayRef = useRef(null);
   const completionPrimaryActionRef = useRef(null);
   const pathname = usePathname();
@@ -289,6 +291,7 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
     completedPartRef.current = false;
     hasRestoredProgressRef.current = false;
     progressSaveRef.current = 0;
+    lastPlaybackActivityRef.current = 0;
   }, [activeLink?.href]);
 
   useEffect(() => {
@@ -311,7 +314,40 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
 
   useEffect(() => () => {
     if (resumeNoticeTimerRef.current) window.clearTimeout(resumeNoticeTimerRef.current);
+    if (stalledNoticeTimerRef.current) window.clearTimeout(stalledNoticeTimerRef.current);
   }, []);
+
+  function clearPieroLoadingState() {
+    if (stalledNoticeTimerRef.current) {
+      window.clearTimeout(stalledNoticeTimerRef.current);
+      stalledNoticeTimerRef.current = null;
+    }
+    setIsPlayerLoading(false);
+  }
+
+  function handlePieroWaiting(player) {
+    if (player?.paused) {
+      clearPieroLoadingState();
+      return;
+    }
+    setLoadingMessage("Almacenando búfer...");
+    setIsPlayerLoading(true);
+  }
+
+  function handlePieroStalled(player) {
+    if (player?.paused) {
+      clearPieroLoadingState();
+      return;
+    }
+    if (stalledNoticeTimerRef.current) window.clearTimeout(stalledNoticeTimerRef.current);
+    stalledNoticeTimerRef.current = window.setTimeout(() => {
+      if (!videoRef.current?.paused) {
+        setLoadingMessage("La conexión está tardando más de lo esperado...");
+        setIsPlayerLoading(true);
+      }
+      stalledNoticeTimerRef.current = null;
+    }, 1500);
+  }
 
   function retryPlayer() {
     setPlayerError(false);
@@ -364,12 +400,18 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   }
 
   function handlePieroCanPlay(player) {
-    setIsPlayerLoading(false);
+    clearPieroLoadingState();
     restorePieroProgress(player);
     tryPieroAutoplay(player);
   }
 
   function handlePieroTimeUpdate(currentTime, duration) {
+    // WebKit puede emitir `stalled` aunque la reproducción siga avanzando y
+    // no siempre vuelve a emitir `playing`. El progreso real invalida el aviso.
+    if (Number.isFinite(currentTime) && currentTime > lastPlaybackActivityRef.current + 0.05) {
+      lastPlaybackActivityRef.current = currentTime;
+      clearPieroLoadingState();
+    }
     if (!Number.isFinite(currentTime) || currentTime - progressSaveRef.current < 5) return;
 
     savePieroProgress(currentTime, duration);
@@ -759,28 +801,14 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
               onLoadedMetadata={() => setLoadingMessage("Preparando reproducción...")}
               onCanPlay={handlePieroCanPlay}
               onPlaying={() => {
-                setIsPlayerLoading(false);
+                clearPieroLoadingState();
                 setIsAutoplayBlocked(false);
               }}
-              onWaiting={(player) => {
-                if (player?.paused) {
-                  setIsPlayerLoading(false);
-                  return;
-                }
-                setLoadingMessage("Almacenando búfer...");
-                setIsPlayerLoading(true);
-              }}
-              onStalled={(player) => {
-                if (player?.paused) {
-                  setIsPlayerLoading(false);
-                  return;
-                }
-                setLoadingMessage("La conexión está tardando más de lo esperado...");
-                setIsPlayerLoading(true);
-              }}
+              onWaiting={handlePieroWaiting}
+              onStalled={handlePieroStalled}
               onTimeUpdate={handlePieroTimeUpdate}
               onPause={(player) => {
-                setIsPlayerLoading(false);
+                clearPieroLoadingState();
                 savePieroProgress(player?.currentTime);
               }}
               onEnded={handlePieroEnded}
