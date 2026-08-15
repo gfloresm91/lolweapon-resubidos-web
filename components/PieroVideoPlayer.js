@@ -3,9 +3,12 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  AirPlayButton,
   Gesture,
+  GoogleCastButton,
   MediaPlayer,
   MediaProvider,
+  PlayButton,
   TextTrack,
   useCaptionOptions,
   useMediaContext,
@@ -421,7 +424,6 @@ const PIERO_PLYR_ICONS = {
 };
 
 function PieroCastControl({ onRequest }) {
-  const remote = useMediaRemote();
   const canGoogleCast = useMediaState("canGoogleCast");
   const canAirPlay = useMediaState("canAirPlay");
   const remotePlaybackState = useMediaState("remotePlaybackState");
@@ -440,23 +442,22 @@ function PieroCastControl({ onRequest }) {
       ? `Transmitiendo mediante ${provider}`
       : `Transmitir mediante ${provider}`;
 
-  function handleCastClick(event) {
-    onRequest?.();
-    if (useGoogleCast) remote.requestGoogleCast(event);
-    else remote.requestAirPlay(event);
-  }
+  const CastButton = useGoogleCast ? GoogleCastButton : AirPlayButton;
 
   return (
-    <button
-      type="button"
+    <CastButton
       className="plyr__controls__item plyr__control piero-cast-button"
       aria-label={label}
       title={label}
-      onClick={handleCastClick}
+      data-state={remotePlaybackState}
+      onPointerDown={onRequest}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onRequest?.();
+      }}
     >
       <Cast aria-hidden="true" />
       <span className="plyr__tooltip">{label}</span>
-    </button>
+    </CastButton>
   );
 }
 
@@ -665,10 +666,12 @@ function PieroUnifiedSettings({
   onOpenSubtitleSettings,
   portalTarget,
 }) {
+  const isFullscreen = useMediaState("fullscreen");
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState("root");
   const rootRef = useRef(null);
   const panelRef = useRef(null);
+  const lastTouchActivationRef = useRef(0);
   const hasReportedOpenStateRef = useRef(false);
   const captionOptions = useCaptionOptions({ off: "Desactivado" });
   const speedOptions = usePlaybackRateOptions({ rates: PLAYBACK_SPEEDS, normalLabel: "1×" });
@@ -711,6 +714,14 @@ function PieroUnifiedSettings({
 
   const openView = (nextView) => setView(nextView);
   const goBack = () => setView("root");
+  const toggleSettings = () => {
+    setView("root");
+    setIsOpen((current) => {
+      const next = !current;
+      if (next) onOpen?.();
+      return next;
+    });
+  };
 
   const panel = isOpen ? (
     <>
@@ -816,20 +827,23 @@ function PieroUnifiedSettings({
         aria-label="Configuración"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        onPointerUp={(event) => {
+          if (event.pointerType !== "touch") return;
+          event.preventDefault();
+          event.stopPropagation();
+          lastTouchActivationRef.current = Date.now();
+          toggleSettings();
+        }}
         onClick={() => {
-          setView("root");
-          setIsOpen((current) => {
-            const next = !current;
-            if (next) onOpen?.();
-            return next;
-          });
+          if (Date.now() - lastTouchActivationRef.current < 600) return;
+          toggleSettings();
         }}
       >
         <Settings aria-hidden="true" />
         <span className="plyr__tooltip">Configuración</span>
       </button>
 
-      {panel && portalTarget ? createPortal(panel, portalTarget) : panel}
+      {panel && !isFullscreen && portalTarget ? createPortal(panel, portalTarget) : panel}
     </div>
   );
 }
@@ -929,6 +943,44 @@ function PieroPlayerChrome({ title, shortcutsControl, subtitleSettingsControl, u
   );
 }
 
+function PieroTouchCenterPlayButton({ enabled }) {
+  const controlsVisible = useMediaState("controlsVisible");
+  const ended = useMediaState("ended");
+  const paused = useMediaState("paused");
+  const started = useMediaState("started");
+  const waiting = useMediaState("waiting");
+  const remotePlaybackState = useMediaState("remotePlaybackState");
+
+  if (
+    !enabled
+    || (waiting && started && !paused)
+    || remotePlaybackState !== "disconnected"
+    || (!controlsVisible && !paused && !ended)
+  ) return null;
+
+  const label = ended ? "Reproducir nuevamente" : paused ? "Reproducir" : "Pausar";
+
+  return (
+    <PlayButton
+      className="piero-touch-center-play"
+      aria-label={label}
+      title={label}
+      data-ended={ended ? "true" : undefined}
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {ended ? (
+        <RotateCcw aria-hidden="true" />
+      ) : paused ? (
+        <Play aria-hidden="true" fill="currentColor" />
+      ) : (
+        <Pause aria-hidden="true" fill="currentColor" />
+      )}
+    </PlayButton>
+  );
+}
+
 const PIERO_PLAYER_TRANSLATIONS = {
   Audio: "Audio",
   Auto: "Automática",
@@ -1011,6 +1063,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
   const [isIOSWebKit, setIsIOSWebKit] = useState(false);
   const [playerElement, setPlayerElement] = useState(null);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [hasPlaybackStarted, setHasPlaybackStarted] = useState(false);
 
   const applyCaptionsState = useCallback((enabled) => {
     setCaptionsEnabled(enabled);
@@ -1054,6 +1107,32 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
   }, []);
 
   useEffect(() => {
+    if (useTouchControls) setIsShortcutsOpen(false);
+  }, [useTouchControls]);
+
+  useEffect(() => {
+    setHasPlaybackStarted(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (!useTouchControls || !playerElement) return;
+
+    const controls = playerRef.current?.controls;
+    if (!controls) return;
+
+    if (!hasPlaybackStarted) {
+      controls.show();
+      controls.pause();
+      return;
+    }
+
+    if (!isShortcutsOpen && !isSubtitleSettingsOpen) {
+      controls.resume();
+      controls.hide(undefined);
+    }
+  }, [hasPlaybackStarted, isShortcutsOpen, isSubtitleSettingsOpen, playerElement, useTouchControls]);
+
+  useEffect(() => {
     const navigatorInfo = window.navigator;
     const appleMobile = /iPad|iPhone|iPod/.test(navigatorInfo.userAgent)
       || (navigatorInfo.platform === "MacIntel" && navigatorInfo.maxTouchPoints > 1);
@@ -1064,21 +1143,33 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     if (!useTouchControls) return undefined;
 
     let video = null;
-    const revealControls = (event) => {
-      const controls = playerRef.current?.controls;
-      controls?.show(0, event);
-      controls?.hide(undefined, event);
+    const toggleControls = (event) => {
+      const player = playerRef.current;
+      const controls = player?.controls;
+      const playerRoot = player?.el || player;
+      if (!controls || !playerRoot) return;
+
+      // El toque sobre el video pertenece a esta interacción: evitamos que el
+      // layout vuelva a mostrar los controles después de que aquí se oculten.
+      event.stopPropagation();
+      if (playerRoot.hasAttribute("data-controls")) {
+        controls.hide(0, event);
+        return;
+      }
+
+      controls.show(0, event);
+      controls.hide(undefined, event);
     };
     const frameId = window.requestAnimationFrame(() => {
       const player = playerRef.current;
       const playerElement = player?.el || player;
       video = playerElement?.querySelector?.("[data-media-provider] video");
-      video?.addEventListener("pointerup", revealControls);
+      video?.addEventListener("pointerup", toggleControls);
     });
 
     return () => {
       window.cancelAnimationFrame(frameId);
-      video?.removeEventListener("pointerup", revealControls);
+      video?.removeEventListener("pointerup", toggleControls);
     };
   }, [src, useTouchControls]);
 
@@ -1646,6 +1737,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
         showActionFeedback("play");
       }}
       onPlaying={() => {
+        setHasPlaybackStarted(true);
         fullscreenPlaybackIntentRef.current = true;
         onPlaying?.();
       }}
@@ -1718,7 +1810,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
       />
       <PieroPlayerChrome
         title={title || "Resubido de Piero"}
-        shortcutsControl={shortcutsControl}
+        shortcutsControl={useTouchControls ? null : shortcutsControl}
         subtitleSettingsControl={subtitleSettingsControl}
         unifiedSettingsControl={unifiedSettingsControl}
         useTouchControls={useTouchControls}
@@ -1727,6 +1819,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
         onPlayHere={(remoteType) => leaveRemotePlayback({ playLocally: true, remoteType })}
         onRetryRemote={retryRemotePlayback}
       />
+      <PieroTouchCenterPlayButton enabled={useTouchControls} />
       {isShortcutsOpen ? (
         <section
           ref={shortcutsPanelRef}
@@ -1789,7 +1882,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
           {seekFeedback === "backward" ? "−10 s" : "+10 s"}
         </div>
       ) : null}
-      {ActionFeedbackIcon ? (
+      {ActionFeedbackIcon && !useTouchControls ? (
         <div className="piero-action-feedback" aria-hidden="true">
           <ActionFeedbackIcon size={30} fill={actionFeedback === "play" ? "currentColor" : "none"} />
         </div>
