@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { ChevronDown, CirclePlay, Eye, FileText, Info, Link2, MessageSquare, X } from "lucide-react";
+import { ChevronDown, CirclePlay, Eye, FileText, Info, Link2, MessageSquare, Monitor, X } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import TwitchCompanionPlayer from "@/components/TwitchCompanionPlayer";
 import Tooltip from "@/components/Tooltip";
@@ -12,6 +12,7 @@ const DEFAULT_VK_LIVE_EMBED_URL = "https://live.vkvideo.ru/app/embed/redbreake";
 const VK_LIVE_EMBED_URL = process.env.NEXT_PUBLIC_VK_LIVE_EMBED_URL || DEFAULT_VK_LIVE_EMBED_URL;
 const IS_VK_MULTISTREAM_ENABLED = process.env.NEXT_PUBLIC_ENABLE_VK_MULTISTREAM !== "false";
 const PRESENCE_CLIENT_STORAGE_KEY = "kala_presence_client_id";
+const VK_DESKTOP_HELP_DISMISSED_KEY = "kala_vk_desktop_help_dismissed";
 const PRESENCE_HEARTBEAT_MS = 20_000;
 const PRESENCE_CLIENT_ID_PATTERN = /^[a-zA-Z0-9_-]{8,128}$/;
 
@@ -28,6 +29,29 @@ function getPresenceClientId() {
     return window.crypto?.randomUUID?.()
       || `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
   }
+}
+
+function detectVkMobileBrowser() {
+  const userAgent = navigator.userAgent || "";
+  const reportsMobile = navigator.userAgentData?.mobile ?? /Mobile/i.test(userAgent);
+  if (!reportsMobile) return null;
+
+  const isEmbeddedWebView = /; wv\)/i.test(userAgent)
+    || (/AppleWebKit/i.test(userAgent) && !/(Safari|CriOS)/i.test(userAgent));
+  if (isEmbeddedWebView) return null;
+
+  if (/Android/i.test(userAgent)
+    && /Chrome\//i.test(userAgent)
+    && !/(SamsungBrowser|EdgA|OPR\/)/i.test(userAgent)) {
+    return "android-chrome";
+  }
+
+  if (/(iPhone|iPad|iPod)/i.test(userAgent)) {
+    if (/CriOS/i.test(userAgent)) return "ios-chrome";
+    if (/Safari/i.test(userAgent)) return "ios-safari";
+  }
+
+  return null;
 }
 
 function openTwitchSubscription(event) {
@@ -207,6 +231,11 @@ export default function HomeDashboard({
   const [isTwitchChatTheaterEligible, setIsTwitchChatTheaterEligible] = useState(false);
   const [isTwitchChatTheaterOpen, setIsTwitchChatTheaterOpen] = useState(false);
   const [isStreamInfoOpen, setIsStreamInfoOpen] = useState(false);
+  const [isVkDesktopHelpOpen, setIsVkDesktopHelpOpen] = useState(false);
+  const [isVkDesktopHelpDismissed, setIsVkDesktopHelpDismissed] = useState(false);
+  const [vkMobileBrowser, setVkMobileBrowser] = useState(null);
+  const [preserveAndroidMobileLayout, setPreserveAndroidMobileLayout] = useState(false);
+  const [androidTheaterViewport, setAndroidTheaterViewport] = useState(null);
   const [twitchPlaybackState, setTwitchPlaybackState] = useState("loading");
   const [isOnlinePreview, setIsOnlinePreview] = useState(false);
   const [pageViewerCount, setPageViewerCount] = useState(null);
@@ -218,6 +247,8 @@ export default function HomeDashboard({
   const isTwitchActuallyOnline = Boolean(currentStream);
   const isOnline = isTwitchActuallyOnline || isOnlinePreview;
   const isDualMode = IS_VK_MULTISTREAM_ENABLED && streamMode === "dual";
+  const usesCompactDualLayout = isDualMode
+    && (isMobileTheaterLayout || preserveAndroidMobileLayout);
   const isTwitchChatTheater = !isDualMode && isTwitchChatTheaterOpen;
 
   function resetStreamInfoDrag() {
@@ -272,6 +303,14 @@ export default function HomeDashboard({
 
   useEffect(() => {
     setTwitchParent(window.location.hostname);
+    setVkMobileBrowser(detectVkMobileBrowser());
+    try {
+      setIsVkDesktopHelpDismissed(window.localStorage.getItem(VK_DESKTOP_HELP_DISMISSED_KEY) === "true");
+    } catch {
+      setIsVkDesktopHelpDismissed(false);
+    }
+    const params = new URLSearchParams(window.location.search);
+    setPreserveAndroidMobileLayout(params.get("layout") === "android");
     if (process.env.NODE_ENV !== "production") {
       const params = new URLSearchParams(window.location.search);
       setIsOnlinePreview(params.get("preview") === "online");
@@ -300,12 +339,45 @@ export default function HomeDashboard({
   }, []);
 
   useEffect(() => {
+    if (!isDualMode || !preserveAndroidMobileLayout) {
+      setAndroidTheaterViewport(null);
+      return undefined;
+    }
+
+    const updateAndroidTheaterViewport = () => {
+      const browserWidth = window.innerWidth;
+      const browserHeight = window.innerHeight;
+      const reportedScreenWidth = window.screen?.width || 0;
+      const compactWidth = reportedScreenWidth >= 320 && reportedScreenWidth <= 600
+        ? reportedScreenWidth
+        : 425;
+      const scale = browserWidth > 700 ? browserWidth / compactWidth : 1;
+
+      setAndroidTheaterViewport({
+        "--android-theater-width": `${browserWidth / scale}px`,
+        "--android-theater-height": `${browserHeight / scale}px`,
+        "--android-theater-scale": scale,
+      });
+    };
+
+    updateAndroidTheaterViewport();
+    window.addEventListener("resize", updateAndroidTheaterViewport);
+    window.visualViewport?.addEventListener("resize", updateAndroidTheaterViewport);
+    return () => {
+      window.removeEventListener("resize", updateAndroidTheaterViewport);
+      window.visualViewport?.removeEventListener("resize", updateAndroidTheaterViewport);
+    };
+  }, [isDualMode, preserveAndroidMobileLayout]);
+
+  useEffect(() => {
     if (!IS_VK_MULTISTREAM_ENABLED) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("stream") === "dual") {
-      window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
-      setStreamMode("dual");
+      requestDualMode();
     }
+    // This is intentionally evaluated once when Inicio mounts. The mobile
+    // browser identity cannot change without Chrome reloading the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -319,7 +391,7 @@ export default function HomeDashboard({
       window.cancelAnimationFrame(frame);
       window.clearTimeout(settleTimer);
     };
-  }, [isMobileTheaterLayout, streamMode]);
+  }, [isMobileTheaterLayout, preserveAndroidMobileLayout, streamMode]);
 
   useEffect(() => {
     function handlePlaybackState(event) {
@@ -424,22 +496,79 @@ export default function HomeDashboard({
   }, [isTwitchChatTheater]);
 
   useEffect(() => {
-    if (!isDualMode && !isTwitchChatTheater && !isStreamInfoOpen) return undefined;
+    if (!isDualMode && !isTwitchChatTheater && !isStreamInfoOpen && !isVkDesktopHelpOpen) return undefined;
 
     function handleEscape(event) {
       if (event.key !== "Escape") return;
-      if (isStreamInfoOpen) setIsStreamInfoOpen(false);
-      else if (isDualMode) setStreamMode("twitch");
+      if (isVkDesktopHelpOpen) setIsVkDesktopHelpOpen(false);
+      else if (isStreamInfoOpen) setIsStreamInfoOpen(false);
+      else if (isDualMode) exitDualMode();
       else if (isTwitchChatTheater) setIsTwitchChatTheaterOpen(false);
     }
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isDualMode, isStreamInfoOpen, isTwitchChatTheater]);
+  }, [isDualMode, isStreamInfoOpen, isTwitchChatTheater, isVkDesktopHelpOpen]);
 
-  function activateDualMode() {
+  function enterDualMode() {
     window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
     setStreamMode("dual");
+  }
+
+  function replaceDualModeParams({ enabled }) {
+    const url = new URL(window.location.href);
+    if (enabled) {
+      url.searchParams.set("stream", "dual");
+    } else {
+      url.searchParams.delete("stream");
+      url.searchParams.delete("layout");
+    }
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function exitDualMode() {
+    setStreamMode("twitch");
+    setPreserveAndroidMobileLayout(false);
+    replaceDualModeParams({ enabled: false });
+  }
+
+  function requestDualMode() {
+    const mobileBrowser = detectVkMobileBrowser();
+    const params = new URLSearchParams(window.location.search);
+    const requestedAndroidLayout = params.get("layout") === "android";
+    let dismissed = false;
+    try {
+      dismissed = window.localStorage.getItem(VK_DESKTOP_HELP_DISMISSED_KEY) === "true";
+    } catch {
+      dismissed = false;
+    }
+
+    if (mobileBrowser === "android-chrome" || requestedAndroidLayout) {
+      setPreserveAndroidMobileLayout(true);
+    }
+
+    if (mobileBrowser) replaceDualModeParams({ enabled: true });
+
+    enterDualMode();
+
+    if (mobileBrowser && !dismissed) {
+      setVkMobileBrowser(mobileBrowser);
+      setIsVkDesktopHelpDismissed(false);
+      setIsVkDesktopHelpOpen(true);
+    }
+  }
+
+  function closeVkDesktopHelp({ remember = false } = {}) {
+    try {
+      if (remember && isVkDesktopHelpDismissed) {
+        window.localStorage.setItem(VK_DESKTOP_HELP_DISMISSED_KEY, "true");
+      } else if (remember) {
+        window.localStorage.removeItem(VK_DESKTOP_HELP_DISMISSED_KEY);
+      }
+    } catch {
+      // Storage can be unavailable in private or restricted browser modes.
+    }
+    setIsVkDesktopHelpOpen(false);
   }
 
   function retryTwitchPlayback() {
@@ -660,6 +789,7 @@ export default function HomeDashboard({
   const dashboardClassName = [
     "home-dashboard",
     mode === "mini" ? "is-mini-player" : "",
+    preserveAndroidMobileLayout ? "is-android-mobile-layout" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -817,7 +947,10 @@ export default function HomeDashboard({
     <main className={dashboardClassName}>
       <section className="home-section home-stream-section" aria-label="Transmisión en directo">
         <div
-          className={`stream-block ${isDualMode ? "is-dual-theater" : ""} ${isTwitchChatTheater ? "is-twitch-chat-theater" : ""} ${!isDualMode && isMobileTheaterLayout ? "is-twitch-compact" : ""} ${!isDualMode && isTwitchChatTheaterEligible && !isTwitchChatTheater ? "has-twitch-chat-cta" : ""} ${isStreamInfoOpen ? "has-info-open" : ""} ${isDualMode && isChatExpanded ? "is-chat-expanded" : ""}`}
+          className={`stream-block ${isDualMode ? "is-dual-theater" : ""} ${usesCompactDualLayout && preserveAndroidMobileLayout ? "is-android-mobile-layout" : ""} ${isTwitchChatTheater ? "is-twitch-chat-theater" : ""} ${!isDualMode && isMobileTheaterLayout ? "is-twitch-compact" : ""} ${!isDualMode && isTwitchChatTheaterEligible && !isTwitchChatTheater ? "has-twitch-chat-cta" : ""} ${isStreamInfoOpen ? "has-info-open" : ""} ${isDualMode && isChatExpanded ? "is-chat-expanded" : ""}`}
+          style={isDualMode && preserveAndroidMobileLayout && androidTheaterViewport
+            ? androidTheaterViewport
+            : undefined}
           role={isDualMode || isTwitchChatTheater ? "dialog" : undefined}
           aria-modal={isDualMode || isTwitchChatTheater ? "true" : undefined}
           aria-label={isDualMode ? "Modo dual VK y Twitch" : isTwitchChatTheater ? "Twitch con chat" : undefined}
@@ -827,15 +960,18 @@ export default function HomeDashboard({
             <div className="stream-theater-bar">
               <strong>VK + Twitch</strong>
               <div className="stream-theater-actions">
-                {isMobileTheaterLayout ? (
+                {usesCompactDualLayout ? (
                   <button type="button" onClick={() => setIsStreamInfoOpen(true)} aria-label="Información del directo">
                     <Info aria-hidden="true" />
                     <span>Información</span>
                   </button>
                 ) : null}
-                <button type="button" onClick={() => setStreamMode("twitch")} aria-label="Salir del modo dual">
+                <button type="button" onClick={exitDualMode} aria-label="Salir del modo dual">
                   <X aria-hidden="true" />
-                  <span>Salir del modo dual</span>
+                  <span className="stream-theater-exit-label">
+                    <span className="is-full">Salir del modo dual</span>
+                    <span className="is-compact">Salir</span>
+                  </span>
                 </button>
               </div>
             </div>
@@ -864,7 +1000,7 @@ export default function HomeDashboard({
                 >
                   Twitch
                 </button>
-                <button type="button" aria-pressed="false" onClick={activateDualMode}>
+                <button type="button" aria-pressed="false" onClick={requestDualMode}>
                   VK + Twitch
                 </button>
               </div>
@@ -926,14 +1062,14 @@ export default function HomeDashboard({
                   ariaLabel="Directo de Twitch"
                 />
               )}
-              {isMobileTheaterLayout || isTwitchChatTheater ? null : streamDetailsBlock}
+              {usesCompactDualLayout || isTwitchChatTheater ? null : streamDetailsBlock}
             </div>
             <div className="stream-side-column">
-              {isDualMode && isMobileTheaterLayout ? (
+              {usesCompactDualLayout ? (
                 <>
                   {chatToggleButton}
-                  {twitchChatBlock}
                   {twitchCompanionBlock}
+                  {twitchChatBlock}
                 </>
               ) : !isTwitchChatTheater && (isDualMode || !isTwitchChatTheaterEligible) ? (
                 <>
@@ -958,7 +1094,7 @@ export default function HomeDashboard({
             </button>
           ) : null}
 
-          {(isMobileTheaterLayout || isTwitchChatTheater) && isStreamInfoOpen ? (
+          {(usesCompactDualLayout || (!isDualMode && isMobileTheaterLayout) || isTwitchChatTheater) && isStreamInfoOpen ? (
             <div className="stream-info-backdrop" role="presentation" onMouseDown={() => setIsStreamInfoOpen(false)}>
               <div
                 ref={streamInfoSheetRef}
@@ -983,11 +1119,81 @@ export default function HomeDashboard({
                   </button>
                 </div>
                 {streamDetailsBlock}
+                {isDualMode && vkMobileBrowser ? (
+                  <button
+                    type="button"
+                    className="stream-vk-help-link"
+                    onClick={() => setIsVkDesktopHelpOpen(true)}
+                  >
+                    <Monitor aria-hidden="true" />
+                    Ayuda para reproducir VK en el móvil
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : null}
         </div>
         {twitchTheaterChatPortal}
+        {isVkDesktopHelpOpen ? createPortal(
+          <div className="vk-desktop-help-backdrop" role="presentation">
+            <div
+              className="vk-desktop-help-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="vk-desktop-help-title"
+            >
+              <button
+                type="button"
+                className="vk-desktop-help-close"
+                onClick={() => setIsVkDesktopHelpOpen(false)}
+                aria-label="Cerrar ayuda de VK"
+              >
+                <X aria-hidden="true" />
+              </button>
+              <span className="vk-desktop-help-icon" aria-hidden="true">
+                <Monitor />
+              </span>
+              <h2 id="vk-desktop-help-title">VK necesita el modo escritorio</h2>
+              <p>
+                En navegadores móviles, VK puede mostrar incorrectamente un aviso de VPN.
+                Para reproducirlo:
+              </p>
+              {vkMobileBrowser === "ios-safari" ? (
+                <ol>
+                  <li>Abre el menú <strong>Más</strong> de Safari.</li>
+                  <li>Pulsa <strong>Solicitar sitio web de escritorio</strong>.</li>
+                  <li>Recarga esta página si no se actualiza automáticamente.</li>
+                </ol>
+              ) : vkMobileBrowser === "ios-chrome" ? (
+                <ol>
+                  <li>Abre el menú <strong>⋯</strong> de Chrome.</li>
+                  <li>Pulsa <strong>Solicitar sitio para ordenadores</strong>.</li>
+                  <li>Recarga esta página si no se actualiza automáticamente.</li>
+                </ol>
+              ) : (
+                <ol>
+                  <li>Abre el menú <strong>⋮</strong> de Chrome.</li>
+                  <li>Activa <strong>Sitio para ordenadores</strong>.</li>
+                  <li>Recarga esta página.</li>
+                </ol>
+              )}
+              <label className="vk-desktop-help-remember">
+                <input
+                  type="checkbox"
+                  checked={isVkDesktopHelpDismissed}
+                  onChange={(event) => setIsVkDesktopHelpDismissed(event.target.checked)}
+                />
+                <span>No volver a mostrar esta ayuda</span>
+              </label>
+              <div className="vk-desktop-help-actions">
+                <button type="button" className="is-primary" onClick={() => closeVkDesktopHelp({ remember: true })}>
+                  Entendido
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        ) : null}
       </section>
 
       <section className="home-section" aria-label="Últimos directos registrados">

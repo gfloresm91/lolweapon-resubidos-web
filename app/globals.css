@@ -1709,6 +1709,10 @@ body.is-dual-theater-open .persistent-footer {
   gap: 0.5rem;
 }
 
+.stream-theater-exit-label .is-compact {
+  display: none;
+}
+
 .stream-theater-bar button,
 .stream-playback-retry {
   display: inline-flex;
@@ -1815,6 +1819,197 @@ body.is-dual-theater-open .persistent-footer {
 .stream-info-sheet-header svg {
   width: 1rem;
   height: 1rem;
+}
+
+.stream-vk-help-link {
+  width: 100%;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.7rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 10px;
+  background: #151923;
+  color: #ddd6fe;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stream-vk-help-link:hover,
+.stream-vk-help-link:focus-visible {
+  border-color: rgba(167, 139, 250, 0.58);
+  background: #191d2a;
+  outline: none;
+}
+
+.stream-vk-help-link svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.vk-desktop-help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(3, 5, 10, 0.8);
+}
+
+.vk-desktop-help-dialog {
+  position: relative;
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
+  padding: 1.25rem;
+  background: #0f131b;
+  color: var(--text-main);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.52);
+}
+
+.vk-desktop-help-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 50%;
+  background: #151923;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.vk-desktop-help-close svg,
+.vk-desktop-help-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.vk-desktop-help-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(139, 92, 246, 0.16);
+  color: #c4b5fd;
+}
+
+.vk-desktop-help-dialog h2 {
+  margin: 0.85rem 2.5rem 0.35rem 0;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.vk-desktop-help-dialog > p {
+  margin: 0;
+  color: #b6c0d0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.vk-desktop-help-dialog ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.9rem 0;
+  padding-left: 1.4rem;
+  color: #e4e8ef;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.vk-desktop-help-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 36px;
+  color: #c7cfdb;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.vk-desktop-help-remember input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: #8b5cf6;
+}
+
+.vk-desktop-help-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.vk-desktop-help-actions button {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.vk-desktop-help-actions .is-secondary {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #151923;
+  color: #d4d9e2;
+}
+
+.vk-desktop-help-actions .is-primary {
+  border: 1px solid rgba(167, 139, 250, 0.5);
+  background: #2a1f47;
+  color: #f1ecff;
+}
+
+.vk-desktop-help-actions button:hover,
+.vk-desktop-help-actions button:focus-visible,
+.vk-desktop-help-close:hover,
+.vk-desktop-help-close:focus-visible {
+  border-color: rgba(167, 139, 250, 0.65);
+  outline: none;
+}
+
+@media (max-width: 420px) {
+  .vk-desktop-help-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .vk-desktop-help-dialog {
+    width: 100%;
+    max-height: 88dvh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 18px 18px 0 0;
+    padding: 1.1rem 1rem max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .vk-desktop-help-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .vk-desktop-help-actions .is-primary {
+    grid-row: 1;
+  }
 }
 
 .stream-info-sheet .stream-details {
@@ -25338,6 +25533,7 @@ body:has(.tierlist-page)::before {
 
   .stream-block.is-dual-theater .stream-side-column {
     position: relative;
+    isolation: isolate;
     height: 100%;
     min-height: 0;
     gap: 0.65rem;
@@ -25355,16 +25551,19 @@ body:has(.tierlist-page)::before {
   .stream-block.is-dual-theater .stream-chat.is-expanded {
     position: absolute;
     inset: calc(34px + 0.65rem) 0 4px;
-    z-index: 2;
+    z-index: 3;
     display: block;
     width: 100%;
     height: auto;
     min-height: 0;
     max-height: none;
     margin: 0;
+    transform: translateZ(1px);
   }
 
   .stream-block.is-dual-theater .stream-twitch-companion-wrap {
+    position: relative;
+    z-index: 0;
     display: flex;
     min-height: 0;
     flex: 1 1 auto;
@@ -25526,6 +25725,165 @@ body:has(.tierlist-page)::before {
     overflow: hidden;
     text-overflow: ellipsis;
   }
+}
+
+/* Safari on iOS can keep a mobile CSS viewport after requesting the desktop
+   site. Keep the expanded chat above Twitch independently of the media query
+   that selected the compact dual layout. The companion remains mounted and
+   playing underneath; only the compositing order changes. */
+.stream-block.is-dual-theater.is-chat-expanded .stream-side-column {
+  isolation: isolate;
+}
+
+.stream-block.is-dual-theater.is-chat-expanded .stream-twitch-companion-wrap {
+  position: relative;
+  z-index: 0;
+}
+
+.stream-block.is-dual-theater.is-chat-expanded .stream-chat.is-expanded {
+  z-index: 3;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateZ(1px);
+}
+
+.stream-block.is-dual-theater.is-chat-expanded .stream-chat.is-expanded iframe {
+  position: relative;
+  z-index: 1;
+  visibility: visible;
+  opacity: 1;
+}
+
+/* Android Chrome replaces the phone viewport with a desktop-sized virtual
+   viewport after "Sitio para ordenadores" is enabled. Render the theater on
+   a phone-sized canvas and scale that canvas back to the browser viewport so
+   Chrome cannot shrink the complete UI to an unreadable 980px desktop page.
+   Iframe proportions and playback behavior remain owned by their components. */
+.stream-block.is-dual-theater.is-android-mobile-layout {
+  inset: 0 auto auto 0;
+  width: var(--android-theater-width, 100vw) !important;
+  height: var(--android-theater-height, 100dvh);
+  transform: scale(var(--android-theater-scale, 1));
+  transform-origin: top left;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-layout.is-dual {
+  height: calc(100% - 44px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 1rem;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-bar {
+  gap: 0.45rem;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-bar > strong {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-actions {
+  min-width: 0;
+  gap: 0.35rem;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-actions button {
+  min-width: 36px;
+  padding-inline: 0.6rem;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-actions button:not([aria-label="Salir del modo dual"]) > span,
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-exit-label .is-full {
+  display: none;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-theater-exit-label .is-compact {
+  display: inline;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout.is-chat-expanded .stream-layout.is-dual {
+  grid-template-rows: minmax(220px, 35fr) minmax(0, 65fr);
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-main-column,
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-vk-wrap {
+  height: 100%;
+  min-height: 0;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-platform-heading,
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-companion-heading {
+  display: none;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-vk-player {
+  width: 100%;
+  height: auto;
+  min-height: 200px;
+  max-height: 55vh;
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-side-column {
+  position: relative;
+  height: auto;
+  min-height: 0;
+  gap: 0.75rem;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout.is-chat-expanded .stream-side-column {
+  height: 100%;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-chat-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-chat:not(.is-expanded) {
+  display: none;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-chat.is-expanded {
+  position: absolute;
+  inset: calc(34px + 0.75rem) 0 4px;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-twitch-companion-wrap {
+  display: flex;
+  width: 100%;
+  height: 30dvh;
+  min-height: 0;
+  flex: 0 0 30dvh;
+}
+
+.stream-block.is-dual-theater.is-android-mobile-layout .stream-twitch-companion {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+}
+
+.home-dashboard.is-android-mobile-layout:not(.is-mini-player) .stream-details .stream-actions {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+}
+
+.home-dashboard.is-android-mobile-layout:not(.is-mini-player) .stream-details .stream-actions a {
+  min-width: 0;
 }
 
 .stream-source-toolbar {
@@ -25703,14 +26061,53 @@ body:has(.stream-layout.is-twitch) .persistent-footer {
   }
 }
 
-@media (max-width: 380px) {
-  .stream-theater-actions button span {
-    display: none;
+@media (max-width: 480px) {
+  .stream-theater-bar {
+    gap: 0.45rem;
+  }
+
+  .stream-theater-bar > strong {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .stream-theater-actions {
+    min-width: 0;
+    gap: 0.35rem;
   }
 
   .stream-theater-actions button {
-    width: 36px;
-    padding-inline: 0;
+    min-width: 36px;
+    padding-inline: 0.6rem;
+  }
+
+  .stream-theater-actions button:not([aria-label="Salir del modo dual"]) > span {
+    display: none;
+  }
+
+  .stream-theater-exit-label .is-full {
+    display: none;
+  }
+
+  .stream-theater-exit-label .is-compact {
+    display: inline;
+  }
+
+  .stream-details .stream-actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .stream-details .stream-actions a {
+    min-width: 0;
+  }
+
+  .vk-desktop-help-actions {
+    display: flex;
+  }
+
+  .vk-desktop-help-actions .is-primary {
+    width: 100%;
   }
 }
 

@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
 const RESUME_RETRY_DELAYS_MS = [0, 150, 400, 900, 1800, 3200];
-let companionInstanceCounter = 0;
 
 function loadTwitchEmbedScript() {
   if (window.Twitch?.Player) return Promise.resolve();
@@ -39,7 +38,7 @@ export default function TwitchCompanionPlayer({
   className = "stream-twitch-companion",
   ariaLabel = "Directo de Twitch silenciado",
 }) {
-  const containerIdRef = useRef(`twitch-companion-player-${++companionInstanceCounter}`);
+  const containerRef = useRef(null);
   const playerRef = useRef(null);
   const resumeRef = useRef(() => {});
   const cancelResumeRef = useRef(() => {});
@@ -81,13 +80,25 @@ export default function TwitchCompanionPlayer({
 
   useEffect(() => {
     if (!channel || !parent) return undefined;
+    const container = containerRef.current;
+    if (!container) return undefined;
+
+    // Twitch requires an element id, but rendering a generated id during SSR
+    // makes it depend on React's hydration tree. Assign it only after mount so
+    // browser identity/viewport changes cannot produce an SSR/client mismatch.
+    if (!container.id) {
+      const clientId = window.crypto?.randomUUID?.()
+        || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+      container.id = `twitch-companion-player-${clientId}`;
+    }
+    const containerId = container.id;
     let isCancelled = false;
 
     loadTwitchEmbedScript()
       .then(() => {
         if (isCancelled || !window.Twitch?.Player) return;
 
-        const player = new window.Twitch.Player(containerIdRef.current, {
+        const player = new window.Twitch.Player(containerId, {
           channel,
           parent: [parent],
           width: "100%",
@@ -119,7 +130,7 @@ export default function TwitchCompanionPlayer({
         }
         if (window.Twitch.Player.PAUSE) {
           player.addEventListener(window.Twitch.Player.PAUSE, () => {
-            const iframe = document.querySelector(`#${containerIdRef.current} iframe`);
+            const iframe = containerRef.current?.querySelector("iframe");
             const isManualPause = Boolean(
               respectManualPause
               && iframe
@@ -204,7 +215,7 @@ export default function TwitchCompanionPlayer({
       className={`stream-frame ${className}`}
       aria-label={ariaLabel}
     >
-      <div id={containerIdRef.current} className="twitch-player-embed" />
+      <div ref={containerRef} className="twitch-player-embed" />
     </div>
   );
 }
