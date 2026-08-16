@@ -215,6 +215,9 @@ npm run db:restore
 ## Autenticación
 
 - Login manual, Twitch OAuth y futuro YouTube deben convivir.
+- `PlatformSession.token` guarda el hash SHA-256 del bearer token entregado en la cookie, nunca el token reutilizable. Un cambio de estrategia de hash debe invalidar explícitamente las sesiones existentes mediante migración.
+- Las mutaciones `/api/*` validan el origen del navegador en `middleware.js`; mantener exento `/api/twitch/eventsub` porque Twitch lo invoca servidor-a-servidor y valida su propia firma.
+- `LoginAttempt` aplica retención configurable con `LOGIN_ATTEMPT_RETENTION_DAYS` (90 días por defecto). No agregar datos sensibles adicionales a esta auditoría.
 - `PlatformUser` es la cuenta canónica; Twitch y Google/YouTube se vinculan mediante identidades externas.
 - Una coincidencia de correo no autoriza una fusión automática. El usuario debe autenticarse con un método ya conectado antes de completar la vinculación.
 - El identificador estable de cada proveedor es su subject externo, nunca el correo ni el login visible.
