@@ -143,6 +143,9 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 
 ## Identidades de acceso
 
+- `PlatformSession.token` guarda el hash SHA-256 del token de cookie. La migración de endurecimiento invalida las sesiones antiguas y obliga a iniciar sesión nuevamente una vez.
+- Las mutaciones `/api/*` validan origen en `middleware.js`; `/api/twitch/eventsub` queda exento porque valida la firma de Twitch.
+- Los registros `LoginAttempt` se conservan 90 días por defecto, configurable con `LOGIN_ATTEMPT_RETENTION_DAYS`.
 - `PlatformUser` es la cuenta canónica y puede tener contraseña, Twitch y Google/YouTube conectados.
 - Resolver identidades por proveedor + subject; no vincular automáticamente por correo o login.
 - Si el correo ya existe, exigir autenticación con un método actual antes de conectar el proveedor nuevo.
