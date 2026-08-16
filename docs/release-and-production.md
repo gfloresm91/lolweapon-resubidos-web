@@ -168,6 +168,7 @@ TWITCH_AUTH_REDIRECT_URI=https://tu-dominio.com/api/auth/twitch/callback
 TWITCH_BROADCASTER_LOGIN=kalathraslolweapon
 SESSION_COOKIE_NAME=kala_admin_session
 SESSION_COOKIE_DOMAIN=.lolweapon.com
+LOGIN_ATTEMPT_RETENTION_DAYS=90
 UPLOAD_DIR=public/imagenes
 ```
 

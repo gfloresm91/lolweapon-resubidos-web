@@ -475,6 +475,15 @@ Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de memb
 
 `lastLoginAt` se actualiza al crear cualquier sesión, por lo que cubre login manual, Twitch y la sesión automática posterior al registro. La migración `20260702123000_backfill_user_last_login_from_sessions` recupera el dato histórico únicamente cuando existe una sesión registrada.
 
+### Endurecimiento de autenticación
+
+- La cookie conserva el token de sesión aleatorio, pero PostgreSQL guarda únicamente su hash SHA-256. Una filtración de la tabla `PlatformSession` o de un dump no entrega bearer tokens reutilizables.
+- La migración `20260816210000_harden_platform_sessions` elimina las sesiones anteriores al cambio; al desplegarla, todos los usuarios deben iniciar sesión nuevamente una vez.
+- Las cookies de sesión continúan usando `HttpOnly`, `Secure` en producción y `SameSite=Lax`.
+- Las mutaciones `/api/*` rechazan orígenes de navegador distintos al host actual. El webhook firmado `/api/twitch/eventsub` queda exento porque es una integración servidor-a-servidor.
+- `LoginAttempt` conserva IP, login y user-agent durante 90 días por defecto. `LOGIN_ATTEMPT_RETENTION_DAYS` permite ajustar el plazo y la limpieza oportunista se ejecuta como máximo una vez cada seis horas cuando se registra un intento.
+- Next.js publica HSTS sin `includeSubDomains`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y una `Permissions-Policy` conservadora. Una CSP queda diferida hasta inventariar y probar todos los embeds externos en QA.
+
 ---
 
 ## Data source
