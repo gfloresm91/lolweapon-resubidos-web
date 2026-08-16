@@ -482,7 +482,7 @@ Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de memb
 - Las cookies de sesión continúan usando `HttpOnly`, `Secure` en producción y `SameSite=Lax`.
 - Las mutaciones `/api/*` rechazan orígenes de navegador distintos al host actual. El webhook firmado `/api/twitch/eventsub` queda exento porque es una integración servidor-a-servidor.
 - `LoginAttempt` conserva IP, login y user-agent durante 90 días por defecto. `LOGIN_ATTEMPT_RETENTION_DAYS` permite ajustar el plazo y la limpieza oportunista se ejecuta como máximo una vez cada seis horas cuando se registra un intento.
-- Next.js publica HSTS sin `includeSubDomains`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y una `Permissions-Policy` conservadora. Una CSP queda diferida hasta inventariar y probar todos los embeds externos en QA.
+- Nginx publica `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y una `Permissions-Policy` conservadora mediante un snippet compartido. Next.js publica HSTS sin `includeSubDomains` y desactiva `X-Powered-By`. Una CSP queda diferida hasta inventariar y probar todos los embeds externos en QA.
 
 ---
 
