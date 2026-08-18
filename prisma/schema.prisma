@@ -445,6 +445,9 @@ model PlatformUser {
   identityLinkAttempts PlatformIdentityLinkAttempt[]
   seasonalAnimeFavorites PlatformUserSeasonalAnimeFavorite[]
   animeTierLists PlatformUserAnimeTierList[]
+  mobileRefreshTokens PlatformMobileRefreshToken[]
+  mobileAccessTokens PlatformMobileAccessToken[]
+  mobileOAuthExchanges PlatformMobileOAuthExchange[]
 
   @@index([roleId])
   @@index([isActive])
@@ -553,6 +556,64 @@ model PlatformSession {
   user      PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+}
+
+// Auth móvil (Lolweapon+/Store apps) - independiente de PlatformSession, que sigue siendo
+// exclusivamente para la sesión de cookie web. Ver docs/backend-api.md del repo mobile.
+model PlatformMobileRefreshToken {
+  id            Int       @id @default(autoincrement())
+  familyId      String
+  tokenHash     String    @unique
+  userId        Int
+  clientType    String
+  deviceId      String?
+  parentId      Int?
+  issuedAt      DateTime  @default(now())
+  expiresAt     DateTime
+  rotatedAt     DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+  lastUsedAt    DateTime?
+  createdIp     String?
+  userAgent     String?
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model PlatformMobileAccessToken {
+  id              Int       @id @default(autoincrement())
+  tokenHash       String    @unique
+  userId          Int
+  refreshFamilyId String
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshFamilyId])
+  @@index([expiresAt])
+}
+
+// Puente de un solo uso entre el callback OAuth web (donde vive el client_secret) y el POST
+// final de la app nativa que canjea el código por su propio par de tokens mobile.
+model PlatformMobileOAuthExchange {
+  id         String    @id
+  userId     Int
+  provider   String
+  clientType String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([expiresAt])
 }
 
