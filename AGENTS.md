@@ -228,6 +228,7 @@ npm run db:restore
 - Alias es visible públicamente y no necesariamente único.
 - Mensajes de login deben evitar filtrar información sensible: para credenciales incorrectas usar mensaje genérico.
 - Usuarios no autenticados se tratan como rol `invitado`.
+- Apps nativas (Lolweapon+) no usan `PlatformSession`/cookie: ver `Features Sensibles` → `Auth Móvil (Lolweapon+)`.
 
 ## Administración Y Auditoría
 
@@ -301,6 +302,19 @@ npm run db:restore
 - Tags se agrupan por reglas automáticas y overrides manuales.
 - Si un tag no tiene uso, se puede eliminar con confirmación.
 - Mantener categorías, iconos y keywords documentados.
+
+### Auth Móvil (Lolweapon+)
+
+- `/api/mobile/v1/auth/*` es un sistema de autenticación independiente de `PlatformSession` (cookie web), pensado para apps nativas (Lolweapon+/Store). Usa bearer tokens opacos hasheados en servidor con `lib/tokenHash.js`; el token en texto plano nunca se guarda.
+- Modelos: `PlatformMobileRefreshToken` (60 días, deslizante, agrupado por `familyId`), `PlatformMobileAccessToken` (15 minutos) y `PlatformMobileOAuthExchange` (código de un solo uso, 60 segundos, puente entre el callback OAuth web —que tiene el `client_secret`— y el POST final de la app nativa).
+- Rotación de refresh token con detección de reuso: si se presenta un refresh ya rotado, revocado o expirado, se asume compromiso y se revoca toda la familia (`lib/mobileAuth.js` → `rotateRefreshToken`/`revokeRefreshFamily`).
+- `getMobileUserIdFromRequest` (`lib/mobileAuth.js`) es el equivalente móvil de resolver la sesión por cookie: lee el header `Authorization: Bearer`.
+- OAuth Twitch/Google reutiliza `buildTwitchAuthorizeUrl`/`buildGoogleAuthorizeUrl`/`exchangeTwitchCode`/`exchangeGoogleCode` con un `redirectPath` alternativo. `getTwitchRedirectUri`/`getGoogleRedirectUri` (`lib/twitchOAuth.js`/`lib/googleOAuth.js`) siempre derivan las rutas móviles del origen real de la request; `TWITCH_AUTH_REDIRECT_URI`/`GOOGLE_AUTH_REDIRECT_URI` solo aplican al callback web por defecto.
+- `/mobile-auth/registro` y `/mobile-auth/vincular` son páginas puente del sitio web para completar registro/vinculación OAuth iniciado desde la app — equivalentes móviles de `/registro?oauth=...`.
+- `middleware.js` exime `/api/mobile/*` de la validación de Origin/CSRF porque esta auth es exclusivamente por bearer token, nunca por cookie. Si alguna ruta móvil empieza a confiar en la cookie de sesión, esta exención debe acotarse.
+- Borrado de cuenta self-service usa `anonymizeAndDeactivatePlatformUser` (`lib/repositories/platformUserRepository.js`), distinto del soft-delete admin (`deletePlatformUser`): scrubbea PII (email, login, alias, avatar, password) y revoca todo el material de auth (identidades, sesiones web, tokens móviles), pero conserva el contenido del usuario (tickets, ratings, tier lists) asociado al usuario anonimizado.
+- `public/lolweapon-plus/latest.json` es el manifest que consulta la app para detectar actualizaciones (`versionCode`, `versionName`, `apkUrl`, `changelog`). El `.apk` se sube manualmente al servidor; no se versiona en git.
+- No confundir con `docs/backend-api.md`: ese archivo vive en el repo de la app móvil (fuera de este repo) y describe el contrato de estos endpoints desde el lado cliente.
 
 ### Sincronización XLSX Del Rastreador
 
