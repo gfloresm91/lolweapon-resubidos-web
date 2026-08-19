@@ -84,4 +84,8 @@ public/imagenes/*
 public/imagenes/uploads/
 public/imagenes/tmp/
 
+# APKs de Lolweapon+ superan el límite de 100MB de GitHub - se suben directo al droplet por SSH,
+# nunca por git. latest.json sí se versiona normalmente.
+public/lolweapon-plus/*.apk
+
 *.json.bak*
