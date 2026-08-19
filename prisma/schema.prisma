@@ -164,6 +164,7 @@ model Live {
   links          LiveLink[]
   userActivity   PlatformUserLive[]
   audienceSessions StreamAudienceSession[]
+  livePlaybacks  PlatformUserLivePlayback[]
 
   @@index([statusId])
   @@index([year])
@@ -434,6 +435,7 @@ model PlatformUser {
   role           PlatformRole      @relation(fields: [roleId], references: [id])
   sessions       PlatformSession[]
   liveActivity   PlatformUserLive[]
+  livePlaybacks  PlatformUserLivePlayback[]
   animeActivity  PlatformUserAnime[]
   animeRatings   AnimeRating[]
   spaceDrumProgress PlatformUserSpaceDrumProgress[]
@@ -448,6 +450,7 @@ model PlatformUser {
   mobileRefreshTokens PlatformMobileRefreshToken[]
   mobileAccessTokens PlatformMobileAccessToken[]
   mobileOAuthExchanges PlatformMobileOAuthExchange[]
+  mobilePushTokens PlatformMobilePushToken[]
 
   @@index([roleId])
   @@index([isActive])
@@ -520,6 +523,31 @@ model PlatformUserLive {
   @@index([liveId])
   @@index([isSaved])
   @@index([isWatched])
+}
+
+// Progreso de reproducción sincronizado (mobile). Clave única de 4 columnas a propósito - a
+// diferencia de PlatformUserLive (por Live), esto es por parte/fuente dentro de un Live, ya que
+// "partes" no es una entidad estructurada: son índices dentro del array plano de links de cada
+// plataforma (ver LiveLink). Cuando completed=true también se refleja en PlatformUserLive.isWatched
+// para que web y mobile no diverjan en ese estado - ver app/api/mobile/v1/lives/[id]/playback.
+model PlatformUserLivePlayback {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  liveId          Int
+  source          String
+  partIndex       Int
+  positionSeconds Int       @default(0)
+  durationSeconds Int?
+  completed       Boolean   @default(false)
+  deviceId        String?
+  updatedAt       DateTime  @updatedAt
+
+  user PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  live Live         @relation(fields: [liveId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, liveId, source, partIndex])
+  @@index([userId])
+  @@index([liveId])
 }
 
 model PlatformUserAnime {
@@ -617,6 +645,30 @@ model PlatformMobileOAuthExchange {
   @@index([expiresAt])
 }
 
+// Dispositivos móviles registrados para push (FCM) - independiente de PlatformMobileRefreshToken/
+// PlatformMobileAccessToken a propósito (ver docs/authentication.md del repo mobile: "sin mezclar
+// el token push con la identidad de sesión"). A diferencia de esos, el token FCM se guarda en texto
+// plano: no es una credencial de auth, es una dirección de entrega - tenerlo no permite autenticarse
+// como el usuario, solo enviarle push (y para eso además hacen falta las credenciales de servidor
+// de Firebase, que nunca salen del backend).
+model PlatformMobilePushToken {
+  id         Int       @id @default(autoincrement())
+  token      String    @unique
+  userId     Int?
+  clientType String
+  deviceId   String?
+  platform   String    @default("android")
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  failCount  Int       @default(0)
+  disabledAt DateTime?
+
+  user PlatformUser? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([disabledAt])
+}
+
 model LoginAttempt {
   id        Int      @id @default(autoincrement())
   login     String?
@@ -650,6 +702,10 @@ model PlatformNotification {
   updatedAt       DateTime                   @updatedAt
   scheduledAt     DateTime?
   publishedAt     DateTime?
+  // Claim atómico para el envío de push (FCM), igual en espíritu que publishedAt: se marca una sola
+  // vez la primera vez que la notificación se publica de verdad, para que ediciones/reactivaciones
+  // posteriores (que vuelven a broadcastear por WebSocket) no reenvíen push. Ver lib/mobilePush.js.
+  pushedAt        DateTime?
   expiresAt       DateTime?
   deletedAt       DateTime?
 
