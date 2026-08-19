@@ -33,8 +33,12 @@ function hasValidMutationOrigin(request) {
 }
 
 export function middleware(request) {
+  // /api/mobile/* is bearer-token auth only and never reads the web session cookie, so Origin/CSRF
+  // checking is meaningless there. If a mobile route ever starts trusting the session cookie, this
+  // exemption must be narrowed - see lib/mobileAuth.js.
   if (
     request.nextUrl.pathname.startsWith("/api/")
+    && !request.nextUrl.pathname.startsWith("/api/mobile/")
     && UNSAFE_METHODS.has(request.method)
     && !ORIGIN_EXEMPT_PATHS.has(request.nextUrl.pathname)
     && !hasValidMutationOrigin(request)

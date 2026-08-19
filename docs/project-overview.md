@@ -184,6 +184,9 @@ ANIME_THEMES_API_BASE_URL=https://graphql.animethemes.moe/
 | `YoutubeVideo` | Videos de YouTube ya detectados para evitar notificaciones duplicadas |
 | `SupportTicket` | Sugerencias/reclamos creados por usuarios registrados, con tipo, asunto, estado y última actividad |
 | `SupportTicketMessage` | Mensajes de la conversación del ticket, escritos por usuario o administración |
+| `PlatformMobileRefreshToken` | Refresh token de apps nativas (Lolweapon+), 60 días deslizante, agrupado por `familyId` para rotación con detección de reuso |
+| `PlatformMobileAccessToken` | Access token de apps nativas, 15 minutos, ligado a la `familyId` de su refresh token |
+| `PlatformMobileOAuthExchange` | Código de un solo uso (60 segundos) que puentea el callback OAuth web con el canje final de tokens móviles de la app |
 
 ### Actividad del usuario
 
@@ -360,6 +363,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/administracion/tickets` | Mantenedor administrativo de sugerencias/reclamos, protegido por `admin.tickets.view` |
 | `/administracion/audiencia` | Dashboard de solo lectura para presencia web concurrente, evolución por minuto, comparación con Twitch e historial por directo; requiere `admin.audience.view` |
 | `/administracion/tickets/[id]` | Conversación administrativa del ticket, permite responder con `admin.tickets.update` |
+| `/mobile-auth/registro` | Página puente para completar registro OAuth iniciado desde la app Lolweapon+, equivalente móvil de `/registro?oauth=...` |
+| `/mobile-auth/vincular` | Página puente para completar vinculación OAuth iniciada desde la app Lolweapon+ |
 
 ### API Routes
 
@@ -406,6 +411,17 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/platform-roles` | GET/POST | CRUD de roles |
 | `/api/tags` | GET/POST | CRUD de tags |
 | `/api/upload` | POST | Subir imagen |
+| `/api/mobile/v1/auth/login` | POST | Login manual para apps nativas; emite par access/refresh token |
+| `/api/mobile/v1/auth/register` | POST | Registro manual para apps nativas |
+| `/api/mobile/v1/auth/logout` | POST | Revoca la familia de refresh token del dispositivo |
+| `/api/mobile/v1/auth/refresh` | POST | Rota el refresh token; detecta reuso y revoca toda la familia si el token ya fue rotado/revocado |
+| `/api/mobile/v1/auth/me` | GET | Usuario actual resuelto por access token |
+| `/api/mobile/v1/auth/delete-account` | POST | Borrado de cuenta self-service (anonimiza PII, revoca todo el material de auth) |
+| `/api/mobile/v1/auth/oauth/[provider]/start` | GET | Inicia OAuth (Twitch/Google) para la app nativa |
+| `/api/mobile/v1/auth/oauth/[provider]/callback` | GET | Callback OAuth web para la app; genera el código de canje de un solo uso |
+| `/api/mobile/v1/auth/oauth/exchange` | POST | Canjea el código de un solo uso por el par de tokens móviles |
+| `/api/mobile/v1/auth/oauth/complete-registration` | POST | Completa el alta de un `PlatformUser` nuevo vía OAuth desde `/mobile-auth/registro` |
+| `/api/mobile/v1/auth/oauth/complete-link` | POST | Completa la vinculación de un proveedor OAuth a una cuenta existente desde `/mobile-auth/vincular` |
 
 ---
 
@@ -483,6 +499,19 @@ Google/YouTube no asigna automáticamente `yt-miembro`. La verificación de memb
 - Las mutaciones `/api/*` rechazan orígenes de navegador distintos al host actual. El webhook firmado `/api/twitch/eventsub` queda exento porque es una integración servidor-a-servidor.
 - `LoginAttempt` conserva IP, login y user-agent durante 90 días por defecto. `LOGIN_ATTEMPT_RETENTION_DAYS` permite ajustar el plazo y la limpieza oportunista se ejecuta como máximo una vez cada seis horas cuando se registra un intento.
 - Nginx publica `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` y una `Permissions-Policy` conservadora mediante un snippet compartido. Next.js publica HSTS sin `includeSubDomains` y desactiva `X-Powered-By`. Una CSP queda diferida hasta inventariar y probar todos los embeds externos en QA.
+
+### Auth móvil (Lolweapon+)
+
+Sistema independiente de `PlatformSession`, para apps nativas. Bearer tokens opacos, hasheados en servidor con `lib/tokenHash.js` (nunca se guarda el token en texto plano).
+
+1. Login/registro manual: `POST /api/mobile/v1/auth/login` o `/register` devuelve un par `accessToken` (15 min) + `refreshToken` (60 días, deslizante) directamente.
+2. OAuth (Twitch/Google): `GET /api/mobile/v1/auth/oauth/[provider]/start` → proveedor → `GET /api/mobile/v1/auth/oauth/[provider]/callback` (mismo callback web, con `client_secret`) → genera un código de un solo uso (`PlatformMobileOAuthExchange`, 60 segundos) → la app hace `POST /api/mobile/v1/auth/oauth/exchange` con ese código y recibe su par de tokens. Si la identidad es nueva o requiere vincular, el callback redirige a `/mobile-auth/registro` o `/mobile-auth/vincular` (páginas web) antes de emitir el código.
+3. Requests autenticadas: header `Authorization: Bearer <accessToken>`, resuelto por `getMobileUserIdFromRequest` (`lib/mobileAuth.js`).
+4. Refresh: `POST /api/mobile/v1/auth/refresh` rota el refresh token (nuevo access + nuevo refresh). Si el token presentado ya fue rotado o revocado, se asume robo/reuso y se revoca toda la familia (`familyId`) — el dispositivo debe volver a loguearse.
+5. Logout: `POST /api/mobile/v1/auth/logout` revoca solo la familia del dispositivo actual.
+6. Borrado de cuenta: `POST /api/mobile/v1/auth/delete-account` llama `anonymizeAndDeactivatePlatformUser`, que scrubbea PII y revoca sesiones web + tokens móviles, pero conserva el contenido del usuario (tickets, ratings, tier lists) bajo el usuario anonimizado.
+
+`middleware.js` exime `/api/mobile/*` de la validación de Origin/CSRF porque esta auth nunca depende de la cookie de sesión.
 
 ---
 

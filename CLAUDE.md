@@ -151,6 +151,7 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 - Si el correo ya existe, exigir autenticación con un método actual antes de conectar el proveedor nuevo.
 - Un OAuth nuevo sin cuenta existente debe pasar por `/registro?oauth=...`: email bloqueado desde el proveedor, usuario/alias precargados editables y contraseña opcional. Si el usuario agrega contraseña, se validan las mismas reglas del registro manual.
 - Google/YouTube no modifica roles. Twitch sincroniza roles cuando `roleSource=twitch` o cuando el rol actual es `publico`; una edición administrativa no pública fija `roleSource=manual`.
+- Apps nativas (Lolweapon+) no usan `PlatformSession`/cookie, usan bearer tokens propios vía `/api/mobile/v1/auth/*`. Ver `AGENTS.md` → `Auth Móvil (Lolweapon+)` para el detalle completo.
 
 ## Gotchas conocidos
 
@@ -173,6 +174,8 @@ Al agregar una variable nueva al `.env`, siempre agregarla también en `.env.exa
 - **Canal temporal para probar embeds** — `NEXT_PUBLIC_TWITCH_EMBED_LOGIN` reemplaza solo el canal visible en player, chat, enlaces y `/api/twitch/status`. Vacío usa `TWITCH_BROADCASTER_LOGIN`; no cambiar el broadcaster oficial solo para probar la UI porque también afecta OAuth, EventSub y archivado.
 - **Registro EventSub** — Twitch permite un solo filtro al listar suscripciones. El mantenedor consulta por separado `type=stream.online` y `type=stream.offline`, filtra el broadcaster localmente, conserva cada suscripción `enabled` del callback actual y reemplaza estados obsoletos. El webhook registra el motivo de futuras revocaciones.
 - **Procesamiento EventSub** — un `stream.online` firmado crea el card desde el payload sin esperar una segunda consulta Helix, evitando perder el evento si Twitch aún no refleja el stream. La comprobación `TWITCH_REQUIRE_ACTIVE_STREAM` se conserva para la acción manual y la alerta se deduplica por ID del stream. Al recibir `stream.offline`, el registro Twitch más reciente que siga `En directo` cambia automáticamente a `Subiendo`.
+- **Auth móvil (Lolweapon+)** — `/api/mobile/v1/auth/*` es independiente de `PlatformSession`: bearer tokens opacos hasheados (`lib/tokenHash.js`), access token de 15 minutos y refresh de 60 días con rotación y detección de reuso (`lib/mobileAuth.js`). `middleware.js` exime `/api/mobile/*` de la validación de Origin porque no usa cookie. `public/lolweapon-plus/latest.json` versiona el manifest de actualización; el `.apk` se sube manualmente al servidor, no se versiona en git. Detalle completo en `AGENTS.md` → `Features Sensibles` → `Auth Móvil (Lolweapon+)`.
+
 - **Dropdowns sobre Twitch** — si topbar/notificaciones/menú de usuario quedan debajo del player en `/inicio`, revisar primero stacking contexts. Caso corregido: `.app-shell { z-index: 1; }` encerraba el topbar bajo el `PersistentTwitchPlayer` fijo; se quitó ese `z-index` y se mantuvo el topbar sobre el player. No ocultar video/chat en desktop como parche.
 
 ## Infraestructura oficial

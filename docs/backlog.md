@@ -4,6 +4,16 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
+### Feature: Auth móvil (Lolweapon+)
+
+- **Estado:** implementada y sin commitear en `dev` (2026-08-18). Migración `20260818130632_add_mobile_auth_tokens` ya aplicada en local, `npm run db:generate` y `npm run build` verificados OK.
+- **Alcance:** `/api/mobile/v1/auth/*`, `lib/mobileAuth.js`, `lib/tokenHash.js`, páginas puente `/mobile-auth/registro` y `/mobile-auth/vincular`, exención de Origin/CSRF en `middleware.js` para `/api/mobile/*`, borrado de cuenta self-service (`anonymizeAndDeactivatePlatformUser`). Documentado en `AGENTS.md`/`CLAUDE.md` → `Auth Móvil (Lolweapon+)` y `docs/project-overview.md` → `Auth móvil (Lolweapon+)`.
+- **Pendiente operativo:**
+  - Probar los flujos reales (login manual, OAuth Twitch/Google, refresh con rotación/detección de reuso, logout, borrado de cuenta) contra la app Lolweapon+, no solo el build del backend.
+  - Aplicar la migración en QA/producción con `npm run db:migrate:deploy` cuando se despliegue.
+  - Confirmar el proceso de subida manual del `.apk` al servidor (`public/lolweapon-plus/latest.json` ya versiona el manifest) y documentarlo si no está en el flujo de release del repo mobile.
+  - `docs/backend-api.md` (contrato de estos endpoints) vive en el repo de la app móvil, no en este repo — mantenerlos sincronizados si cambia algo de este lado.
+
 ### ~~Calendario de temporada — vista "Todos / Solo favoritos"~~
 
 - Completado (2026-07-28). Botón de marcador por anime (esquina superior derecha de la card), `PlatformUserSeasonalAnimeFavorite` referenciado por `aniListId`, API `POST /api/anime-calendar` con `action: "toggle-favorite"`, y switch de vista "Temporada" / "Favoritos (N)" reutilizando el pill `tracker-calendar-view-toggle` ya existente. Los toggles Mostrar estándar/adulto/donghua y la búsqueda quedan escopados a la vista activa.
