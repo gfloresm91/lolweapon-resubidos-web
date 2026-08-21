@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "1.1.0",
-  "apkUrl": "https://resubidos.lolweapon.com/lolweapon-plus/lolweapon-plus-1.1.0.apk",
-  "changelog": "Archivo: reproducción de resubidos (Piero/OK.RU), filtros por año/mes/estado/tag, guardar/marcar visto/notificar/editar, y rediseño de la pantalla de detalle."
+  "versionCode": 4,
+  "versionName": "1.2.0",
+  "apkUrl": "https://resubidos.lolweapon.com/lolweapon-plus/lolweapon-plus-1.2.0.apk",
+  "changelog": "Auto-avance de parte, sincronización de progreso por BD entre app y web, y varias correcciones de reproducción."
 }
