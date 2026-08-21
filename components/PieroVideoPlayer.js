@@ -943,7 +943,7 @@ function PieroPlayerChrome({ title, shortcutsControl, subtitleSettingsControl, u
   );
 }
 
-function PieroTouchCenterPlayButton({ enabled }) {
+function PieroTouchCenterPlayButton({ enabled, suppressed }) {
   const controlsVisible = useMediaState("controlsVisible");
   const ended = useMediaState("ended");
   const paused = useMediaState("paused");
@@ -953,6 +953,7 @@ function PieroTouchCenterPlayButton({ enabled }) {
 
   if (
     !enabled
+    || suppressed
     || (waiting && started && !paused)
     || remotePlaybackState !== "disconnected"
     || (!controlsVisible && !paused && !ended)
@@ -1017,6 +1018,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
     subtitleSrc,
     title,
     children,
+    hideCenterButton,
     onLoadStart,
     onLoadedMetadata,
     onCanPlay,
@@ -1819,7 +1821,7 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
         onPlayHere={(remoteType) => leaveRemotePlayback({ playLocally: true, remoteType })}
         onRetryRemote={retryRemotePlayback}
       />
-      <PieroTouchCenterPlayButton enabled={useTouchControls} />
+      <PieroTouchCenterPlayButton enabled={useTouchControls} suppressed={hideCenterButton} />
       {isShortcutsOpen ? (
         <section
           ref={shortcutsPanelRef}

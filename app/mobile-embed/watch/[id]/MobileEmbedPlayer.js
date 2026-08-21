@@ -19,7 +19,20 @@ function postToNative(message) {
 export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title }) {
   const searchParams = useSearchParams();
   const resumeSeconds = Number(searchParams.get("resume"));
+  // El lado nativo agrega este flag cuando el usuario está logueado (ver PieroPlayer.tsx en el repo
+  // mobile) - esta página no tiene su propia sesión (ver comentario de page.js), así que es la única
+  // forma de saber el estado de auth acá. Con isAuthenticated=true, OkruWatchPlayer deja de leer y
+  // escribir localStorage por completo (ver su propio comentario de props) - el seek de resumeSeconds
+  // de más abajo (loadedmetadata) queda como la única fuente de posición inicial, sin que
+  // restorePieroProgress (canplay, más tarde en el ciclo de vida) lo pise con un valor local viejo.
+  const isAuthenticated = searchParams.get("authenticated") === "1";
+  // Igual que resumeSeconds/isAuthenticated: el lado nativo agrega este flag cuando su propio toggle
+  // "Reproducción automática" está prendido (ver archive/[id].tsx). Con esto, OkruWatchPlayer reusa su
+  // propio overlay "parte completada" con cuenta regresiva de 7s (el mismo mecanismo que ya tiene la
+  // web) en vez de necesitar una cuenta regresiva nativa aparte.
+  const forcedAutoAdvance = searchParams.get("autoAdvance") === "1";
   const seekedRef = useRef(false);
+  const lastNotifiedPartIndexRef = useRef(Math.max(0, Number(searchParams.get("parte") || "1") - 1));
 
   useEffect(() => {
     seekedRef.current = false;
@@ -34,9 +47,30 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
 
     function attach(video) {
       currentVideo = video;
-      const partIndex = resolvePartIndex(video);
 
-      const emit = (type) => () =>
+      // No capturar el índice una sola vez acá - cuando el MutationObserver detecta el <video> nuevo,
+      // Vidstack todavía puede no haberle asignado el src real (llega un instante después), así que
+      // resolvePartIndex podría devolver un índice viejo/erróneo si quedara cerrado sobre ese momento.
+      // Se resuelve de nuevo en cada evento y también al llegar loadedmetadata (por si el primer
+      // intento, acá abajo, fue antes de que el src estuviera listo).
+      function syncPartIndex() {
+        const partIndex = resolvePartIndex(video);
+        // El overlay interno de OkruWatchPlayer puede avanzar de parte sin recargar el WebView (clic
+        // manual en "Reproducir Parte X" o la cuenta regresiva de auto-avance) - sin esto, los tabs
+        // nativos "Parte 1"/"Parte 2" de archive/[id].tsx se quedan pegados en la parte anterior.
+        if (partIndex !== lastNotifiedPartIndexRef.current) {
+          lastNotifiedPartIndexRef.current = partIndex;
+          postToNative({ type: "partChanged", partIndex });
+        }
+        return partIndex;
+      }
+
+      const emit = (type) => () => {
+        // El MutationObserver puede detectar el <video> nuevo antes de que Vidstack le asigne el src
+        // real (queda vacío un instante) - reintentar acá en vez de solo una vez en loadedmetadata,
+        // que en la práctica no siempre llega a dispararse a tiempo. timeupdate es frecuente y barato
+        // de recalcular, así que esto se autocorrige apenas arranca la reproducción real.
+        const partIndex = syncPartIndex();
         postToNative({
           type,
           source: "piero",
@@ -44,6 +78,7 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
           currentTime: video.currentTime,
           duration: Number.isFinite(video.duration) ? video.duration : null,
         });
+      };
 
       const onTimeUpdate = emit("timeupdate");
       const onPause = emit("pause");
@@ -52,6 +87,9 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
       video.addEventListener("timeupdate", onTimeUpdate);
       video.addEventListener("pause", onPause);
       video.addEventListener("ended", onEnded);
+
+      syncPartIndex();
+      video.addEventListener("loadedmetadata", syncPartIndex);
 
       if (!seekedRef.current && Number.isFinite(resumeSeconds) && resumeSeconds > 0) {
         seekedRef.current = true;
@@ -66,6 +104,7 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
         video.removeEventListener("timeupdate", onTimeUpdate);
         video.removeEventListener("pause", onPause);
         video.removeEventListener("ended", onEnded);
+        video.removeEventListener("loadedmetadata", syncPartIndex);
       };
     }
 
@@ -105,7 +144,14 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
           display: none !important;
         }
       `}</style>
-      <OkruWatchPlayer okruLinks={okruLinks} pieroLinks={pieroLinks} liveId={String(liveId)} title={title} />
+      <OkruWatchPlayer
+        okruLinks={okruLinks}
+        pieroLinks={pieroLinks}
+        liveId={String(liveId)}
+        title={title}
+        isAuthenticated={isAuthenticated}
+        forcedAutoAdvance={forcedAutoAdvance}
+      />
     </>
   );
 }

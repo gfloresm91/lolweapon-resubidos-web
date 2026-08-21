@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { Play, RotateCcw, SkipForward } from "lucide-react";
 
 const PieroVideoPlayer = dynamic(() => import("@/components/PieroVideoPlayer"), { ssr: false });
@@ -83,7 +82,26 @@ function formatPlaybackTime(totalSeconds) {
     : `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
-export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }) {
+export default function OkruWatchPlayer({
+  okruLinks,
+  pieroLinks,
+  liveId,
+  title,
+  // isAuthenticated/dbLiveId/initialPlayback son opcionales a propósito. Cuando isAuthenticated es
+  // true, el progreso de Piero (leer/guardar/borrar) usa BD exclusivamente - ni se lee ni se escribe
+  // localStorage, sin fallback. localStorage solo aplica para invitados (isAuthenticated=false).
+  // La página real (rastreador/[id]) pasa los 3 props para usuarios logueados. El embed mobile
+  // (app/mobile-embed/watch/[id]) solo pasa isAuthenticated (sin dbLiveId/initialPlayback) cuando el
+  // usuario nativo está logueado - ahí la sincronización real la hace el lado nativo (usePlaybackSync
+  // + resume= en la URL), así que este componente simplemente se abstiene de tocar progreso.
+  isAuthenticated = false,
+  dbLiveId = null,
+  initialPlayback = [],
+  // Solo lo pasa el embed mobile (ver MobileEmbedPlayer.js) para reflejar el toggle nativo "Reproducción
+  // automática" - cuando está definido (true o false), reemplaza por completo la lectura de
+  // localStorage de más abajo. undefined = comportamiento de siempre (localStorage, página real).
+  forcedAutoAdvance = undefined,
+}) {
   const progressSaveRef = useRef(0);
   const videoRef = useRef(null);
   const autoplayNextRef = useRef(false);
@@ -246,12 +264,16 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   }, [availableSources, liveId, pathname, requestedSource, searchParams]);
 
   useEffect(() => {
+    if (forcedAutoAdvance !== undefined) {
+      setIsAutoAdvanceEnabled(forcedAutoAdvance);
+      return;
+    }
     try {
       setIsAutoAdvanceEnabled(window.localStorage.getItem("kala_piero_auto_advance") === "true");
     } catch {
       setIsAutoAdvanceEnabled(false);
     }
-  }, []);
+  }, [forcedAutoAdvance]);
 
   useEffect(() => {
     if (!activeLink) {
@@ -283,6 +305,10 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
     return () => window.clearTimeout(timer);
   }, [activeIndex, nextPartCountdown]);
 
+  // Se resetea por (fuente, índice de parte), no por href: si dos partes distintas apuntan al mismo
+  // archivo (dato mal cargado - link duplicado en vez de la parte real), el cambio de índice igual
+  // debe cerrar el overlay de "parte completada" y remontar el player, en vez de quedarse pegado
+  // mostrando la parte anterior con el texto de la siguiente.
   useEffect(() => {
     setNextPartCountdown(null);
     setResumeMessage("");
@@ -292,7 +318,7 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
     hasRestoredProgressRef.current = false;
     progressSaveRef.current = 0;
     lastPlaybackActivityRef.current = 0;
-  }, [activeLink?.href]);
+  }, [activeSourceId, activeIndex]);
 
   useEffect(() => {
     function saveCurrentPlayback() {
@@ -360,29 +386,62 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
     setPlayerError(true);
   }
 
+  // Progreso en BD gana siempre sobre localStorage para usuarios logueados (decisión explícita,
+  // no reconciliación por timestamp) - si hay una fila sin completar para esta parte, ni siquiera
+  // se mira localStorage. Invitados y la página de embed mobile (que no pasa initialPlayback) caen
+  // directo al camino de localStorage de siempre, sin cambios.
+  function findDbPlayback() {
+    if (!isAuthenticated) return null;
+    return initialPlayback.find((row) => row.source === "piero" && row.partIndex === activeIndex && !row.completed) || null;
+  }
+
+  function syncPlaybackToServer(positionSeconds, completed) {
+    if (!isAuthenticated || !dbLiveId) return;
+    const duration = videoRef.current?.duration;
+    fetch(`/api/lives/${dbLiveId}/playback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "piero",
+        partIndex: activeIndex,
+        positionSeconds: Math.floor(positionSeconds),
+        durationSeconds: Number.isFinite(duration) ? Math.floor(duration) : null,
+        completed,
+      }),
+    }).catch(() => {});
+  }
+
   function restorePieroProgress(player) {
     if (!player || hasRestoredProgressRef.current) return;
     hasRestoredProgressRef.current = true;
     let savedTime = 0;
 
-    try {
-      const rawProgress = window.localStorage.getItem(getProgressStorageKey());
-      if (rawProgress) {
-        const parsedProgress = JSON.parse(rawProgress);
-        if (typeof parsedProgress === "number") {
-          savedTime = parsedProgress;
-        } else if (
-          Number.isFinite(parsedProgress?.time) &&
-          Number.isFinite(parsedProgress?.updatedAt) &&
-          Date.now() - parsedProgress.updatedAt <= PROGRESS_EXPIRATION_MS
-        ) {
-          savedTime = parsedProgress.time;
-        } else {
-          window.localStorage.removeItem(getProgressStorageKey());
+    if (isAuthenticated) {
+      // Usuario logueado: BD es la única fuente de verdad, ni siquiera se mira localStorage como
+      // respaldo (si no hay fila en BD para esta parte, savedTime queda en 0 - nunca "adivina" con
+      // el último valor local, que podría ser de otro dispositivo o estar desactualizado).
+      const dbRow = findDbPlayback();
+      if (dbRow) savedTime = dbRow.positionSeconds;
+    } else {
+      try {
+        const rawProgress = window.localStorage.getItem(getProgressStorageKey());
+        if (rawProgress) {
+          const parsedProgress = JSON.parse(rawProgress);
+          if (typeof parsedProgress === "number") {
+            savedTime = parsedProgress;
+          } else if (
+            Number.isFinite(parsedProgress?.time) &&
+            Number.isFinite(parsedProgress?.updatedAt) &&
+            Date.now() - parsedProgress.updatedAt <= PROGRESS_EXPIRATION_MS
+          ) {
+            savedTime = parsedProgress.time;
+          } else {
+            window.localStorage.removeItem(getProgressStorageKey());
+          }
         }
+      } catch {
+        savedTime = 0;
       }
-    } catch {
-      savedTime = 0;
     }
 
     if (
@@ -420,6 +479,10 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
   function savePieroProgress(currentTime) {
     if (!Number.isFinite(currentTime) || completedPartRef.current || !hasRestoredProgressRef.current) return;
     progressSaveRef.current = currentTime;
+    if (isAuthenticated) {
+      syncPlaybackToServer(currentTime, false);
+      return;
+    }
     try {
       window.localStorage.setItem(
         getProgressStorageKey(),
@@ -435,6 +498,10 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
     videoRef.current.currentTime = 0;
     setResumeMessage("");
     if (resumeNoticeTimerRef.current) window.clearTimeout(resumeNoticeTimerRef.current);
+    if (isAuthenticated) {
+      syncPlaybackToServer(0, false);
+      return;
+    }
     try {
       window.localStorage.removeItem(getProgressStorageKey());
     } catch {
@@ -467,10 +534,14 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
 
   function handlePieroEnded() {
     completedPartRef.current = true;
-    try {
-      window.localStorage.removeItem(getProgressStorageKey());
-    } catch {
-      // Some browser privacy modes can block localStorage.
+    if (isAuthenticated) {
+      syncPlaybackToServer(videoRef.current?.currentTime || progressSaveRef.current, true);
+    } else {
+      try {
+        window.localStorage.removeItem(getProgressStorageKey());
+      } catch {
+        // Some browser privacy modes can block localStorage.
+      }
     }
 
     if (hasNextPieroPart) {
@@ -601,13 +672,15 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
             <div className="watch-next-part-card is-final">
               <span className="watch-next-part-kicker">Resubido completado</span>
               <strong id="watch-final-part-title">Terminaste la última parte</strong>
-              <span>Puedes volver a reproducirla o regresar al rastreador.</span>
+              <span>Puedes volver a reproducirla o quedarte aquí.</span>
               <div className="watch-next-part-actions">
                 <button ref={completionPrimaryActionRef} type="button" onClick={replayFinalPieroPart}>
                   <RotateCcw size={15} aria-hidden="true" />
                   Reproducir nuevamente
                 </button>
-                <Link className="watch-next-part-link" href="/rastreador">Volver al rastreador</Link>
+                <button type="button" className="is-secondary" onClick={dismissCompletionOverlay}>
+                  Quedarme aquí
+                </button>
               </div>
             </div>
           </div>
@@ -790,10 +863,11 @@ export default function OkruWatchPlayer({ okruLinks, pieroLinks, liveId, title }
           {activeSource.id === "piero" ? (
             <PieroVideoPlayer
               ref={videoRef}
-              key={`${activeLink.href}-${playerRetryKey}`}
+              key={`${activeSource.id}-${activeIndex}-${playerRetryKey}`}
               src={activeLink.href}
               subtitleSrc={activeSubtitleSrc}
               title={`${title || "Resubido"} - ${activePartLabel}`}
+              hideCenterButton={isCompletionOverlayOpen}
               onLoadStart={() => {
                 setLoadingMessage("Conectando con Piero...");
                 setIsPlayerLoading(true);

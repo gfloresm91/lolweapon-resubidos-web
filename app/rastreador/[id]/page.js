@@ -16,6 +16,7 @@ import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionTo
 import { can } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses, getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
 import { getLiveActivityForLive } from "@/lib/repositories/liveActivityRepository";
+import { getPrismaClient } from "@/lib/prisma";
 import { normalizeTag } from "@/lib/tags";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,13 @@ export default async function LiveDetailPage({ params }) {
   }
 
   const isAuthenticated = Boolean(currentUser?.id);
+  // Progreso de reproducción por BD - solo para usuarios logueados (ver
+  // lib/repositories/livePlaybackRepository.js, misma tabla que ya sincroniza el app mobile). Se
+  // trae acá server-side (sin round-trip extra de cliente) y se le pasa a OkruWatchPlayer, que
+  // decide con esto si prioriza BD sobre localStorage al restaurar posición.
+  const initialPlayback = isAuthenticated
+    ? await getPrismaClient().platformUserLivePlayback.findMany({ where: { userId: currentUser.id, liveId: live.dbId } })
+    : [];
   const tags = Array.isArray(live.tags) ? live.tags : [];
   const telegramLinks = Array.isArray(live.links?.telegram) ? live.links.telegram : [];
   const okruLinks = Array.isArray(live.links?.okru) ? live.links.okru : [];
@@ -194,6 +202,9 @@ export default async function LiveDetailPage({ params }) {
                     pieroLinks={pieroLinks}
                     liveId={live.id}
                     title={live.title}
+                    isAuthenticated={isAuthenticated}
+                    dbLiveId={live.dbId}
+                    initialPlayback={initialPlayback}
                   />
 
                   <div className="watch-title-block">
