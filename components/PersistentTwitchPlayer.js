@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { House, X } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { getClientTwitchStatus } from "@/lib/clientTwitchStatus";
 
 const TWITCH_EMBED_SCRIPT_URL = "https://player.twitch.tv/js/embed/v1.js";
 const MINI_PLAYER_SIZE_STORAGE_KEY = "kala_twitch_mini_player_width";
@@ -434,9 +435,8 @@ export default function PersistentTwitchPlayer({ twitchLogin }) {
 
     async function refreshStatus() {
       try {
-        const response = await fetch("/api/twitch/status", { cache: "no-store" });
-        const data = await response.json();
-        if (isMounted && response.ok) {
+        const data = await getClientTwitchStatus();
+        if (isMounted) {
           setCurrentStream(data.stream || null);
           isPlayerOnlineRef.current = Boolean(data.stream);
           if (data.stream) setIsPlayerOnline(true);
