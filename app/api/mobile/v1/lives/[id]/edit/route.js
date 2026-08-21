@@ -14,7 +14,10 @@ export const dynamic = "force-dynamic";
 // hecho desde el admin de la web.
 export async function PUT(request, { params }) {
   const user = await getMobileAccessUser(request);
-  if (!canAny(user, ["tracker.update"])) {
+  // Mismo criterio que trackerFormVariant/canEditTracker en la web: tracker.update por sí solo NO
+  // alcanza, hace falta además uno de los dos permisos de variante de formulario.
+  const formVariant = canAny(user, ["tracker.form.full"]) ? "full" : canAny(user, ["tracker.form.compact"]) ? "compact" : null;
+  if (!canAny(user, ["tracker.update"]) || !formVariant) {
     return jsonError("No autorizado", { status: 401 });
   }
 
@@ -35,8 +38,20 @@ export async function PUT(request, { params }) {
   }
 
   // El formulario mobile no edita imagen (ver plan - evita sumar expo-image-picker/rebuild nativo
-  // en esta pasada), así que se preserva tal cual venía para no pisarla con "".
-  const candidate = { ...payload.live, id: before.id, image: before.image };
+  // en esta pasada), así que se preserva tal cual venía para no pisarla con "". La variante compacta
+  // tampoco expone Piero/Patreon en la web (TrackerMaintainerModal.js oculta esos inputs y preserva
+  // el valor existente al enviar) - se replica acá server-side, no solo ocultando el campo en el
+  // cliente, para que un usuario "compacto" no pueda tocarlos igual mandando el payload a mano.
+  const candidate = {
+    ...payload.live,
+    id: before.id,
+    image: before.image,
+    links: {
+      ...payload.live?.links,
+      piero: formVariant === "full" ? payload.live?.links?.piero : before.links?.piero || [],
+      patreon: formVariant === "full" ? payload.live?.links?.patreon : before.links?.patreon || [],
+    },
+  };
   const validation = trackerLivePayloadSchema.safeParse(candidate);
 
   if (!validation.success) {

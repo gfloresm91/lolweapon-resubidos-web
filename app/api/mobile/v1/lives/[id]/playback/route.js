@@ -1,6 +1,6 @@
 import { jsonError, readJsonRequest } from "@/lib/http";
 import { getMobileUserIdFromRequest } from "@/lib/mobileAuth";
-import { getPrismaClient } from "@/lib/prisma";
+import { upsertLivePlayback } from "@/lib/repositories/livePlaybackRepository";
 
 export const dynamic = "force-dynamic";
 
@@ -30,23 +30,7 @@ export async function POST(request, { params }) {
     return jsonError("Faltan datos de reproducción.", { status: 400 });
   }
 
-  const prisma = getPrismaClient();
-
-  const playback = await prisma.platformUserLivePlayback.upsert({
-    where: { userId_liveId_source_partIndex: { userId, liveId, source, partIndex } },
-    create: { userId, liveId, source, partIndex, positionSeconds, durationSeconds, completed, deviceId },
-    update: { positionSeconds, durationSeconds, completed, deviceId },
-  });
-
-  // PlatformUserLive.isWatched es la fuente de verdad "visto" que ya usa la web (PlatformUserLive
-  // existente) - si no se refleja acá, web y mobile divergen en ese estado.
-  if (completed) {
-    await prisma.platformUserLive.upsert({
-      where: { userId_liveId: { userId, liveId } },
-      create: { userId, liveId, isWatched: true, watchedAt: new Date() },
-      update: { isWatched: true, watchedAt: new Date() },
-    });
-  }
+  const playback = await upsertLivePlayback({ userId, liveId, source, partIndex, positionSeconds, durationSeconds, completed, deviceId });
 
   return Response.json({ success: true, playback });
 }
