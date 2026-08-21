@@ -17,11 +17,22 @@ export async function GET(request) {
 
   const [lives, statuses] = await Promise.all([readLives(), getLiveStatuses()]);
 
+  // Mismo criterio que trackerFormVariant en HomePage.js/rastreador/[id]/page.js: tracker.update por
+  // sí solo NO alcanza para editar - hace falta además tener uno de los dos permisos de variante de
+  // formulario. Sin ninguno, la web ni siquiera ofrece el botón Editar.
+  const formVariant = canAny(user, ["tracker.form.full"]) ? "full" : canAny(user, ["tracker.form.compact"]) ? "compact" : null;
   const permissions = {
     canSave: user?.id != null,
     canNotify: canAny(user, ["tracker.lives.notify", "admin.lives.notify"]),
-    canEdit: canAny(user, ["tracker.update"]),
+    canEdit: canAny(user, ["tracker.update"]) && Boolean(formVariant),
+    formVariant,
   };
 
-  return NextResponse.json({ success: true, lives, statuses, permissions });
+  // Cache-Control explícito: "force-dynamic" evita el cacheo de Next.js en build/SSR, pero no manda
+  // por sí solo un header que impida a un proxy/CDN intermedio (o al propio cliente) cachear esta
+  // respuesta - esta lista cambia seguido (ediciones desde el admin), nunca debería servirse stale.
+  return NextResponse.json(
+    { success: true, lives, statuses, permissions },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

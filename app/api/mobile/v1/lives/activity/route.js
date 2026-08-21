@@ -20,7 +20,7 @@ export async function GET(request) {
   }
 
   const activity = await getLiveActivityMapForUser(userId);
-  return NextResponse.json({ success: true, activity });
+  return NextResponse.json({ success: true, activity }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request) {

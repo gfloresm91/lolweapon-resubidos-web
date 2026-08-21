@@ -34,11 +34,19 @@ export async function GET(request, { params }) {
     playback = await prisma.platformUserLivePlayback.findMany({ where: { userId, liveId } });
   }
 
+  // Mismo criterio que trackerFormVariant en HomePage.js/rastreador/[id]/page.js: tracker.update por
+  // sí solo NO alcanza para editar - hace falta además tener uno de los dos permisos de variante de
+  // formulario. Sin ninguno, la web ni siquiera ofrece el botón Editar.
+  const formVariant = canAny(user, ["tracker.form.full"]) ? "full" : canAny(user, ["tracker.form.compact"]) ? "compact" : null;
   const permissions = {
     canSave: user?.id != null,
     canNotify: canAny(user, ["tracker.lives.notify", "admin.lives.notify"]),
-    canEdit: canAny(user, ["tracker.update"]),
+    canEdit: canAny(user, ["tracker.update"]) && Boolean(formVariant),
+    formVariant,
   };
 
-  return NextResponse.json({ success: true, live, playback, permissions });
+  return NextResponse.json(
+    { success: true, live, playback, permissions },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
