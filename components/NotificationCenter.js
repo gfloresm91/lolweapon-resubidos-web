@@ -24,7 +24,8 @@ const TABS = [
   { key: "activity", label: "Actividad" },
   { key: "system", label: "Sistema" },
 ];
-const REFRESH_INTERVAL_MS = 30000;
+const FALLBACK_REFRESH_INTERVAL_MS = 120000;
+const MIN_FOCUS_REFRESH_AGE_MS = 60000;
 const GUEST_NOTIFICATION_STATE_KEY = "lolweapon_guest_notification_state";
 
 const ICONS = {
@@ -138,7 +139,9 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
   const rootRef = useRef(null);
   const isLoadingRef = useRef(false);
   const reconnectTimerRef = useRef(null);
+  const reconnectAttemptRef = useRef(0);
   const socketRef = useRef(null);
+  const lastLoadedAtRef = useRef(0);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("alert");
@@ -178,6 +181,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
           : applyGuestNotificationState(data.notifications || []);
         setNotifications(nextNotifications);
         setUnreadCount(isAuthenticated ? data.unreadCount || 0 : countUnreadNotifications(nextNotifications));
+        lastLoadedAtRef.current = Date.now();
       }
     } finally {
       isLoadingRef.current = false;
@@ -253,14 +257,18 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
         return;
       }
 
+      const delays = [2000, 5000, 10000, 30000, 60000];
+      const baseDelay = delays[Math.min(reconnectAttemptRef.current, delays.length - 1)];
+      const jitter = Math.round(baseDelay * (Math.random() * 0.4 - 0.2));
+      reconnectAttemptRef.current += 1;
       reconnectTimerRef.current = window.setTimeout(() => {
         reconnectTimerRef.current = null;
         connect();
-      }, 5000);
+      }, baseDelay + jitter);
     }
 
     function connect() {
-      if (!isMounted || socketRef.current?.readyState === WebSocket.OPEN) {
+      if (!isMounted || [WebSocket.OPEN, WebSocket.CONNECTING].includes(socketRef.current?.readyState)) {
         return;
       }
 
@@ -269,6 +277,10 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const socket = new WebSocket(`${protocol}//${window.location.host}/api/notifications/ws`);
       socketRef.current = socket;
+
+      socket.addEventListener("open", () => {
+        reconnectAttemptRef.current = 0;
+      });
 
       socket.addEventListener("message", (event) => {
         let payload = null;
@@ -284,7 +296,10 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
         }
       });
 
-      socket.addEventListener("close", scheduleReconnect);
+      socket.addEventListener("close", () => {
+        if (socketRef.current === socket) socketRef.current = null;
+        scheduleReconnect();
+      });
       socket.addEventListener("error", () => {
         socket.close();
       });
@@ -302,12 +317,15 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
 
   useEffect(() => {
     function refreshIfVisible() {
-      if (document.visibilityState === "visible") {
+      const socketIsOpen = socketRef.current?.readyState === WebSocket.OPEN;
+      const dataIsStale = Date.now() - lastLoadedAtRef.current >= MIN_FOCUS_REFRESH_AGE_MS;
+
+      if (document.visibilityState === "visible" && !socketIsOpen && dataIsStale) {
         loadNotifications();
       }
     }
 
-    const intervalId = window.setInterval(refreshIfVisible, REFRESH_INTERVAL_MS);
+    const intervalId = window.setInterval(refreshIfVisible, FALLBACK_REFRESH_INTERVAL_MS);
 
     window.addEventListener("focus", refreshIfVisible);
     document.addEventListener("visibilitychange", refreshIfVisible);

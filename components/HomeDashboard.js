@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import { ChevronDown, CirclePlay, Eye, FileText, Info, Link2, MessageSquare, Monitor, X } from "lucide-react";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
+import { getClientTwitchStatus } from "@/lib/clientTwitchStatus";
 import TwitchCompanionPlayer from "@/components/TwitchCompanionPlayer";
 import Tooltip from "@/components/Tooltip";
 
@@ -582,10 +583,9 @@ export default function HomeDashboard({
       if (document.hidden) return;
 
       try {
-        const response = await fetch("/api/twitch/status", { cache: "no-store" });
-        const data = await response.json();
+        const data = await getClientTwitchStatus();
 
-        if (isMounted && response.ok) {
+        if (isMounted) {
           setCurrentStream(data.stream || null);
           setCurrentProfile(data.profile || null);
           setCurrentChannelInfo(data.channelInfo || null);

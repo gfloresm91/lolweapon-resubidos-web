@@ -16,10 +16,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const [user, accessUser] = await Promise.all([
-    getCurrentUserFromToken(token),
-    getAccessUserFromToken(token),
-  ]);
+  const user = await getCurrentUserFromToken(token);
+  const accessUser = user || await getAccessUserFromToken(null);
   const { searchParams } = new URL(request.url);
   const isFullPage = searchParams.has("page") || searchParams.has("status") || searchParams.has("search") || searchParams.has("type");
 

@@ -216,7 +216,9 @@ El topbar incluye un centro de notificaciones persistente para usuarios autentic
 
 Las notificaciones se guardan en `PlatformNotification` y el estado individual en `PlatformUserNotification`. La API `/api/notifications` lista notificaciones visibles para el usuario actual y permite marcar una, marcar todas o descartar. Si `DATA_SOURCE` no es `postgres`, el repositorio devuelve lista vacía.
 
-El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling suave queda como respaldo. La presencia concurrente de Inicio usa un canal independiente en `/api/presence/ws` para no mezclar sus mensajes con notificaciones o tickets.
+El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling queda exclusivamente como respaldo cuando el WebSocket no está conectado, con una cadencia de dos minutos; la reconexión usa backoff exponencial con jitter para evitar estampidas. El servidor envía ping cada 30 segundos y termina conexiones que no responden. La presencia concurrente de Inicio usa un canal independiente en `/api/presence/ws` para no mezclar sus mensajes con notificaciones o tickets.
+
+La inicialización idempotente de roles y permisos se comparte entre solicitudes y se ejecuta una sola vez por proceso. Nunca debe repetirse la secuencia completa de `upsert` por cada invitado o consulta de notificaciones. La campana obtiene lista y conteo de no leídas desde una sola lectura de notificaciones visibles.
 
 `server.mjs` toma una muestra de audiencia cada minuto mientras el broadcaster oficial está online. Guarda únicamente agregados en PostgreSQL: presencia web concurrente y `viewer_count` oficial de Twitch, agrupados por `twitchStreamId`. Los fallos de Twitch o de persistencia se registran sin cerrar una sesión válida ni afectar Inicio. `STREAM_AUDIENCE_ANALYTICS_ENABLED=false` permite desactivar el agregador; con una fuente distinta de PostgreSQL queda desactivado automáticamente.
 
@@ -403,7 +405,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/admin/anime-tier-list-openings` | GET/POST | Openings/Endings del Tier List: sync preview/apply desde AnimeThemes.moe (requiere Animes ya sincronizado) y CRUD (`create-theme`, `update-theme`, `delete-theme`, `restore-theme`) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
-| `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. No participa en OAuth ni sincronización de membresías. |
+| `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. Los consumidores del mismo navegador comparten además una caché cliente y una única promesa en vuelo para no duplicar solicitudes. No participa en OAuth ni sincronización de membresías. |
 | `/api/twitch/eventsub` | POST | Webhook firmado: `stream.online` crea el card directamente desde el evento y publica una alerta deduplicada por stream; `stream.offline` cambia el registro Twitch activo a `Subiendo`. Ambos flujos dejan auditoría automática. |
 | `/api/twitch/eventsub/subscribe` | POST | Verificar o registrar `stream.online` y `stream.offline`: lista cada tipo con el único filtro permitido por Twitch, conserva las suscripciones activas del callback actual y reemplaza estados obsoletos del mismo broadcaster. |
 | `/api/youtube/videos` | GET | Últimos videos de YouTube; también sincroniza `YoutubeVideo` como respaldo al scheduler de `server.mjs` |
@@ -520,6 +522,12 @@ Sistema independiente de `PlatformSession`, para apps nativas. Bearer tokens opa
 ```env
 DATA_SOURCE=json      # lectura desde /data/*.json (legado local)
 DATA_SOURCE=postgres  # PostgreSQL vía Prisma (producción y QA)
+DATABASE_POOL_MAX=12  # Máximo de conexiones del pool por proceso Node
+DATABASE_CONNECTION_TIMEOUT_MS=5000
+DATABASE_IDLE_TIMEOUT_MS=30000
+DATABASE_STATEMENT_TIMEOUT_MS=15000
+DATABASE_QUERY_TIMEOUT_MS=15000
+DATABASE_IDLE_TRANSACTION_TIMEOUT_MS=15000
 ```
 
 Los repositorios en `lib/repositories/` abstraen la diferencia — el frontend nunca sabe cuál se usa.
