@@ -41,8 +41,9 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
 
     function resolvePartIndex(video) {
       const src = video.currentSrc || video.src || "";
-      const index = pieroLinks.findIndex((href) => src.includes(href) || href.includes(src));
-      return index >= 0 ? index : 0;
+      // -1 = todavía no se puede saber (src vacío o sin poblar todavía) - a diferencia de un match
+      // real, esto NO debe tratarse como "parte 0" en ningún lado de más abajo.
+      return pieroLinks.findIndex((href) => src.includes(href) || href.includes(src));
     }
 
     function attach(video) {
@@ -54,15 +55,20 @@ export default function MobileEmbedPlayer({ okruLinks, pieroLinks, liveId, title
       // Se resuelve de nuevo en cada evento y también al llegar loadedmetadata (por si el primer
       // intento, acá abajo, fue antes de que el src estuviera listo).
       function syncPartIndex() {
-        const partIndex = resolvePartIndex(video);
+        const resolved = resolvePartIndex(video);
+        // Mientras no se sabe (resolved === -1, típicamente el instante justo después de un cambio de
+        // parte, antes de que Vidstack le asigne el src real al <video> nuevo), se asume la última
+        // parte confirmada en vez de "parte 0" - si no, un cambio manual a Parte 2 quedaba pisado por
+        // un falso "partChanged: 0" apenas se recargaba el WebView, reseteando la selección del usuario.
+        if (resolved === -1) return lastNotifiedPartIndexRef.current;
         // El overlay interno de OkruWatchPlayer puede avanzar de parte sin recargar el WebView (clic
         // manual en "Reproducir Parte X" o la cuenta regresiva de auto-avance) - sin esto, los tabs
         // nativos "Parte 1"/"Parte 2" de archive/[id].tsx se quedan pegados en la parte anterior.
-        if (partIndex !== lastNotifiedPartIndexRef.current) {
-          lastNotifiedPartIndexRef.current = partIndex;
-          postToNative({ type: "partChanged", partIndex });
+        if (resolved !== lastNotifiedPartIndexRef.current) {
+          lastNotifiedPartIndexRef.current = resolved;
+          postToNative({ type: "partChanged", partIndex: resolved });
         }
-        return partIndex;
+        return resolved;
       }
 
       const emit = (type) => () => {
