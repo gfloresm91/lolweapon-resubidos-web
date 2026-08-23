@@ -19,10 +19,12 @@ Servir `/directo` como un único archivo HTML/CSS/JavaScript estático directame
 - iframe principal de VK;
 - iframe companion de Twitch, silenciado;
 - iframe del chat oficial de Twitch;
-- controles mínimos para chat, recarga y salida;
+- controles para intercambiar y dimensionar los players, mostrar el chat, recargar, consultar ayuda/información y salir;
 - layout responsive y compatibilidad opcional con `?layout=android`.
 
-La página no resuelve sesión o permisos, no consulta PostgreSQL, no llama APIs internas y no abre WebSockets propios. Nginx entrega el archivo antes del proxy hacia Next.js. Cloudflare podrá cachear el HTML en una etapa posterior.
+En móvil los players se apilan y se intercambian sin desmontar los iframes. El chat permanece montado, oculto inicialmente, y al abrirse cubre siempre el segundo player. En desktop VK ocupa el área principal y Twitch/chat la columna secundaria, cuyo tamaño puede ajustarse.
+
+La página no resuelve sesión o permisos, no consulta PostgreSQL, no abre WebSockets propios y no hace llamadas dinámicas a Next.js. Nginx entrega el archivo antes del proxy hacia Next.js. La metadata pública de Twitch se publica cada 30 segundos como `/directo-status.json`: `server.mjs` actualiza atómicamente una única copia usando la misma caché compartida de `/api/twitch/status`, y cada navegador solo descarga ese JSON estático cacheable. Si Node, Twitch o el snapshot fallan, los embeds siguen funcionando y el modal degrada a `Sin datos`.
 
 Nginx no lee el archivo desde `/home/kalaplex`: ese home no es atravesable por `www-data` y abrirlo ampliaría permisos innecesariamente. QA publica una copia en `/var/www/resubidos-qa/directo.html`, directorio propiedad del usuario de deploy y grupo `www-data`; el workflow actualiza esa copia con `install -m 0644` después de completar build y migraciones. Producción debe usar el equivalente `/var/www/resubidos/directo.html` cuando se apruebe el release.
 
@@ -66,19 +68,46 @@ Ventaja: evita Node, PostgreSQL y bundles de la plataforma; continúa disponible
 - El ancho de banda de video/chat continúa siendo responsabilidad de VK y Twitch.
 - Cambios visuales del teatro deben aplicarse explícitamente a la página estática cuando corresponda.
 - El canal Twitch se selecciona por hostname: QA usa su canal de prueba y producción el canal público actual.
-- La página no muestra presencia, notificaciones ni metadata dinámica del stream para mantener el aislamiento.
+- La página no muestra presencia, notificaciones ni información personalizada. Solo muestra un snapshot estático y prescindible de metadata pública de Twitch.
 - `/api/twitch/status` se conserva porque la app móvil lo consume y ya dispone de caché breve.
+- Twitch inicia silenciado y solicita `play()` al montar, al recibir `PAUSE` y al recuperar foco/visibilidad. `PLAYBACK_BLOCKED` expone una acción manual; las restricciones del navegador o del proveedor no se pueden eludir ni garantizan que una view sea contabilizada.
+- El iframe oficial del chat conserva la sesión Twitch que el navegador permita compartir; puede pedir login cuando cookies o almacenamiento de terceros estén bloqueados.
 - La implementación nativa móvil no debe reemplazarse por `/directo`; hacerlo perdería contratos nativos como PiP y sería otro proyecto.
 
 ## Verificación requerida
 
 1. Confirmar que `/directo` es atendido por Nginx y no contiene headers de upstream Next.
-2. Confirmar cero solicitudes a `/api/*`, `/api/notifications/ws` y `/api/presence/ws`.
+2. Confirmar cero solicitudes a `/api/*`, `/api/notifications/ws` y `/api/presence/ws`; `/directo-status.json` debe ser servido por Nginx.
 3. Probar VK, Twitch y chat en desktop, tablet, Android e iOS.
 4. Probar chat expandido, recarga, salida, fullscreen y `?layout=android`.
 5. Comprobar que las acciones de moderación del chat no queden bloqueadas por superposiciones.
 6. Medir 500–800 solicitudes concurrentes al HTML estático.
 7. Validar que la página siga respondiendo con `resubidos-qa.service` detenido durante una prueba controlada en QA.
+
+## Configuración del snapshot
+
+Cada ambiente define el directorio publicado, sin incluir el nombre del archivo:
+
+```dotenv
+# QA
+DIRECTO_STATIC_DIR=/var/www/resubidos-qa
+
+# Producción
+DIRECTO_STATIC_DIR=/var/www/resubidos
+```
+
+Nginx debe servir el JSON antes del proxy, con caché breve:
+
+```nginx
+location = /directo-status.json {
+    alias /var/www/resubidos-qa/directo-status.json;
+    default_type application/json;
+    etag on;
+    expires 15s;
+}
+```
+
+En producción se reemplaza únicamente la ruta del `alias`. El archivo no contiene tokens, IDs internos, sesión ni datos de usuarios.
 
 ## Resultado en QA
 
