@@ -441,7 +441,7 @@ The backup and restore scripts load `.env` automatically when it exists. Use `EN
 Recommended cron example:
 
 ```cron
-15 4 * * * cd /srv/lolweapon-resubidos-web && COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env /usr/bin/npm run db:backup >> /var/log/lolweapon-postgres-backup.log 2>&1
+15 4 * * * cd /home/kalaplex/resubidos && COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env /usr/bin/npm run db:backup >> /var/log/lolweapon-postgres-backup.log 2>&1
 ```
 
 Copy backup files outside the droplet regularly with `scp`, `rsync`, S3, or another storage provider.

@@ -1,0 +1,268 @@
+# Plan de resiliencia ante picos de tráfico
+
+## Propósito y estado
+
+Este documento permite continuar, incluso con otro agente, el trabajo iniciado después del incidente de tráfico del 21 de agosto de 2026. Reúne el diagnóstico confirmado, las medidas ya desplegadas, los cambios locales pendientes y un plan gradual para soportar picos legítimos de al menos 500 usuarios concurrentes sin bloquearlos.
+
+Documento relacionado: [`docs/incidents/2026-08-21-traffic-collapse.md`](../incidents/2026-08-21-traffic-collapse.md). Ese postmortem es la fuente de evidencia, cronología y comandos de diagnóstico. Este archivo es la hoja de ruta de implementación.
+
+Estado al 22 de agosto de 2026:
+
+- El hotfix `v2.22.1` está en producción y estabilizó el incidente.
+- El Droplet fue ampliado a 4 vCPU y 8 GiB de RAM, con CPU compartida.
+- Producción continúa usando un solo proceso Node y PostgreSQL local en Docker.
+- YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico.
+- Existen optimizaciones adicionales en el worktree local que todavía deben pasar por QA, commit, despliegue y prueba de carga.
+- No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
+
+## Qué ocurrió
+
+Durante un directo entraron aproximadamente 150–200 usuarios reales simultáneos según la mejor evidencia disponible. Se observaron más de 800 conexiones HTTPS, pero una persona puede abrir varias conexiones HTTP, API y WebSocket; por eso conexiones y usuarios no son equivalentes.
+
+La causa raíz no fue un ataque, Nginx caído, PostgreSQL detenido ni falta de RAM por sí sola. Una lectura pública frecuente de notificaciones resolvía al usuario invitado y ejecutaba repetidamente la inicialización de roles y permisos. Cada solicitud podía provocar decenas de `upsert` en PostgreSQL. El polling y las reconexiones de cientos de navegadores multiplicaron ese trabajo, saturaron la base de datos y ocuparon el event loop del único proceso Node.
+
+El resize dio margen de capacidad, pero no corrigió la causa: Node volvió a saturar un núcleo después de ampliar el servidor. La recuperación ocurrió después del hotfix que eliminó la inicialización por solicitud y redujo la amplificación.
+
+## Medidas ya desplegadas en `v2.22.1`
+
+- Inicialización de permisos una sola vez por proceso, con promesa compartida entre solicitudes concurrentes.
+- Menos lecturas duplicadas de sesión y notificaciones.
+- Polling de notificaciones como respaldo del WebSocket, con menor frecuencia.
+- Reconexión WebSocket con backoff y jitter.
+- Heartbeat y limpieza de sockets inactivos.
+- Solicitud Twitch compartida y deduplicada en el navegador.
+- Límites y timeouts explícitos para el pool PostgreSQL.
+- Resize del Droplet de 2 vCPU/4 GiB a 4 vCPU/8 GiB.
+
+Después del hotfix, con unas 860 conexiones HTTPS y 177 usuarios deduplicados, Node bajó aproximadamente de 97 % a 23–32 % de un núcleo y no quedaron sesiones `idle in transaction`.
+
+## Optimizaciones locales pendientes de despliegue
+
+Antes de iniciar una etapa, revisar `git status` y `git diff`; no asumir que estos cambios ya están en QA o producción.
+
+- Inicio entrega solo los diez directos recientes y obtiene el catálogo completo al entrar a Rastreador, Calendario, Mi lista o Mantenedor Rastreador.
+- `/api/youtube/videos` deja de sincronizar/escribir por visita, usa caché en proceso, promesa compartida, stale fallback y headers de caché pública.
+- `/api/twitch/status` permite caché pública breve.
+- Las notificaciones públicas usan un scope explícito, caché breve en proceso, promesa compartida e invalidación al emitir actualizaciones.
+- El rol invitado tiene caché y deduplicación breve para evitar una estampida de lecturas.
+- Las respuestas privadas/autenticadas continúan sin caché pública.
+
+El último `npm run build` local terminó correctamente, pero debe repetirse antes de entregar el commit si el diff cambia.
+
+## Evaluación de las recomendaciones externas
+
+### Conexiones PostgreSQL
+
+La recomendación de no crear un cliente por solicitud es correcta. La aplicación ya reutiliza un cliente Prisma singleton y un pool acotado. No se debe reducir PostgreSQL a una única conexión total: eso serializaría el trabajo. La unidad correcta es un cliente/pool por proceso Node, con límites, timeouts y consultas eficientes.
+
+### Caché de permisos
+
+Es pertinente y fue central en el incidente. La inicialización repetida ya fue eliminada y el camino invitado tiene optimizaciones adicionales pendientes. Para usuarios autenticados puede evaluarse una caché de 30–120 segundos con invalidación al cambiar rol, permisos, estado o sesión.
+
+No cachear permisos durante 30 días sin invalidación confiable. Podría conservar accesos después de desactivar un usuario o revocar permisos.
+
+### Node y uso de CPU
+
+Un proceso Node ejecuta JavaScript principalmente en un event loop y puede saturar un núcleo aunque el Droplet tenga cuatro. Las operaciones I/O con `async/await` no bloquean por sí mismas, pero demasiadas consultas, promesas concurrentes, serialización o trabajo CPU pueden agotar pools y retrasar el event loop.
+
+Levantar varios workers no es un cambio aislado: WebSockets, presencia, cachés y jobs viven en memoria. Antes de escalar horizontalmente se necesita afinidad de conexiones o, preferentemente, Redis/Valkey para estado compartido, Pub/Sub, locks y coordinación de trabajos.
+
+### Redis/Valkey
+
+Redis/Valkey es útil, pero no debe instalarse solo por moda. En un único proceso, una caché en memoria es más simple y rápida. Se vuelve justificable cuando una prueba demuestra saturación del proceso o cuando se agregan varios workers/instancias.
+
+Usos futuros apropiados:
+
+- caché compartida de permisos y respuestas públicas;
+- Pub/Sub para notificaciones y WebSockets;
+- presencia compartida entre procesos;
+- locks y elección de líder para sincronizadores/jobs;
+- rate limiting técnico o protección contra estampidas sin bloquear audiencia legítima.
+
+No usar Redis como almacenamiento único de información importante. Su persistencia debe configurarse y los datos durables deben conservarse en PostgreSQL.
+
+### Procesamiento por lotes
+
+Agrupar escrituras es adecuado para chat, telemetría o eventos de alta frecuencia. No era la solución primaria de este incidente: las escrituras de permisos no debían agruparse, sino eliminarse del camino de lectura. Solo implementar batching donde exista un flujo legítimo y medido de muchas escrituras.
+
+### Separación de servicios
+
+No dividir por pantallas o funciones arbitrarias como login. La separación debe seguir dominios de carga y fallo. Los primeros candidatos son downloader/procesamiento pesado, sincronizadores y, si se escala horizontalmente, el canal realtime. Un monolito modular optimizado puede atender esta escala.
+
+## Objetivos y criterios de aceptación
+
+Objetivo inicial: soportar 500 usuarios concurrentes legítimos y un spike de entrada sin indisponibilidad. Objetivo posterior de certificación: 800 usuarios concurrentes si sigue siendo necesario.
+
+Durante una prueba sostenida de 20–30 minutos:
+
+- menos de 1 % de respuestas 5xx;
+- p95 menor a 2 segundos para el flujo público principal y APIs críticas;
+- ningún reinicio de Node, OOM ni crecimiento continuo de memoria;
+- CPU sostenida del proceso por debajo de 75 % de un núcleo como objetivo preventivo;
+- pool PostgreSQL sin agotarse y cero transacciones inactivas prolongadas;
+- WebSockets estables y sin tormenta de reconexiones;
+- recuperación de CPU, memoria y conexiones al retirar la carga.
+
+Registrar también p50, p95, p99, throughput, errores por ruta, event-loop lag, RSS/heap, conexiones de Node/Nginx/PostgreSQL y usuarios deduplicados.
+
+## Plan por etapas
+
+No avanzar automáticamente por todas las etapas. Cada una tiene una decisión de continuar, corregir o detenerse.
+
+### Etapa 1: código defensivo en QA
+
+Objetivo: desplegar y verificar las optimizaciones locales sin tocar aún producción ni agregar infraestructura.
+
+1. Revisar el estado y diff local, cuidando cambios ajenos.
+2. Cambiar a `dev`, repetir `npm run build` si hubo modificaciones posteriores y crear el commit de rendimiento.
+3. Hacer push a `dev` para desplegar QA.
+4. Confirmar que el workflow terminó correctamente y `resubidos-qa.service` está activo.
+5. Ejecutar smoke test en QA como invitado y autenticado:
+   - Inicio y modo dual;
+   - notificaciones y WebSocket;
+   - estado Twitch;
+   - videos recientes de YouTube;
+   - navegación interna y directa a Rastreador, Calendario y Mi lista;
+   - comprobar que Inicio carga solo diez directos y que las vistas completas recuperan el catálogo.
+6. Revisar logs de QA y ausencia de errores Prisma/Next.js.
+
+Criterio de salida: build y deploy correctos, rutas principales funcionales, datos privados nunca cacheados públicamente y sin errores nuevos en logs.
+
+Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desplegar. No usar `git reset --hard` ni restaurar archivos con cambios ajenos.
+
+### Etapa 2: observabilidad y alertas
+
+Objetivo: conocer el límite antes de otro directo y detectar degradación antes de una caída.
+
+1. Activar o validar DigitalOcean Monitoring Agent.
+2. Crear alertas de CPU agregada, memoria, swap y disco.
+3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.
+4. Medir Nginx: tasa de solicitudes, conexiones activas, 499/502/503/504 y latencia.
+5. Medir PostgreSQL: conexiones por estado, pool ocupado/esperando, consultas lentas e `idle in transaction`.
+6. Mejorar access logs para incluir host, status, tiempo total y upstream sin guardar datos personales innecesarios.
+7. Definir destinatarios y runbook de respuesta para cada alerta.
+
+Criterio de salida: dashboard utilizable y una alerta de prueba recibida correctamente. No ejecutar prueba de carga significativa sin esta etapa.
+
+### Etapa 3: Nginx y límites técnicos seguros
+
+Objetivo: manejar HTTP y WebSocket correctamente sin bloquear a los usuarios válidos.
+
+1. Respaldar y validar la configuración actual con `sudo nginx -T`.
+2. Usar un `map` para enviar `Connection: upgrade` solo cuando corresponda.
+3. Revisar timeouts de proxy/WebSocket, keepalive, buffers y límites de archivos abiertos.
+4. No aplicar rate limits globales que rechacen una entrada legítima de 500 usuarios.
+5. Validar con `sudo nginx -t` antes de recargar.
+
+Criterio de salida: HTTP normal y ambos WebSockets operativos, sin errores de sintaxis ni reconexiones adicionales.
+
+### Etapa 4: prueba de carga representativa
+
+Objetivo: medir capacidad real, no estimarla por hardware.
+
+1. Preparar un escenario con usuarios invitados, páginas HTML, APIs públicas y WebSockets persistentes.
+2. Usar datos de prueba y evitar mutaciones destructivas.
+3. Ejecutar escalones de 50, 100, 200 y 500 usuarios; sostener el nivel objetivo entre 20 y 30 minutos.
+4. Simular un spike de entrada y reconexión, no solo requests HTTP aislados.
+5. Capturar métricas y detener si se superan los criterios de rollback.
+6. Corregir cuellos medidos y repetir hasta obtener un resultado reproducible.
+7. Certificar después 800 usuarios si el negocio lo requiere.
+
+Criterio de salida: informe con configuración, commit probado, resultados, gráficos, fallos y capacidad certificada. No probar por primera vez contra producción durante un directo.
+
+### Etapa 5: reactivación controlada de funciones
+
+Objetivo: recuperar funciones desactivadas sin mezclar variables.
+
+1. Establecer una línea base con ambos flags apagados.
+2. Reactivar YouTube fuera de un pico, reiniciar producción y observar al menos 15–30 minutos.
+3. Ejecutar smoke/load test comparable y documentar diferencia.
+4. Si es estable, repetir separadamente con analítica de audiencia.
+5. Si una función degrada el sistema, volver a apagar solo ese flag y optimizarla antes de reintentar.
+
+Criterio de salida: cada función tiene evidencia independiente de su costo y una decisión documentada.
+
+### Etapa 6: release productivo y ensayo controlado
+
+Objetivo: llevar a producción solamente el conjunto certificado en QA.
+
+1. Integrar `dev` en `main` siguiendo el workflow del repositorio.
+2. Hacer bump de versión en `package.json` y `package-lock.json`.
+3. Crear commit de release, tag y push manual por parte del usuario.
+4. Desplegar en una ventana de bajo tráfico con rollback preparado.
+5. Ejecutar smoke test y observar métricas/logs.
+6. Si es seguro y está autorizado, ejecutar un ensayo productivo acotado por debajo de la capacidad certificada.
+
+Criterio de salida: producción estable y métricas comparables o mejores que QA.
+
+### Etapa 7: decisión Redis/Valkey y múltiples procesos
+
+Activar esta etapa si un solo proceso satura un núcleo, el event loop excede el objetivo, se necesitan varias instancias o el estado realtime debe compartirse.
+
+1. Inventariar todo estado en memoria, timers y jobs de `server.mjs`.
+2. Introducir Redis/Valkey primero para caché compartida, Pub/Sub, presencia, locks y elección de líder.
+3. Definir expiración e invalidación de permisos; nunca confiar solo en TTL largo.
+4. Evitar que sincronizadores y publicaciones programadas se ejecuten una vez por worker.
+5. Probar fallo y recuperación de Redis; la web debe degradar de manera controlada.
+6. Agregar dos workers o dos instancias detrás de un balanceador.
+7. Repetir pruebas de carga, WebSocket, reconexión y failover.
+
+Criterio de salida: pérdida de una instancia sin caída pública, jobs sin duplicarse y estado realtime consistente.
+
+### Etapa 8: aislamiento y alta disponibilidad
+
+Esta etapa reduce dominios de fallo y corresponde cuando el costo/criticidad lo justifique.
+
+Arquitectura objetivo posible:
+
+```text
+Cloudflare/CDN
+      |
+DigitalOcean Load Balancer
+      |
+  +---+---+
+  |       |
+App 1   App 2
+  |       |
+  +---+---+
+      |
+Redis/Valkey administrado
+      |
+PostgreSQL administrado con HA
+```
+
+Acciones:
+
+1. Servir estáticos/cache público mediante CDN.
+2. Separar downloader y procesamiento pesado del host web.
+3. Desplegar al menos dos instancias web en dominios de fallo distintos.
+4. Usar Load Balancer con health checks.
+5. Migrar a PostgreSQL administrado con alta disponibilidad si el presupuesto lo permite.
+6. Mover archivos compartidos a object storage cuando corresponda.
+7. Ensayar pérdida de una app, Redis y nodo de base de datos.
+
+Criterio de salida: no existe un único proceso o Droplet cuya caída deje la web completamente indisponible.
+
+## Prompt de continuidad para otra IA
+
+Copiar el siguiente prompt y ajustar únicamente la etapa solicitada:
+
+```text
+Trabaja en el repositorio /Users/gabriel/Developer/kala-apps/lolweapon-resubidos-web.
+
+Antes de proponer o ejecutar cambios:
+1. Lee completamente AGENTS.md y respeta sus instrucciones.
+2. Lee CLAUDE.md, docs/project-overview.md, docs/incidents/2026-08-21-traffic-collapse.md y docs/operations/traffic-resilience-plan.md.
+3. Revisa git status, git diff y el historial reciente. El worktree puede contener cambios del usuario o de otra IA: no los reviertas ni los sobrescribas.
+4. Comprueba qué partes del plan están realmente desplegadas; no confundas cambios locales, QA y producción.
+
+Continúa con la etapa [INDICAR NÚMERO Y NOMBRE] del plan de resiliencia. Primero valida los criterios de entrada de esa etapa, después entrega el paso a paso y ejecuta solamente las acciones seguras autorizadas. Yo ejecuto manualmente git add, commit, tag y push. Si necesitas sudo en el servidor, dame los comandos exactos para que yo los ejecute; el alias SSH es lolweapon. No imprimas secretos, valores de .env, tokens, credenciales ni argumentos completos de procesos.
+
+El tráfico de 500 o más usuarios es legítimo y debe ser atendido, no bloqueado. No implementes rate limits punitivos como sustituto de capacidad. Usa mediciones de CPU por proceso y agregada, memoria, event-loop lag, latencias p50/p95/p99, errores, conexiones, WebSockets y PostgreSQL. Detente y explica la evidencia si una decisión requiere Redis/Valkey, varios workers, nueva infraestructura o gasto recurrente.
+
+Al terminar, documenta lo aplicado, las verificaciones, resultados, rollback, pendientes y el estado exacto de la siguiente etapa. Ejecuta npm run build después de cambios de código. No hagas cambios Git de escritura salvo que te lo solicite expresamente.
+```
+
+## Regla de continuidad
+
+Al finalizar cada etapa, actualizar este documento con fecha, commit, entorno, resultados y decisión. Una etapa no se considera completada solo porque el código exista: debe cumplir sus criterios de aceptación en el entorno correspondiente.

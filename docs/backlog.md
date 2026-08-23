@@ -6,12 +6,12 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ### Feature: Auth móvil (Lolweapon+)
 
-- **Estado:** implementada y sin commitear en `dev` (2026-08-18). Migración `20260818130632_add_mobile_auth_tokens` ya aplicada en local, `npm run db:generate` y `npm run build` verificados OK.
+- **Estado:** implementada e integrada en `main` (2026-08-18). La app móvil publicada se encuentra en la línea 1.2.0 y el manifest vive en `public/lolweapon-plus/latest.json`.
 - **Alcance:** `/api/mobile/v1/auth/*`, `lib/mobileAuth.js`, `lib/tokenHash.js`, páginas puente `/mobile-auth/registro` y `/mobile-auth/vincular`, exención de Origin/CSRF en `middleware.js` para `/api/mobile/*`, borrado de cuenta self-service (`anonymizeAndDeactivatePlatformUser`). Documentado en `AGENTS.md`/`CLAUDE.md` → `Auth Móvil (Lolweapon+)` y `docs/project-overview.md` → `Auth móvil (Lolweapon+)`.
+- **Extensiones integradas (2026-08-19 a 2026-08-21):** API móvil del Rastreador, edición según permisos de formulario, notificación manual de resubidos, actividad, reproducción embebida, registro de tokens FCM y sincronización de progreso entre web y móvil. Migraciones `20260819034453_add_mobile_push_tokens` y `20260819045734_add_live_playback` versionadas.
 - **Pendiente operativo:**
   - Probar los flujos reales (login manual, OAuth Twitch/Google, refresh con rotación/detección de reuso, logout, borrado de cuenta) contra la app Lolweapon+, no solo el build del backend.
-  - Aplicar la migración en QA/producción con `npm run db:migrate:deploy` cuando se despliegue.
-  - Confirmar el proceso de subida manual del `.apk` al servidor (`public/lolweapon-plus/latest.json` ya versiona el manifest) y documentarlo si no está en el flujo de release del repo mobile.
+  - Mantener documentado en el repositorio móvil el proceso de publicación del APK y confirmar desde el dispositivo la entrega push y la continuidad del progreso web/móvil.
   - `docs/backend-api.md` (contrato de estos endpoints) vive en el repo de la app móvil, no en este repo — mantenerlos sincronizados si cambia algo de este lado.
 
 ### ~~Calendario de temporada — vista "Todos / Solo favoritos"~~
@@ -27,7 +27,7 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ### Feature: Google/YouTube y cuentas conectadas
 
-- **Estado:** implementada en `feature/auth-identities` (2026-07-04); pendiente configuración OAuth, migración y pruebas reales en QA.
+- **Estado:** implementación integrada en `main` (2026-07-04); la configuración y las pruebas OAuth reales por ambiente no se verificaron durante la auditoría documental de 2026-08-22.
 - **Alcance:** cuenta canónica `PlatformUser`, identidades Twitch y Google/YouTube, alta OAuth mediante `/registro?oauth=...` con email bloqueado y contraseña opcional, vinculación mediante reautenticación y gestión desde Perfil.
 - **Roles:** la migración conserva `roleId`; `roleSource` distingue asignaciones manuales de sincronizaciones Twitch. Google/YouTube inicia como `publico`; Twitch aplica reglas automáticas al registrar o conectar sobre rol `publico`.
 - **Fuera de alcance:** detección de membresía con `members.list`, condicionada a autorización del creador y acceso oficial de YouTube.
@@ -35,7 +35,7 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ### ~~Feature: Centro y mantenedor de notificaciones~~
 
-- **Estado:** Implementada en `feature/notification-management` (2026-06-28). Pendiente aplicar la migración versionada y completar pruebas visuales autenticadas con datos PostgreSQL.
+- **Estado:** implementada e integrada en `main` (2026-06-28). Las mejoras posteriores incluyen publicación programada desde `server.mjs`, WebSocket con polling de respaldo y entrega push móvil. El estado operativo de cada ambiente debe verificarse con `docs/workflows/deploy-status.md`.
 - **Objetivo:** agregar una página completa para que usuarios autenticados administren sus notificaciones y un mantenedor administrativo para gestionar tanto notificaciones manuales como automáticas.
 - **Rutas acordadas:**
   - `/notificaciones` — centro completo para el usuario.
@@ -131,10 +131,10 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ### Notificación manual de resubidos
 
-- **Estado:** En implementación en `feature/notify-resubido`.
+- **Estado:** implementada e integrada en `main`.
 - **Alcance actual:** acción con confirmación desde el rastreador y su mantenedor, permisos separados por pantalla, notificación pública realtime, reenvío explícito, auditoría y marca `Live.notifiedAt`.
 - **Persistencia:** migración `20260623120000_add_live_notified_at`; la creación de la notificación y la actualización de `notifiedAt` se ejecutan en una única transacción PostgreSQL, con protección de 10 segundos frente a envíos concurrentes.
-- **Pendiente operativo:** aplicar la migración versionada en los entornos correspondientes antes de desplegar la feature.
+- **Verificación operativa:** confirmar permisos y envío realtime/push en el ambiente correspondiente cuando se cambie este flujo.
 
 ## Pendiente
 
