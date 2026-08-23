@@ -111,6 +111,14 @@ location = /directo-status.json {
 
 En producción se reemplaza únicamente la ruta del `alias`. El archivo no contiene tokens, IDs internos, sesión ni datos de usuarios.
 
+## Caché de Cloudflare
+
+Cloudflare no incluye HTML ni JSON entre sus extensiones cacheables por defecto. Crear una Cache Rule limitada exclusivamente al hostname del ambiente y a `/directo`/`/directo-status.json`, con `Cache eligibility: Eligible for cache`.
+
+No forzar `Edge TTL`: debe respetar los headers del origen. Nginx entrega `/directo` con `max-age=300` y `/directo-status.json` con `max-age=15`, conservando el equilibrio entre absorción de picos y actualidad. Mantener también Browser TTL en `Respect existing headers` y la cache key predeterminada.
+
+Nunca ampliar esta regla a `/inicio`, `/api/*`, autenticación ni otras rutas dinámicas. Después de desplegar HTML nuevo, purgar únicamente la URL exacta de `/directo`; no usar `Purge Everything`.
+
 ## Resultado en QA
 
 Certificación completada el 23 de agosto de 2026:
