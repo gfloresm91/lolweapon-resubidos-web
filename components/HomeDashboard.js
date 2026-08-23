@@ -511,11 +511,6 @@ export default function HomeDashboard({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [isDualMode, isStreamInfoOpen, isTwitchChatTheater, isVkDesktopHelpOpen]);
 
-  function enterDualMode() {
-    window.dispatchEvent(new CustomEvent("kala:twitch-play-request", { detail: { muted: true, source: "dual-mode" } }));
-    setStreamMode("dual");
-  }
-
   function replaceDualModeParams({ enabled }) {
     const url = new URL(window.location.href);
     if (enabled) {
@@ -537,26 +532,11 @@ export default function HomeDashboard({
     const mobileBrowser = detectVkMobileBrowser();
     const params = new URLSearchParams(window.location.search);
     const requestedAndroidLayout = params.get("layout") === "android";
-    let dismissed = false;
-    try {
-      dismissed = window.localStorage.getItem(VK_DESKTOP_HELP_DISMISSED_KEY) === "true";
-    } catch {
-      dismissed = false;
-    }
-
+    const directUrl = new URL("/directo", window.location.origin);
     if (mobileBrowser === "android-chrome" || requestedAndroidLayout) {
-      setPreserveAndroidMobileLayout(true);
+      directUrl.searchParams.set("layout", "android");
     }
-
-    if (mobileBrowser) replaceDualModeParams({ enabled: true });
-
-    enterDualMode();
-
-    if (mobileBrowser && !dismissed) {
-      setVkMobileBrowser(mobileBrowser);
-      setIsVkDesktopHelpDismissed(false);
-      setIsVkDesktopHelpOpen(true);
-    }
+    window.location.assign(`${directUrl.pathname}${directUrl.search}`);
   }
 
   function closeVkDesktopHelp({ remember = false } = {}) {

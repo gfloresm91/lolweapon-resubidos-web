@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#080b12">
+    <meta name="robots" content="index,follow">
+    <title>VK + Twitch | Lolweapon</title>
+    <meta name="description" content="Directo de Lolweapon con VK Video, Twitch y chat en una vista ligera.">
+    <style>
+      :root {
+        color-scheme: dark;
+        --page: #080b12;
+        --surface: #101520;
+        --surface-strong: #161c29;
+        --border: #293244;
+        --text: #f4f7fb;
+        --muted: #b4becd;
+        --accent: #9147ff;
+        --danger: #e75b64;
+        --header-height: 54px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        min-height: 100%;
+        margin: 0;
+        background: var(--page);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      body {
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+      }
+
+      html.is-android-layout body {
+        width: var(--android-layout-width, 100vw);
+        height: var(--android-layout-height, 100dvh);
+        transform: scale(var(--android-layout-scale, 1));
+        transform-origin: top left;
+      }
+
+      button,
+      a {
+        font: inherit;
+      }
+
+      button:focus-visible,
+      a:focus-visible {
+        outline: 2px solid #c6a8ff;
+        outline-offset: 2px;
+      }
+
+      .direct-header {
+        position: relative;
+        z-index: 10;
+        height: var(--header-height);
+        padding: max(7px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 7px max(12px, env(safe-area-inset-left));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        background: #0d111a;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .direct-brand {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .live-dot {
+        width: 9px;
+        height: 9px;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: #ef4552;
+        box-shadow: 0 0 0 4px rgba(239, 69, 82, 0.14);
+      }
+
+      .direct-brand strong {
+        display: block;
+        overflow: hidden;
+        font-size: 15px;
+        line-height: 1.2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .direct-brand span:last-child {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .direct-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .direct-action {
+        min-height: 36px;
+        padding: 0 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface-strong);
+        color: var(--text);
+        text-decoration: none;
+        cursor: pointer;
+      }
+
+      .direct-action:hover {
+        border-color: #46536c;
+        background: #1b2332;
+      }
+
+      .direct-action.is-exit {
+        border-color: rgba(231, 91, 100, 0.5);
+      }
+
+      .direct-action svg {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-width: 2;
+      }
+
+      .direct-stage {
+        height: calc(100dvh - var(--header-height));
+        min-height: 0;
+        padding: 10px;
+        display: grid;
+        grid-template-columns: minmax(0, 2.25fr) minmax(300px, 0.75fr);
+        gap: 10px;
+      }
+
+      .panel {
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #05070b;
+      }
+
+      .main-panel,
+      .side-panel,
+      .side-section {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .side-panel {
+        gap: 10px;
+        overflow: visible;
+        border: 0;
+        background: transparent;
+      }
+
+      .side-section {
+        min-height: 0;
+      }
+
+      .side-section.is-player {
+        flex: 0 0 auto;
+      }
+
+      .side-section.is-chat {
+        flex: 1 1 auto;
+      }
+
+      .panel-heading {
+        height: 34px;
+        flex: 0 0 34px;
+        padding: 0 11px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .panel-heading strong {
+        font-size: 12px;
+      }
+
+      .panel-heading span {
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .frame-wrap {
+        position: relative;
+        min-width: 0;
+        min-height: 0;
+        flex: 1 1 auto;
+        background: #000;
+      }
+
+      .is-player .frame-wrap {
+        aspect-ratio: 16 / 9;
+        flex: 0 0 auto;
+      }
+
+      iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #000;
+      }
+
+      .mobile-chat-toggle {
+        display: none;
+      }
+
+      .noscript-message {
+        position: fixed;
+        inset: var(--header-height) 0 0;
+        z-index: 30;
+        padding: 24px;
+        display: grid;
+        place-items: center;
+        background: var(--page);
+        color: var(--text);
+        text-align: center;
+      }
+
+      @media (max-width: 900px) {
+        :root {
+          --header-height: 50px;
+        }
+
+        .direct-header {
+          gap: 8px;
+        }
+
+        .direct-brand > span:last-child > span,
+        .action-label-optional {
+          display: none;
+        }
+
+        .direct-action {
+          width: 36px;
+          min-height: 36px;
+          padding: 0;
+        }
+
+        .direct-stage {
+          padding: 6px;
+          grid-template-columns: 1fr;
+          grid-template-rows: minmax(0, 58fr) minmax(0, 42fr);
+          gap: 6px;
+        }
+
+        .main-panel {
+          min-height: 0;
+        }
+
+        .side-panel {
+          position: relative;
+          min-height: 0;
+          display: block;
+        }
+
+        .side-section.is-player,
+        .side-section.is-chat {
+          min-height: 0;
+          height: 100%;
+        }
+
+        .side-section.is-player .frame-wrap {
+          min-height: 0;
+          aspect-ratio: auto;
+          flex: 1 1 auto;
+        }
+
+        .side-section.is-chat {
+          display: none;
+        }
+
+        .mobile-chat-toggle {
+          display: inline-flex;
+        }
+
+        body.is-chat-expanded .direct-stage {
+          grid-template-rows: minmax(0, 35fr) minmax(0, 65fr);
+        }
+
+        body.is-chat-expanded .side-section.is-player {
+          display: none;
+        }
+
+        body.is-chat-expanded .side-section.is-chat {
+          display: flex;
+          height: 100%;
+        }
+      }
+
+      @media (max-width: 600px), (max-height: 620px) and (max-width: 900px) {
+        .direct-stage {
+          grid-template-rows: minmax(0, 62fr) minmax(0, 38fr);
+        }
+
+        body.is-chat-expanded .direct-stage {
+          grid-template-rows: minmax(0, 35fr) minmax(0, 65fr);
+        }
+      }
+
+      @media (orientation: landscape) and (max-height: 620px) {
+        :root {
+          --header-height: 44px;
+        }
+
+        .panel-heading {
+          height: 28px;
+          flex-basis: 28px;
+        }
+
+        .direct-stage {
+          grid-template-columns: minmax(0, 2fr) minmax(260px, 0.8fr);
+          grid-template-rows: 1fr;
+        }
+
+        .side-panel {
+          display: flex;
+        }
+
+        .side-section.is-player {
+          display: flex;
+          flex: 0 0 min(42%, 210px);
+        }
+
+        .side-section.is-chat {
+          display: flex;
+          flex: 1 1 auto;
+        }
+      }
+
+      html.is-android-layout {
+        --header-height: 50px;
+      }
+
+      html.is-android-layout .direct-header {
+        gap: 8px;
+      }
+
+      html.is-android-layout .direct-brand > span:last-child > span,
+      html.is-android-layout .action-label-optional {
+        display: none;
+      }
+
+      html.is-android-layout .direct-action {
+        width: 36px;
+        min-height: 36px;
+        padding: 0;
+      }
+
+      html.is-android-layout .direct-stage {
+        width: 100%;
+        height: calc(100% - var(--header-height));
+        padding: 6px;
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 62fr) minmax(0, 38fr);
+        gap: 6px;
+      }
+
+      html.is-android-layout body.is-chat-expanded .direct-stage {
+        grid-template-rows: minmax(0, 35fr) minmax(0, 65fr);
+      }
+
+      html.is-android-layout .side-panel {
+        position: relative;
+        min-height: 0;
+        display: block;
+      }
+
+      html.is-android-layout .side-section.is-player,
+      html.is-android-layout .side-section.is-chat {
+        min-height: 0;
+        height: 100%;
+      }
+
+      html.is-android-layout .side-section.is-player .frame-wrap {
+        min-height: 0;
+        aspect-ratio: auto;
+        flex: 1 1 auto;
+      }
+
+      html.is-android-layout .side-section.is-chat {
+        display: none;
+      }
+
+      html.is-android-layout .mobile-chat-toggle {
+        display: inline-flex;
+      }
+
+      html.is-android-layout body.is-chat-expanded .side-section.is-player {
+        display: none;
+      }
+
+      html.is-android-layout body.is-chat-expanded .side-section.is-chat {
+        display: flex;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="direct-header">
+      <div class="direct-brand">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>
+          <strong>VK + Twitch</strong>
+          <span>Modo directo ligero</span>
+        </span>
+      </div>
+      <nav class="direct-actions" aria-label="Acciones del directo">
+        <button class="direct-action mobile-chat-toggle" id="chat-toggle" type="button" aria-pressed="false" aria-label="Expandir chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path></svg>
+          <span class="action-label-optional">Chat</span>
+        </button>
+        <button class="direct-action" id="reload-players" type="button" aria-label="Recargar reproductores">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66"></path><path d="M20 4v7h-7"></path></svg>
+          <span class="action-label-optional">Recargar</span>
+        </button>
+        <a class="direct-action is-exit" href="/inicio" aria-label="Salir del modo directo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          <span class="action-label-optional">Salir</span>
+        </a>
+      </nav>
+    </header>
+
+    <main class="direct-stage">
+      <section class="panel main-panel" aria-label="Video principal de VK">
+        <div class="panel-heading"><strong>VK Video</strong><span>Video principal</span></div>
+        <div class="frame-wrap">
+          <iframe
+            id="vk-player"
+            src="https://live.vkvideo.ru/app/embed/redbreake"
+            title="Directo completo en VK Video"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen
+            loading="eager"
+            referrerpolicy="strict-origin-when-cross-origin"
+            scrolling="no"
+          ></iframe>
+        </div>
+      </section>
+
+      <aside class="side-panel" aria-label="Twitch y chat">
+        <section class="panel side-section is-player" aria-label="Video de Twitch">
+          <div class="panel-heading"><strong>Twitch</strong><span>Companion silenciado</span></div>
+          <div class="frame-wrap"><iframe id="twitch-player" title="Directo de Twitch silenciado" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="eager"></iframe></div>
+        </section>
+        <section class="panel side-section is-chat" aria-label="Chat de Twitch">
+          <div class="panel-heading"><strong>Chat de Twitch</strong><span>Comunidad en vivo</span></div>
+          <div class="frame-wrap"><iframe id="twitch-chat" title="Chat de Twitch" loading="eager"></iframe></div>
+        </section>
+      </aside>
+    </main>
+
+    <noscript><div class="noscript-message">Activa JavaScript para cargar Twitch. El video principal de VK continúa disponible.</div></noscript>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const hostname = window.location.hostname;
+        const params = new URLSearchParams(window.location.search);
+        const isQa = hostname === "resubidos-qa.lolweapon.com" || hostname === "viendo-qa.lolweapon.com";
+        const twitchChannel = isQa ? "redbreake" : "kalathraslolweapon";
+        const twitchPlayer = document.getElementById("twitch-player");
+        const twitchChat = document.getElementById("twitch-chat");
+        const chatToggle = document.getElementById("chat-toggle");
+
+        function updateForcedAndroidLayout() {
+          if (params.get("layout") !== "android") return;
+          const browserWidth = window.innerWidth;
+          const browserHeight = window.innerHeight;
+          const reportedScreenWidth = window.screen && window.screen.width ? window.screen.width : 0;
+          const compactWidth = reportedScreenWidth >= 320 && reportedScreenWidth <= 600 ? reportedScreenWidth : 425;
+          const scale = browserWidth > 700 ? browserWidth / compactWidth : 1;
+          document.documentElement.classList.add("is-android-layout");
+          document.documentElement.style.setProperty("--android-layout-width", `${browserWidth / scale}px`);
+          document.documentElement.style.setProperty("--android-layout-height", `${browserHeight / scale}px`);
+          document.documentElement.style.setProperty("--android-layout-scale", String(scale));
+        }
+
+        function buildTwitchUrl(type) {
+          const parent = encodeURIComponent(hostname || "localhost");
+          const channel = encodeURIComponent(twitchChannel);
+          return type === "chat"
+            ? `https://www.twitch.tv/embed/${channel}/chat?parent=${parent}&darkpopout`
+            : `https://player.twitch.tv/?channel=${channel}&parent=${parent}&muted=true&autoplay=true`;
+        }
+
+        function loadTwitchFrames() {
+          twitchPlayer.src = buildTwitchUrl("player");
+          twitchChat.src = buildTwitchUrl("chat");
+        }
+
+        function reloadFrame(frame) {
+          const source = frame.src;
+          frame.removeAttribute("src");
+          window.requestAnimationFrame(() => { frame.src = source; });
+        }
+
+        chatToggle.addEventListener("click", () => {
+          const expanded = document.body.classList.toggle("is-chat-expanded");
+          chatToggle.setAttribute("aria-pressed", String(expanded));
+          chatToggle.setAttribute("aria-label", expanded ? "Cerrar chat expandido" : "Expandir chat");
+        });
+
+        document.getElementById("reload-players").addEventListener("click", () => {
+          reloadFrame(document.getElementById("vk-player"));
+          reloadFrame(twitchPlayer);
+          reloadFrame(twitchChat);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && document.body.classList.contains("is-chat-expanded")) {
+            chatToggle.click();
+          }
+        });
+
+        updateForcedAndroidLayout();
+        window.addEventListener("resize", updateForcedAndroidLayout);
+        window.visualViewport && window.visualViewport.addEventListener("resize", updateForcedAndroidLayout);
+        loadTwitchFrames();
+      })();
+    </script>
+  </body>
+</html>

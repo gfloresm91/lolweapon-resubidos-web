@@ -158,6 +158,24 @@ Criterio de salida: build y deploy correctos, rutas principales funcionales, dat
 
 Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desplegar. No usar `git reset --hard` ni restaurar archivos con cambios ajenos.
 
+### Etapa 1.5: aislar el punto caliente `/directo`
+
+Objetivo: sacar el modo dual, destino de entrada masiva durante los directos, del camino dinámico de Inicio.
+
+Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/directo-static.md).
+
+1. Crear un HTML estático autónomo con VK, Twitch, chat y controles mínimos.
+2. Mantener responsive real y compatibilidad con `?layout=android` para navegadores móviles.
+3. No resolver sesión/permisos, consultar PostgreSQL, llamar APIs internas ni abrir WebSockets propios.
+4. Hacer que los enlaces web de modo dual abran `/directo` y conservar fallback para enlaces existentes.
+5. Servir el archivo directamente desde Nginx en QA antes del proxy hacia Next.
+6. Validar visualmente en desktop/móvil y comprobar cero llamadas internas.
+7. Detener controladamente Node QA y confirmar que `/directo` continúa respondiendo.
+8. Ejecutar una prueba de 500–800 solicitudes concurrentes contra el archivo.
+9. Repetir configuración y verificación en producción mediante release normal.
+
+Criterio de salida: `/directo` funciona aunque Next QA esté detenido, los embeds y chat mantienen su funcionalidad y el pico de solicitudes no genera trabajo en Node/PostgreSQL.
+
 ### Etapa 2: observabilidad y alertas
 
 Objetivo: conocer el límite antes de otro directo y detectar degradación antes de una caída.
