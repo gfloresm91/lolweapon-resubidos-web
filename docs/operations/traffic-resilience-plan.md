@@ -49,6 +49,32 @@ Antes de iniciar una etapa, revisar `git status` y `git diff`; no asumir que est
 
 El último `npm run build` local terminó correctamente, pero debe repetirse antes de entregar el commit si el diff cambia.
 
+## Flujo adicional de escritura: progreso de reproducción
+
+La app móvil guarda la posición del video aproximadamente cada 12 segundos por usuario que está reproduciendo. La persistencia usa `PlatformUserLivePlayback` y `upsertLivePlayback()`, con una clave única indexada por `userId`, `liveId`, `source` y `partIndex`. La ruta web de reproducción reutiliza el mismo repositorio, por lo que este flujo no debe medirse exclusivamente como tráfico móvil.
+
+Carga máxima teórica si todos los usuarios concurrentes están reproduciendo y sincronizando al mismo tiempo:
+
+| Reproducciones activas | Intervalo | Upserts aproximados |
+| ---: | ---: | ---: |
+| 200 | 12 segundos | 17 por segundo |
+| 500 | 12 segundos | 42 por segundo |
+| 800 | 12 segundos | 67 por segundo |
+
+Cuando un video se completa, el repositorio también actualiza mediante `upsert` el estado visto en `PlatformUserLive`. Esa segunda escritura no ocurre en cada tick, solo al recibirse `completed=true`.
+
+Este flujo no cambia la causa raíz del incidente de tráfico público: las escrituras problemáticas eran inicializaciones de permisos que nunca debieron ejecutarse por solicitud. Sin embargo, sí es una carga legítima y sostenida que debe incluirse en las pruebas de capacidad de PostgreSQL.
+
+Antes de optimizarlo, medir latencia, throughput, espera del pool, WAL, I/O y contención del índice. Opciones posteriores, solamente si las mediciones lo justifican:
+
+- agregar jitter al intervalo del cliente para evitar que muchos dispositivos escriban en el mismo segundo;
+- no enviar una actualización si la posición no cambió materialmente;
+- aumentar el intervalo durante pausa o background y forzar guardado al pausar, salir o cambiar de parte;
+- aceptar el progreso en memoria/Redis y consolidarlo de forma asíncrona, conservando una estrategia segura ante pérdida de proceso;
+- agrupar escrituras únicamente si se introduce una cola durable y se define cuánto progreso es aceptable perder.
+
+No retrasar el guardado solo para reducir consultas sin validar primero la experiencia esperada de reanudación del video.
+
 ## Evaluación de las recomendaciones externas
 
 ### Conexiones PostgreSQL
@@ -113,6 +139,8 @@ No avanzar automáticamente por todas las etapas. Cada una tiene una decisión d
 
 Objetivo: desplegar y verificar las optimizaciones locales sin tocar aún producción ni agregar infraestructura.
 
+Estado: **completada en QA el 23 de agosto de 2026** con `0cb5701` (`fix(performance): harden public traffic paths`) y documentación `ec6cc40`. El build de producción terminó correctamente; los flujos invitados y autenticados pasaron el smoke test; QA respondió cinco veces con HTTP 200 en aproximadamente 18–70 ms; `resubidos-qa.service` quedó activo con cero reinicios; PostgreSQL mostró cero sesiones `idle in transaction`; no aparecieron errores propios de la aplicación. Se observaron un 404 externo de Amazon IVS y un `MaxListenersExceededWarning` del reproductor, registrados para revisión pero no bloqueantes para esta etapa.
+
 1. Revisar el estado y diff local, cuidando cambios ajenos.
 2. Cambiar a `dev`, repetir `npm run build` si hubo modificaciones posteriores y crear el commit de rendimiento.
 3. Hacer push a `dev` para desplegar QA.
@@ -139,8 +167,9 @@ Objetivo: conocer el límite antes de otro directo y detectar degradación antes
 3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.
 4. Medir Nginx: tasa de solicitudes, conexiones activas, 499/502/503/504 y latencia.
 5. Medir PostgreSQL: conexiones por estado, pool ocupado/esperando, consultas lentas e `idle in transaction`.
-6. Mejorar access logs para incluir host, status, tiempo total y upstream sin guardar datos personales innecesarios.
-7. Definir destinatarios y runbook de respuesta para cada alerta.
+6. Medir por separado los `upsert` de progreso de reproducción: escrituras por segundo, latencia, WAL e I/O.
+7. Mejorar access logs para incluir host, status, tiempo total y upstream sin guardar datos personales innecesarios.
+8. Definir destinatarios y runbook de respuesta para cada alerta.
 
 Criterio de salida: dashboard utilizable y una alerta de prueba recibida correctamente. No ejecutar prueba de carga significativa sin esta etapa.
 
@@ -162,11 +191,13 @@ Objetivo: medir capacidad real, no estimarla por hardware.
 
 1. Preparar un escenario con usuarios invitados, páginas HTML, APIs públicas y WebSockets persistentes.
 2. Usar datos de prueba y evitar mutaciones destructivas.
-3. Ejecutar escalones de 50, 100, 200 y 500 usuarios; sostener el nivel objetivo entre 20 y 30 minutos.
-4. Simular un spike de entrada y reconexión, no solo requests HTTP aislados.
-5. Capturar métricas y detener si se superan los criterios de rollback.
-6. Corregir cuellos medidos y repetir hasta obtener un resultado reproducible.
-7. Certificar después 800 usuarios si el negocio lo requiere.
+3. Separar al menos dos escenarios: pico web invitado y reproducciones autenticadas con guardado cada 12 segundos.
+4. En el escenario de reproducción, distribuir los ticks durante la ventana o reproducir el patrón real del cliente; también ensayar una sincronización accidental para conocer el peor caso.
+5. Ejecutar escalones de 50, 100, 200 y 500 usuarios; sostener el nivel objetivo entre 20 y 30 minutos.
+6. Simular un spike de entrada y reconexión, no solo requests HTTP aislados.
+7. Capturar métricas y detener si se superan los criterios de rollback.
+8. Corregir cuellos medidos y repetir hasta obtener un resultado reproducible.
+9. Certificar después 800 usuarios si el negocio lo requiere.
 
 Criterio de salida: informe con configuración, commit probado, resultados, gráficos, fallos y capacidad certificada. No probar por primera vez contra producción durante un directo.
 
