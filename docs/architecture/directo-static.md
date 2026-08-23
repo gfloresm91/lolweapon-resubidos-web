@@ -1,6 +1,6 @@
 # ADR-001: aislar el modo dual como página estática
 
-**Estado:** aceptada, activa en QA; pendiente prueba de aislamiento/carga y producción
+**Estado:** aceptada y certificada en QA; pendiente producción
 **Fecha:** 23 de agosto de 2026  
 **Decisor:** propietario del proyecto
 
@@ -79,6 +79,21 @@ Ventaja: evita Node, PostgreSQL y bundles de la plataforma; continúa disponible
 5. Comprobar que las acciones de moderación del chat no queden bloqueadas por superposiciones.
 6. Medir 500–800 solicitudes concurrentes al HTML estático.
 7. Validar que la página siga respondiendo con `resubidos-qa.service` detenido durante una prueba controlada en QA.
+
+## Resultado en QA
+
+Certificación completada el 23 de agosto de 2026:
+
+- Con `resubidos-qa.service` detenido, `/directo` respondió `HTTP 200` directamente desde Nginx y `/inicio` respondió `502`, confirmando el aislamiento de Node.
+- El servicio QA se restauró correctamente y quedó `active` junto con Nginx.
+- Cinco oleadas de 100 conexiones nuevas: 500/500 respuestas `200`, cero errores, p95 172 ms.
+- Cinco oleadas de 500 conexiones nuevas: 2.500/2.500 respuestas `200`, cero errores, p95 686 ms.
+- Cinco oleadas de 800 conexiones nuevas: 4.000/4.000 respuestas `200`, cero errores, p50 1,20 s, p95 1,56 s, p99 1,64 s y máximo 1,68 s.
+- La prueba creó conexiones TLS independientes directamente contra Nginx; es más costosa para el origen que la reutilización normal detrás de Cloudflare.
+- Después de la carga: load average 0,41/0,34/0,18, aproximadamente 6,3 GiB de memoria disponible, 28 MiB de swap en uso sin crecimiento observado y cero errores recientes de Nginx.
+- La comprobación posterior del origen respondió `200` en aproximadamente 6 ms.
+
+Esta certificación cubre la entrega del HTML estático, no la capacidad de VK/Twitch ni el resto de la plataforma dinámica. Los iframes descargan su contenido directamente desde los proveedores.
 
 ## Rollback
 

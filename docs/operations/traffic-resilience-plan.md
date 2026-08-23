@@ -162,7 +162,7 @@ Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desple
 
 Objetivo: sacar el modo dual, destino de entrada masiva durante los directos, del camino dinámico de Inicio.
 
-Estado al 23 de agosto de 2026: página implementada y servida directamente por Nginx en QA desde `/var/www/resubidos-qa/directo.html`; funcionamiento visual confirmado. Pendientes la prueba con Node QA detenido, carga concurrente, automatización del workflow ya preparada localmente y despliegue productivo.
+Estado al 23 de agosto de 2026: **completada y certificada en QA**. La página se sirve directamente por Nginx desde `/var/www/resubidos-qa/directo.html` y el workflow actualiza esa copia. Con Node QA detenido mantuvo HTTP 200 mientras `/inicio` devolvió 502. Cinco oleadas de 800 solicitudes TLS nuevas entregaron 4.000/4.000 respuestas HTTP 200, cero errores y p95 de 1,56 s; servicios y recursos quedaron saludables. Pendiente repetir la configuración mediante release productivo.
 
 Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/directo-static.md).
 
