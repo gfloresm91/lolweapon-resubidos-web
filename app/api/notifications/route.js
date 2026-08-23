@@ -14,6 +14,42 @@ import { can } from "@/lib/repositories/platformUserRepository";
 
 export const dynamic = "force-dynamic";
 
+const PUBLIC_CACHE_CONTROL = "public, max-age=5, s-maxage=10, stale-while-revalidate=30";
+const PUBLIC_RESULT_TTL_MS = 10 * 1000;
+const globalForPublicNotifications = globalThis;
+
+if (!globalForPublicNotifications.__lolweaponPublicNotifications) {
+  globalForPublicNotifications.__lolweaponPublicNotifications = new Map();
+}
+
+const publicNotificationCache = globalForPublicNotifications.__lolweaponPublicNotifications;
+
+function listPublicNotifications({ user, limit }) {
+  const cacheKey = String(limit || 20);
+  const cached = publicNotificationCache.get(cacheKey);
+
+  if (cached?.result && Date.now() - cached.updatedAt <= PUBLIC_RESULT_TTL_MS) {
+    return Promise.resolve(cached.result);
+  }
+
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = listNotifications({ user, limit })
+    .then((result) => {
+      publicNotificationCache.set(cacheKey, { result, updatedAt: Date.now(), promise: null });
+      return result;
+    })
+    .catch((error) => {
+      publicNotificationCache.delete(cacheKey);
+      throw error;
+    });
+
+  publicNotificationCache.set(cacheKey, { result: cached?.result || null, updatedAt: cached?.updatedAt || 0, promise });
+  return promise;
+}
+
 export async function GET(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const user = await getCurrentUserFromToken(token);
@@ -29,13 +65,25 @@ export async function GET(request) {
     return NextResponse.json({ success: false, error: "Permiso insuficiente" }, { status: 403 });
   }
 
+  const isPublicRequest = !user?.id && !isFullPage && searchParams.get("scope") === "public";
   const result = isFullPage ? await listUserNotifications({
     user, search: searchParams.get("search") || "", type: searchParams.get("type") || "all",
     status: searchParams.get("status") || "all", page: searchParams.get("page") || 1, pageSize: searchParams.get("pageSize") || 10,
     sort: searchParams.get("sort") || "published", direction: searchParams.get("direction") || "desc",
-  }) : await listNotifications({ user: user || accessUser, limit: searchParams.get("limit") || 20 });
+  }) : isPublicRequest
+    ? await listPublicNotifications({ user: accessUser, limit: searchParams.get("limit") || 20 })
+    : await listNotifications({ user: user || accessUser, limit: searchParams.get("limit") || 20 });
 
-  return NextResponse.json({ success: true, ...result });
+  const response = NextResponse.json({ success: true, ...result });
+
+  if (isPublicRequest) {
+    response.headers.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+    response.headers.set("Cloudflare-CDN-Cache-Control", PUBLIC_CACHE_CONTROL);
+  } else {
+    response.headers.set("Cache-Control", "private, no-store");
+  }
+
+  return response;
 }
 
 export async function POST(request) {

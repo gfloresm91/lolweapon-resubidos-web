@@ -730,7 +730,7 @@ export default function HomeDashboard({
 
     async function loadYoutubeVideos() {
       try {
-        const response = await fetch("/api/youtube/videos", { cache: "no-store" });
+        const response = await fetch("/api/youtube/videos");
         const data = await response.json();
 
         if (isMounted && response.ok) {

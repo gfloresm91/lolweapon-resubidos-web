@@ -374,6 +374,7 @@ function wasDiscoveryToastShown(key) {
 export default function HomePage({
   activeView = "home",
   initialLives = EMPTY_LIST,
+  initialLivesAreComplete = true,
   initialLiveStatuses = LIVE_STATUS_OPTIONS,
   initialAnimeLibrary = EMPTY_LIST,
   initialAnimeCalendar = null,
@@ -492,6 +493,7 @@ export default function HomePage({
   const isAuthenticated = Boolean(currentUser?.id);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
+  const [livesAreComplete, setLivesAreComplete] = useState(initialLivesAreComplete);
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
   const [animeActivity, setAnimeActivity] = useState(initialAnimeActivity || {});
@@ -585,7 +587,8 @@ export default function HomePage({
 
   useEffect(() => {
     setLives(initialLives);
-  }, [initialLives]);
+    setLivesAreComplete(initialLivesAreComplete);
+  }, [initialLives, initialLivesAreComplete]);
 
   useEffect(() => {
     setLiveStatuses(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -1000,7 +1003,10 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    if (!["home", "tracker", "trackerCalendar", "myList"].includes(currentView) || lives.length) {
+    const needsHomeLives = currentView === "home" && !lives.length;
+    const needsCompleteTrackerLives = ["tracker", "trackerCalendar", "myList", "platformTracker"].includes(currentView) && !livesAreComplete;
+
+    if (!needsHomeLives && !needsCompleteTrackerLives) {
       return undefined;
     }
 
@@ -1014,6 +1020,7 @@ export default function HomePage({
         if (isMounted && response.ok) {
           setLives(data.lives || []);
           setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+          setLivesAreComplete(true);
         }
       } catch {
         if (isMounted && currentView !== "home") {
@@ -1027,7 +1034,7 @@ export default function HomePage({
     return () => {
       isMounted = false;
     };
-  }, [currentView, lives.length]);
+  }, [currentView, lives.length, livesAreComplete]);
 
   useEffect(() => {
     if (!["tracker", "trackerCalendar", "myList"].includes(currentView) || !isAuthenticated) {

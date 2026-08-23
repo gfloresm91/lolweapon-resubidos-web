@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_CACHE_TTL_MS = 30 * 1000;
 const STATUS_STALE_TTL_MS = 2 * 60 * 1000;
+const RESPONSE_CACHE_CONTROL = "public, max-age=10, s-maxage=15, stale-while-revalidate=45";
 
 let statusCache = null;
 let statusRefreshPromise = null;
@@ -13,7 +14,8 @@ let statusRefreshPromise = null;
 function createResponse(status, cacheStatus) {
   return NextResponse.json(status, {
     headers: {
-      "Cache-Control": "no-store",
+      "Cache-Control": RESPONSE_CACHE_CONTROL,
+      "Cloudflare-CDN-Cache-Control": RESPONSE_CACHE_CONTROL,
       "X-Twitch-Status-Cache": cacheStatus,
     },
   });
