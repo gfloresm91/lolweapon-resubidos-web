@@ -42,6 +42,12 @@ jobs:
             npm run db:generate
             npm run build
             npm run db:migrate:deploy
+            if [[ ! -d /var/www/resubidos-qa || ! -w /var/www/resubidos-qa ]]; then
+              echo "El directorio /var/www/resubidos-qa no existe o no es escribible por $(id -un)." >&2
+              echo "Créalo una vez con: sudo install -d -o $(id -un) -g www-data -m 0755 /var/www/resubidos-qa" >&2
+              exit 1
+            fi
+            install -m 0644 public/directo/index.html /var/www/resubidos-qa/directo.html
             sudo systemctl restart resubidos-qa.service
             systemctl is-active resubidos-qa.service
 

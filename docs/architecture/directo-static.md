@@ -1,6 +1,6 @@
 # ADR-001: aislar el modo dual como página estática
 
-**Estado:** aceptada, implementación local pendiente de QA  
+**Estado:** aceptada, activa en QA; pendiente prueba de aislamiento/carga y producción
 **Fecha:** 23 de agosto de 2026  
 **Decisor:** propietario del proyecto
 
@@ -23,6 +23,8 @@ Servir `/directo` como un único archivo HTML/CSS/JavaScript estático directame
 - layout responsive y compatibilidad opcional con `?layout=android`.
 
 La página no resuelve sesión o permisos, no consulta PostgreSQL, no llama APIs internas y no abre WebSockets propios. Nginx entrega el archivo antes del proxy hacia Next.js. Cloudflare podrá cachear el HTML en una etapa posterior.
+
+Nginx no lee el archivo desde `/home/kalaplex`: ese home no es atravesable por `www-data` y abrirlo ampliaría permisos innecesariamente. QA publica una copia en `/var/www/resubidos-qa/directo.html`, directorio propiedad del usuario de deploy y grupo `www-data`; el workflow actualiza esa copia con `install -m 0644` después de completar build y migraciones. Producción debe usar el equivalente `/var/www/resubidos/directo.html` cuando se apruebe el release.
 
 Se conserva un fallback estático de Next: mientras Nginx no tenga la ubicación exacta, `/directo` redirige a `/directo/index.html`. Los enlaces web nuevos abren `/directo`. Los enlaces antiguos con `/inicio?stream=dual` también navegan allí al montar y posteriormente podrán redirigirse en Nginx antes de tocar Node.
 

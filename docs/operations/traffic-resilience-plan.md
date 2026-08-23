@@ -162,6 +162,8 @@ Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desple
 
 Objetivo: sacar el modo dual, destino de entrada masiva durante los directos, del camino dinámico de Inicio.
 
+Estado al 23 de agosto de 2026: página implementada y servida directamente por Nginx en QA desde `/var/www/resubidos-qa/directo.html`; funcionamiento visual confirmado. Pendientes la prueba con Node QA detenido, carga concurrente, automatización del workflow ya preparada localmente y despliegue productivo.
+
 Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/directo-static.md).
 
 1. Crear un HTML estático autónomo con VK, Twitch, chat y controles mínimos.
