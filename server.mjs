@@ -9,6 +9,7 @@ import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/yout
 import { publishDueNotifications } from "./lib/repositories/notificationRepository.js";
 import { closeActiveStreamAudienceSessions, recordStreamAudienceSample } from "./lib/repositories/streamAudienceRepository.js";
 import { fetchCurrentTwitchStream } from "./lib/twitch.js";
+import { writeDirectoStatusSnapshot } from "./lib/directoStatusSnapshot.js";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = process.env.HOSTNAME || "0.0.0.0";
@@ -17,6 +18,7 @@ const DEFAULT_YOUTUBE_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 const MIN_YOUTUBE_SYNC_INTERVAL_MS = 60 * 1000;
 const NOTIFICATION_PUBLISH_INTERVAL_MS = 30 * 1000;
 const AUDIENCE_SAMPLE_INTERVAL_MS = 60 * 1000;
+const DIRECTO_STATUS_INTERVAL_MS = 30 * 1000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
@@ -119,6 +121,31 @@ function startStreamAudienceSampler() {
   console.log(`> Stream audience sample every ${AUDIENCE_SAMPLE_INTERVAL_MS / 1000}s`);
 }
 
+function startDirectoStatusPublisher() {
+  const outputDirectory = process.env.DIRECTO_STATIC_DIR;
+  if (!outputDirectory) {
+    console.log("> Directo status snapshot disabled");
+    return;
+  }
+
+  let isPublishing = false;
+  async function publish() {
+    if (isPublishing) return;
+    isPublishing = true;
+    try {
+      await writeDirectoStatusSnapshot(outputDirectory);
+    } catch (error) {
+      console.error("> Directo status snapshot failed:", error);
+    } finally {
+      isPublishing = false;
+    }
+  }
+
+  void publish();
+  setInterval(publish, DIRECTO_STATUS_INTERVAL_MS);
+  console.log(`> Directo status snapshot every ${DIRECTO_STATUS_INTERVAL_MS / 1000}s`);
+}
+
 async function syncStartupNotifications() {
   try {
     const result = await syncContentNotifications();
@@ -176,4 +203,5 @@ server.listen(port, hostname, () => {
   startYoutubeNotificationSync();
   startScheduledNotificationPublisher();
   startStreamAudienceSampler();
+  startDirectoStatusPublisher();
 });

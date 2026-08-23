@@ -250,6 +250,7 @@ npm run db:restore
 - `PersistentTwitchPlayer` es delicado.
 - En Inicio, la vista `Twitch` usa un player oficial dentro del flujo normal junto al chat para evitar que una capa fija active las protecciones anti-clickjacking; respeta pausas manuales. `PersistentTwitchPlayer` queda oculto en Inicio y se reserva para el mini player fuera de esa ruta. `VK + Twitch` mantiene su companion oficial separado, visible y silenciado junto al chat, con la política de reanudación específica aprobada para el modo dual.
 - `/api/twitch/status` comparte durante 30 segundos el estado público del canal y deduplica refrescos simultáneos. `lib/twitch.js` reutiliza únicamente el token de aplicación, con expiración anticipada, timeout y un reintento ante `401`; no mezclar esta caché con los tokens OAuth de usuarios ni con la sincronización de roles Twitch.
+- Las respuestas públicas de `/api/twitch/status` admiten caché CDN corta; no volverlas privadas o `no-store` sin revisar el impacto de concurrencia durante un directo.
 - El registro manual de EventSub mantiene suscripciones `stream.online` y `stream.offline`. Para cada tipo lista usando el único filtro permitido por Twitch, identifica localmente el broadcaster y reemplaza únicamente suscripciones coincidentes que no estén activas para el callback configurado. Las revocaciones deben registrar `type`, `status` e `id` sin incluir secretos.
 - Un `stream.online` con firma válida es evidencia suficiente para crear el card sin volver a depender inmediatamente de Helix; `TWITCH_REQUIRE_ACTIVE_STREAM` sigue aplicando a la creación manual. Las notificaciones EventSub se deduplican por ID del stream. `stream.offline` cambia el registro Twitch más reciente que siga `En directo` a `Subiendo`.
 - Twitch iframe es cross-origin y puede pausar por reglas del navegador/Twitch.
@@ -314,6 +315,10 @@ npm run db:restore
 - `middleware.js` exime `/api/mobile/*` de la validación de Origin/CSRF porque esta auth es exclusivamente por bearer token, nunca por cookie. Si alguna ruta móvil empieza a confiar en la cookie de sesión, esta exención debe acotarse.
 - Borrado de cuenta self-service usa `anonymizeAndDeactivatePlatformUser` (`lib/repositories/platformUserRepository.js`), distinto del soft-delete admin (`deletePlatformUser`): scrubbea PII (email, login, alias, avatar, password) y revoca todo el material de auth (identidades, sesiones web, tokens móviles), pero conserva el contenido del usuario (tickets, ratings, tier lists) asociado al usuario anonimizado.
 - `public/lolweapon-plus/latest.json` es el manifest que consulta la app para detectar actualizaciones (`versionCode`, `versionName`, `apkUrl`, `changelog`). El `.apk` se sube manualmente al servidor; no se versiona en git.
+- La API móvil del Rastreador vive en `/api/mobile/v1/lives/*` y reutiliza los permisos configurados de la web. Editar exige `tracker.update` y además `tracker.form.full` o `tracker.form.compact`; notificar exige `tracker.lives.notify` o `admin.lives.notify`.
+- `PlatformMobilePushToken` registra direcciones FCM independientemente de las sesiones móviles. `FIREBASE_SERVICE_ACCOUNT_JSON` contiene las credenciales del servidor y nunca debe imprimirse ni versionarse. `PlatformNotification.pushedAt` evita reenviar una publicación ya entregada.
+- `PlatformUserLivePlayback` sincroniza posición y estado de reproducción entre la web y Lolweapon+. La web usa `/api/lives/[id]/playback`; la app usa `/api/mobile/v1/lives/[id]/playback`. Ambos caminos deben conservar el mismo registro por usuario/directo/parte.
+- `/mobile-embed/watch/[id]` es la superficie embebida de reproducción para Lolweapon+; cualquier cambio del player debe comprobar navegación, persistencia de progreso y comunicación con el contenedor móvil.
 - No confundir con `docs/backend-api.md`: ese archivo vive en el repo de la app móvil (fuera de este repo) y describe el contrato de estos endpoints desde el lado cliente.
 
 ### Sincronización XLSX Del Rastreador
@@ -348,6 +353,8 @@ npm run db:restore
 - Deploy recomendado vía GitHub Actions, no manual, salvo instrucciones explícitas.
 - `npm start` usa `server.mjs`; Nginx debe permitir `Upgrade`/`Connection` para el WebSocket de notificaciones.
 - `server.mjs` también ejecuta el sincronizador de YouTube en background para notificaciones realtime; revisar `YOUTUBE_NOTIFICATION_SYNC_ENABLED` y `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` si se cambia la cadencia.
+- `/api/youtube/videos` solo consulta y cachea la fuente pública para renderizar Inicio; nunca debe sincronizar PostgreSQL ni crear notificaciones por visitante. Esa escritura pertenece exclusivamente al sincronizador de `server.mjs`.
+- Inicio carga únicamente los directos recientes que muestra. Si desde Inicio se navega internamente al Rastreador, Calendario, Mi lista o su mantenedor, `HomePage` debe completar el catálogo mediante `/api/lives` antes de renderizar esas vistas.
 - `server.mjs` publica notificaciones programadas cada 30 segundos. `PlatformNotification.publishedAt` debe asignarse una sola vez antes de emitir `notifications:update`; no mostrar registros inactivos, eliminados, no publicados o expirados.
 - Notificaciones públicas usan `audience: all` y pueden llegar a invitados; invitados guardan leído/descartado en `localStorage`, autenticados en `PlatformUserNotification`. Novedades/changelog se sincronizan por `dedupeKey` desde `server.mjs`.
 - Servicios systemd oficiales:

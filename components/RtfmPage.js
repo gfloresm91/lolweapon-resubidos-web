@@ -114,6 +114,7 @@ const navigationTree = [
     icon: FolderOpen,
     children: [
       { title: "Inicio", href: "/inicio", permission: "home.view", icon: House },
+      { title: "Modo dual VK + Twitch", href: "/directo", publicAccess: true, icon: PlayCircle },
       { title: "RTFM", href: "/rtfm", permission: "rtfm.view", icon: FileText },
       { title: "Novedades", href: "/novedades", permission: "news.view", icon: Sparkles },
       { title: "Historial de cambios", href: "/changelog", permission: "changelog.view", icon: History },

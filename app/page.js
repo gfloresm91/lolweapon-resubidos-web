@@ -5,7 +5,7 @@ import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can, listPlatformPermissions, listPlatformRoles, listPlatformUsers } from "@/lib/repositories/platformUserRepository";
-import { getLiveStatuses, readLives } from "@/lib/repositories/liveRepository";
+import { readRecentLives } from "@/lib/repositories/liveRepository";
 import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +13,11 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const [currentUser, accessUser, isAdmin, lives, liveStatuses] = await Promise.all([
+  const [currentUser, accessUser, isAdmin, lives] = await Promise.all([
     getCurrentUserFromToken(token),
     getAccessUserFromToken(token),
     validateAdminSessionToken(token),
-    readLives(),
-    getLiveStatuses(),
+    readRecentLives({ limit: 10 }),
   ]);
 
   if (!can(accessUser, "home.view")) {
@@ -48,7 +47,7 @@ export default async function Page() {
     <HomePage
       activeView="home"
       initialLives={lives}
-      initialLiveStatuses={liveStatuses}
+      initialLivesAreComplete={false}
       twitchLogin={twitchLogin}
       youtubeChannelUrl={youtubeChannelUrl}
       isAdmin={isAdmin}

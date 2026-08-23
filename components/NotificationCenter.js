@@ -172,7 +172,10 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
     }
 
     try {
-      const response = await fetch("/api/notifications?limit=40", { cache: "no-store" });
+      const notificationUrl = isAuthenticated
+        ? "/api/notifications?limit=40"
+        : "/api/notifications?limit=40&scope=public";
+      const response = await fetch(notificationUrl, isAuthenticated ? { cache: "no-store" } : undefined);
       const data = await response.json().catch(() => null);
 
       if (response.ok && data?.success) {

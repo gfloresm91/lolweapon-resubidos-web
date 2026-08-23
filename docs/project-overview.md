@@ -55,7 +55,7 @@ TWITCH_REQUIRE_ACTIVE_STREAM
 
 No retorna duración ni views (requeriría llamada extra a `/videos` con `contentDetails`/`statistics` — costo adicional de cuota).
 
-`server.mjs` ejecuta un sincronizador en background para detectar nuevos videos aunque ningún usuario visite `/inicio`. El intervalo se controla con `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` y puede desactivarse con `YOUTUBE_NOTIFICATION_SYNC_ENABLED=false`. Cuando `DATA_SOURCE=postgres`, el sistema guarda IDs en `YoutubeVideo`: la primera sincronización crea una línea base silenciosa para evitar notificaciones antiguas; los videos nuevos posteriores crean una notificación `Alerta` pública y se empujan por WebSocket. `/api/youtube/videos` mantiene la sincronización como respaldo al cargar el home.
+`server.mjs` ejecuta un sincronizador en background para detectar nuevos videos aunque ningún usuario visite `/inicio`. El intervalo se controla con `YOUTUBE_NOTIFICATION_SYNC_INTERVAL_MS` y puede desactivarse con `YOUTUBE_NOTIFICATION_SYNC_ENABLED=false`. Cuando `DATA_SOURCE=postgres`, el sistema guarda IDs en `YoutubeVideo`: la primera sincronización crea una línea base silenciosa para evitar notificaciones antiguas; los videos nuevos posteriores crean una notificación `Alerta` pública y se empujan por WebSocket. `/api/youtube/videos` no escribe en PostgreSQL: obtiene los videos para Inicio mediante una caché de proceso de 15 minutos, deduplica refrescos concurrentes, conserva el último resultado válido durante una hora y publica cabeceras de caché CDN.
 
 **Variables de entorno requeridas:**
 ```
@@ -336,7 +336,8 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 
 | Ruta | Descripción |
 |---|---|
-| `/inicio` | Home: stream en vivo, últimos directos y últimos videos de YouTube. `Twitch` es la vista predeterminada; `VK + Twitch` abre siempre un teatro de aplicación fijo de pantalla completa que bloquea el scroll exterior y conserva VK, Twitch y chat dentro del viewport. Al montar el teatro, Chrome móvil en Android y Safari/Chrome en iOS muestran encima una ayuda descartable para solicitar el sitio de escritorio, debido a la restricción móvil del embed de VK; la ayuda no modifica el layout del teatro y queda recuperable desde Información. Android admite temporalmente el override manual y opcional `stream=dual&layout=android`: el teatro se renderiza sobre un lienzo móvil escalado al viewport virtual de escritorio para conservar tamaños legibles, pero entrar al modo dual no agrega `layout` automáticamente. Los parámetros se eliminan al salir del teatro. Una sola instancia del SDK oficial de Twitch se mueve entre Inicio y el mini player; al entrar al teatro solicita reproducción durante el clic y después de montar el ancla, y `PAUSE` intenta reanudarla mientras la pestaña siga visible. `PLAYBACK_BLOCKED` habilita una acción manual. Salir o pulsar `Escape` vuelve a Twitch. VK conserva su fullscreen nativo y se desmonta al salir. Durante el directo se muestran por separado la audiencia oficial de Twitch y la presencia aproximada en esta página. |
+| `/inicio` | Home: stream en vivo, últimos directos y últimos videos de YouTube. `Twitch` es la vista predeterminada. La acción `VK + Twitch` navega a `/directo`; enlaces anteriores con `?stream=dual` hacen la misma transición al montar. El teatro interno anterior se conserva temporalmente como rollback de código, pero ya no es el destino normal. |
+| `/directo` | Modo dual público y aislado. Nginx sirve `public/directo/index.html` antes del proxy a Next. Contiene VK, companion Twitch silenciado, chat, intercambio/tamaño de players y ayuda/información; no resuelve sesión/permisos, no usa PostgreSQL ni abre APIs/WebSockets propios. La metadata pública proviene del archivo prescindible `/directo-status.json`, publicado cada 30 segundos por `server.mjs`; los embeds no dependen de él. Soporta responsive y `?layout=android`. Ver `docs/architecture/directo-static.md`. |
 | `/rtfm` | RTFM del archivo: origen de los resubidos, notas operativas, mapa de navegación con permisos por rol y enlaces principales. Controlado por permiso `rtfm.view` y asignado por defecto a todos los roles. |
 | `/novedades` | Onboarding, beneficios por tipo de usuario, novedades recientes y tutoriales rápidos. Controlado por permiso `news.view` y asignado por defecto a todos los roles. |
 | `/changelog` | Historial completo de versiones, mejoras y correcciones. Controlado por permiso `changelog.view` y asignado por defecto a todos los roles. |
@@ -405,10 +406,10 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/admin/anime-tier-list-openings` | GET/POST | Openings/Endings del Tier List: sync preview/apply desde AnimeThemes.moe (requiere Animes ya sincronizado) y CRUD (`create-theme`, `update-theme`, `delete-theme`, `restore-theme`) |
 | `/api/anime-library/anilist` | POST | Buscar en AniList |
 | `/api/anime-activity` | GET/POST | Actividad del usuario en anime |
-| `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes y conserva el último resultado válido hasta 2 minutos ante fallas breves de Twitch. Los consumidores del mismo navegador comparten además una caché cliente y una única promesa en vuelo para no duplicar solicitudes. No participa en OAuth ni sincronización de membresías. |
+| `/api/twitch/status` | GET | Estado en vivo público: stream, perfil, canal y juego. Comparte caché de proceso por 30 segundos, deduplica refrescos concurrentes, conserva el último resultado válido hasta 2 minutos y admite caché CDN corta. Los consumidores del mismo navegador comparten además una caché cliente y una única promesa en vuelo para no duplicar solicitudes. No participa en OAuth ni sincronización de membresías. |
 | `/api/twitch/eventsub` | POST | Webhook firmado: `stream.online` crea el card directamente desde el evento y publica una alerta deduplicada por stream; `stream.offline` cambia el registro Twitch activo a `Subiendo`. Ambos flujos dejan auditoría automática. |
 | `/api/twitch/eventsub/subscribe` | POST | Verificar o registrar `stream.online` y `stream.offline`: lista cada tipo con el único filtro permitido por Twitch, conserva las suscripciones activas del callback actual y reemplaza estados obsoletos del mismo broadcaster. |
-| `/api/youtube/videos` | GET | Últimos videos de YouTube; también sincroniza `YoutubeVideo` como respaldo al scheduler de `server.mjs` |
+| `/api/youtube/videos` | GET | Últimos videos de YouTube para Inicio, con caché de proceso/CDN y sin escrituras en PostgreSQL por visitante |
 | `/api/platform-users` | GET/POST | CRUD de usuarios |
 | `/api/platform-roles` | GET/POST | CRUD de roles |
 | `/api/tags` | GET/POST | CRUD de tags |
@@ -424,6 +425,14 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/mobile/v1/auth/oauth/exchange` | POST | Canjea el código de un solo uso por el par de tokens móviles |
 | `/api/mobile/v1/auth/oauth/complete-registration` | POST | Completa el alta de un `PlatformUser` nuevo vía OAuth desde `/mobile-auth/registro` |
 | `/api/mobile/v1/auth/oauth/complete-link` | POST | Completa la vinculación de un proveedor OAuth a una cuenta existente desde `/mobile-auth/vincular` |
+| `/api/mobile/v1/lives` | GET | Lista de directos para Lolweapon+ con permisos efectivos de guardado, notificación y edición; no usa caché |
+| `/api/mobile/v1/lives/[id]` | GET | Detalle de un directo y permisos efectivos para la app móvil |
+| `/api/mobile/v1/lives/[id]/edit` | PUT | Edita un directo con bearer token; exige `tracker.update` y una variante `tracker.form.full` o `tracker.form.compact` |
+| `/api/mobile/v1/lives/[id]/notify` | POST | Envía la notificación manual de resubido desde Lolweapon+ con los mismos permisos que la web |
+| `/api/mobile/v1/lives/activity` | GET/POST | Consulta o actualiza la actividad móvil del usuario sobre directos |
+| `/api/mobile/v1/lives/[id]/playback` | POST | Persiste progreso de reproducción móvil para sincronizarlo con la web |
+| `/api/lives/[id]/playback` | POST | Persiste progreso web del directo autenticado |
+| `/api/mobile/v1/notifications/register-token` | POST | Registra o renueva un token FCM asociado opcionalmente al usuario y dispositivo |
 
 ---
 
@@ -514,6 +523,14 @@ Sistema independiente de `PlatformSession`, para apps nativas. Bearer tokens opa
 6. Borrado de cuenta: `POST /api/mobile/v1/auth/delete-account` llama `anonymizeAndDeactivatePlatformUser`, que scrubbea PII y revoca sesiones web + tokens móviles, pero conserva el contenido del usuario (tickets, ratings, tier lists) bajo el usuario anonimizado.
 
 `middleware.js` exime `/api/mobile/*` de la validación de Origin/CSRF porque esta auth nunca depende de la cookie de sesión.
+
+### Integración móvil del Rastreador
+
+- Las rutas `/api/mobile/v1/lives/*` resuelven el usuario mediante bearer token, pero aplican los mismos permisos configurables que el frontend web.
+- La edición requiere `tracker.update` junto con `tracker.form.full` o `tracker.form.compact`; el permiso de actualización por sí solo no habilita el formulario.
+- `PlatformMobilePushToken` guarda direcciones FCM activas por instalación. Firebase se inicializa exclusivamente en servidor desde `FIREBASE_SERVICE_ACCOUNT_JSON`; `PlatformNotification.pushedAt` funciona como claim para no duplicar el envío push.
+- `PlatformUserLivePlayback` mantiene la posición por usuario, directo y parte. El player web y `/mobile-embed/watch/[id]` escriben sobre esa misma persistencia mediante sus endpoints respectivos.
+- El manifest `public/lolweapon-plus/latest.json` anuncia la versión descargable; el APK se publica fuera de Git para evitar versionar binarios.
 
 ---
 

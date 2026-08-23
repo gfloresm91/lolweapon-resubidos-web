@@ -49,6 +49,12 @@ jobs:
             fi
             COMPOSE_FILE=docker-compose.prod.yml ENV_FILE=.env npm run db:backup
             npm run db:migrate:deploy
+            if [[ ! -d /var/www/resubidos || ! -w /var/www/resubidos ]]; then
+              echo "El directorio /var/www/resubidos no existe o no es escribible por $(id -un)." >&2
+              echo "Créalo una vez con: sudo install -d -o $(id -un) -g www-data -m 0755 /var/www/resubidos" >&2
+              exit 1
+            fi
+            install -m 0644 public/directo/index.html /var/www/resubidos/directo.html
             sudo systemctl restart resubidos.service
             systemctl is-active resubidos.service
 
