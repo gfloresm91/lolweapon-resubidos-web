@@ -22,7 +22,7 @@ Servir `/directo` como un único archivo HTML/CSS/JavaScript estático directame
 - controles para intercambiar y dimensionar los players, mostrar el chat, recargar, consultar ayuda/información y salir;
 - layout responsive y compatibilidad opcional con `?layout=android`.
 
-En móvil los players se apilan y se intercambian sin desmontar los iframes. El chat permanece montado, oculto inicialmente, y al abrirse cubre siempre el segundo player mientras la distribución cambia a 30 % para el player principal y 70 % para el chat. En desktop existen una posición principal y otra secundaria: intercambiar mueve Twitch a la posición de VK y VK a la de Twitch, mientras el chat conserva su columna. La ficha pública del canal queda bajo el player principal y el ancho de la columna secundaria puede ajustarse sin bajar Twitch de 400 px.
+En móvil los players se apilan y se intercambian sin desmontar los iframes. El chat permanece montado, oculto inicialmente, y al abrirse cubre siempre el segundo player mientras la distribución cambia a 30 % para el player principal y 70 % para el chat. La información se mantiene en un modal móvil. En desktop existen una posición principal y otra secundaria: intercambiar mueve Twitch a la posición de VK y VK a la de Twitch, mientras el chat conserva su columna. No existe modal de información en desktop: la ficha pública completa y sus acciones quedan bajo el player principal. El ancho de la columna secundaria puede ajustarse sin bajar Twitch de 400 px.
 
 La página no resuelve sesión o permisos, no consulta PostgreSQL, no abre WebSockets propios y no hace llamadas dinámicas a Next.js. Nginx entrega el archivo antes del proxy hacia Next.js. La metadata pública de Twitch se publica cada 30 segundos como `/directo-status.json`: `server.mjs` actualiza atómicamente una única copia usando la misma caché compartida de `/api/twitch/status`, y cada navegador solo descarga ese JSON estático cacheable. Si Node, Twitch o el snapshot fallan, los embeds siguen funcionando y el modal degrada a `Sin datos`.
 
@@ -72,6 +72,7 @@ Ventaja: evita Node, PostgreSQL y bundles de la plataforma; continúa disponible
 - `/api/twitch/status` se conserva porque la app móvil lo consume y ya dispone de caché breve.
 - Twitch inicia silenciado y solicita `play()` al montar, al recibir `PAUSE` y al recuperar foco/visibilidad. `PLAYBACK_BLOCKED` expone una acción manual; las restricciones del navegador o del proveedor no se pueden eludir ni garantizan que una view sea contabilizada.
 - El chat no se expande en desktop: hacerlo reduciría el player Twitch por debajo de su geometría protegida o introduciría una superposición, ambas incompatibles con el objetivo de mantenerlo visible y elegible para contabilización.
+- En desktop el iframe del chat se renderiza sin un ancestro que lo recorte con `overflow`, borde o radio. La cabecera ocupa su propia fila y no se superpone al iframe, evitando que Twitch deshabilite herramientas de moderación por detectar una obstrucción.
 - El iframe oficial del chat conserva la sesión Twitch que el navegador permita compartir; puede pedir login cuando cookies o almacenamiento de terceros estén bloqueados.
 - La implementación nativa móvil no debe reemplazarse por `/directo`; hacerlo perdería contratos nativos como PiP y sería otro proyecto.
 
