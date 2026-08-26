@@ -1,6 +1,6 @@
 # ADR-001: aislar el modo dual como página estática
 
-**Estado:** aceptada y certificada en QA; pendiente producción
+**Estado:** aceptada y desplegada en QA y producción
 **Fecha:** 23 de agosto de 2026  
 **Decisor:** propietario del proyecto
 
@@ -17,16 +17,22 @@ La app móvil Lolweapon+ fue auditada por separado. No consume `/inicio?stream=d
 Servir `/directo` como un único archivo HTML/CSS/JavaScript estático directamente desde Nginx. La página contiene solamente:
 
 - iframe principal de VK;
-- iframe companion de Twitch, silenciado;
+- iframe companion de Twitch, inicialmente silenciado para autoplay;
 - iframe del chat oficial de Twitch;
-- controles para intercambiar y dimensionar los players, mostrar el chat, recargar, consultar ayuda/información y salir;
+- controles para intercambiar y dimensionar los players, mostrar el chat, abrir una vista completa compuesta, recargar, consultar ayuda/información y salir;
 - layout responsive y compatibilidad opcional con `?layout=android`.
 
-En móvil los players se apilan y se intercambian sin desmontar los iframes. El chat permanece montado, oculto inicialmente, y al abrirse cubre siempre el segundo player mientras la distribución cambia a 30 % para el player principal y 70 % para el chat. La información se mantiene en un modal móvil. En desktop existen una posición principal y otra secundaria: intercambiar mueve Twitch a la posición de VK y VK a la de Twitch, mientras el chat conserva su columna. No existe modal de información en desktop: la ficha pública completa y sus acciones quedan bajo el player principal. El ancho de la columna secundaria puede ajustarse sin bajar Twitch de 400 px.
+En móvil vertical los players se apilan y se intercambian sin desmontar los iframes. El chat permanece montado, oculto inicialmente, y al abrirse cubre siempre el segundo player mientras la distribución cambia a 30 % para el player principal y 70 % para el chat. En tablet vertical se usa una proporción más equilibrada de 58/42 sin chat y 42/58 con chat. En orientación horizontal ambos players ocupan una única fila en mitades iguales; al mostrar el chat, este cubre solamente el área del player secundario, que permanece montado debajo. Así se evita el espacio vacío causado por combinar una cuadrícula horizontal con las filas 30/70 del modo vertical. La información se mantiene en un modal móvil.
+
+En tablets horizontales de mayor tamaño se conserva la misma interacción: player principal a la izquierda y una columna secundaria de al menos 400 px. Ambos players son visibles inicialmente y el botón de chat cubre únicamente la columna secundaria; el iframe del player cubierto permanece montado. La ficha del canal se oculta en ese rango para priorizar altura útil. En desktop existen una posición principal y otra secundaria: intercambiar mueve Twitch a la posición de VK y VK a la de Twitch, mientras el chat conserva su columna propia y permanece visible. No existe modal de información en desktop: la ficha pública completa y sus acciones quedan bajo el player principal. El ancho de la columna secundaria puede ajustarse sin bajar Twitch de 400 px.
+
+El icono de intercambio representa la geometría activa: flechas verticales cuando los players están apilados y horizontales cuando ocupan columnas. En navegadores móviles se solicita `interactive-widget=resizes-content` y se mantiene `--app-height` sincronizado con `visualViewport.height`. Al aparecer el teclado, la página y el iframe fijo del chat se recalculan dentro del área visible sin desmontar, cubrir ni interceptar el chat oficial; al cerrarlo recuperan la altura disponible. El resultado exacto continúa sujeto al soporte del teclado y viewport de cada navegador, especialmente Safari.
+
+La vista completa propia solicita fullscreen para el documento y no para un iframe cross-origin. Distribuye aproximadamente 75 % al player principal y 25 % a una columna con el player secundario arriba y el chat abajo, sin remontar ninguno de los tres embeds. Una fila de controles independiente evita superponer elementos al player o al chat de Twitch y permite intercambiar ambos reproductores sin salir del fullscreen. El fullscreen nativo de VK o Twitch continúa mostrando exclusivamente ese proveedor.
 
 La página no resuelve sesión o permisos, no consulta PostgreSQL, no abre WebSockets propios y no hace llamadas dinámicas a Next.js. Nginx entrega el archivo antes del proxy hacia Next.js. La metadata pública de Twitch se publica cada 30 segundos como `/directo-status.json`: `server.mjs` actualiza atómicamente una única copia usando la misma caché compartida de `/api/twitch/status`, y cada navegador solo descarga ese JSON estático cacheable. Si Node, Twitch o el snapshot fallan, los embeds siguen funcionando y el modal degrada a `Sin datos`.
 
-Nginx no lee el archivo desde `/home/kalaplex`: ese home no es atravesable por `www-data` y abrirlo ampliaría permisos innecesariamente. QA publica una copia en `/var/www/resubidos-qa/directo.html`, directorio propiedad del usuario de deploy y grupo `www-data`; el workflow actualiza esa copia con `install -m 0644` después de completar build y migraciones. Producción debe usar el equivalente `/var/www/resubidos/directo.html` cuando se apruebe el release.
+Nginx no lee el archivo desde `/home/kalaplex`: ese home no es atravesable por `www-data` y abrirlo ampliaría permisos innecesariamente. QA publica una copia en `/var/www/resubidos-qa/directo.html` y producción en `/var/www/resubidos/directo.html`; ambos directorios pertenecen al usuario de deploy y al grupo `www-data`. El workflow actualiza la copia correspondiente con `install -m 0644` después de completar build y migraciones.
 
 Se conserva un fallback estático de Next: mientras Nginx no tenga la ubicación exacta, `/directo` redirige a `/directo/index.html`. Los enlaces web nuevos abren `/directo`. Los enlaces antiguos con `/inicio?stream=dual` también navegan allí al montar y posteriormente podrán redirigirse en Nginx antes de tocar Node.
 
@@ -70,8 +76,8 @@ Ventaja: evita Node, PostgreSQL y bundles de la plataforma; continúa disponible
 - El canal Twitch se selecciona por hostname: QA usa su canal de prueba y producción el canal público actual.
 - La página no muestra presencia, notificaciones ni información personalizada. Solo muestra un snapshot estático y prescindible de metadata pública de Twitch.
 - `/api/twitch/status` se conserva porque la app móvil lo consume y ya dispone de caché breve.
-- Twitch inicia silenciado y solicita `play()` al montar, al recibir `PAUSE` y al recuperar foco/visibilidad. `PLAYBACK_BLOCKED` expone una acción manual; las restricciones del navegador o del proveedor no se pueden eludir ni garantizan que una view sea contabilizada.
-- El chat no se expande en desktop: hacerlo reduciría el player Twitch por debajo de su geometría protegida o introduciría una superposición, ambas incompatibles con el objetivo de mantenerlo visible y elegible para contabilización.
+- Twitch inicia silenciado para facilitar autoplay y solicita `play()` al montar, al recibir `PAUSE` y al recuperar foco/visibilidad. Después de inicializar no vuelve a imponer `setMuted(true)`: si el usuario activa el sonido, los intentos automáticos de reanudar respetan esa decisión. `PLAYBACK_BLOCKED` expone una acción manual; las restricciones del navegador o del proveedor no se pueden eludir ni garantizan que una view sea contabilizada.
+- El chat no se superpone al player en desktop. En la vista completa compuesta ocupa una columna propia junto al player secundario; Twitch conserva geometría protegida cuando está visible.
 - En desktop el iframe del chat se renderiza sin un ancestro que lo recorte con `overflow`, borde o radio. La cabecera ocupa su propia fila y no se superpone al iframe, evitando que Twitch deshabilite herramientas de moderación por detectar una obstrucción.
 - El iframe oficial del chat conserva la sesión Twitch que el navegador permita compartir; puede pedir login cuando cookies o almacenamiento de terceros estén bloqueados.
 - La implementación nativa móvil no debe reemplazarse por `/directo`; hacerlo perdería contratos nativos como PiP y sería otro proyecto.
