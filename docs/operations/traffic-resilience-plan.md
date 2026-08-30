@@ -15,7 +15,7 @@ Estado actualizado al 29 de agosto de 2026:
 - `/directo` está aislado como HTML estático servido por Nginx, dispone de caché específica en Cloudflare para QA y producción y lleva varios días de uso real estable sin errores operativos reportados.
 - La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas. Esta prueba no certifica todavía toda la aplicación dinámica con 500 usuarios concurrentes sostenidos.
 - YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico; antes de reactivarlos se debe verificar el valor efectivo de ambos flags en producción.
-- El siguiente bloque de trabajo es retirar la autorización pública dependiente del rol `invitado` en PostgreSQL, y luego completar observabilidad/alertas antes de la prueba de carga dinámica.
+- La autorización pública ya no depende del rol `invitado` en PostgreSQL; la Etapa 1.75 quedó certificada en QA. El siguiente bloque es completar observabilidad/alertas antes de la prueba de carga dinámica.
 - No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
 
 ## Qué ocurrió
@@ -190,7 +190,7 @@ Resultado: **cumplido** para la entrega propia de `/directo`. La capacidad y pol
 
 Objetivo: hacer que una solicitud sin sesión nunca necesite leer roles o permisos desde PostgreSQL para decidir si una superficie pública puede mostrarse.
 
-Estado: **implementada localmente; pendiente de QA**. El inventario y la política quedaron documentados el 29 de agosto de 2026. Los validadores privados exigen sesión, las superficies públicas usan una política inmutable en código, web y móvil dejaron de resolver un rol invitado, el mantenedor ya no lo ofrece y existe una migración defensiva para retirarlo de PostgreSQL. El build y el smoke test anónimo local pasaron; falta desplegar y comprobar consultas/roles en QA antes de cerrar la etapa.
+Estado al 29 de agosto de 2026: **completada y certificada en QA** mediante `0b0306b` (`fix(performance): decouple public access and refresh tracker data`). Los validadores privados exigen sesión, las superficies públicas usan una política inmutable en código, web y móvil dejaron de resolver un rol invitado y el mantenedor ya no lo ofrece. El smoke test local y la validación funcional en QA pasaron. `resubidos-qa.service` quedó activo con el commit esperado; la migración retiró `invitado` de `PlatformRole` y se verificaron cero usuarios con `roleId` nulo. El paso a producción queda reservado para el release posterior a las etapas de certificación acordadas.
 
 Política y matriz inicial: [`docs/architecture/public-access-policy.md`](../architecture/public-access-policy.md).
 
@@ -223,6 +223,8 @@ Rollback: conservar temporalmente el helper anterior detrás de un commit revers
 ### Etapa 2: observabilidad y alertas
 
 Objetivo: conocer el límite antes de otro directo y detectar degradación antes de una caída.
+
+Estado al 29 de agosto de 2026: **en progreso**. El agente de DigitalOcean `3.18.14` está activo y producción, QA, Nginx y PostgreSQL se encontraron saludables; producción registró cero reinicios en el inventario inicial. Se implementó localmente la primera capa de métricas estructuradas del proceso Node, pendiente de desplegar y validar en QA antes de configurar umbrales y alertas.
 
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.

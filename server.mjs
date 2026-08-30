@@ -3,8 +3,9 @@ import next from "next";
 import { WebSocketServer } from "ws";
 
 import { syncContentNotifications } from "./lib/contentNotificationSync.js";
-import { registerNotificationSocket } from "./lib/notificationRealtime.js";
-import { getHomePresenceCount, registerPagePresenceSocket } from "./lib/pagePresence.js";
+import { getNotificationSocketCount, registerNotificationSocket } from "./lib/notificationRealtime.js";
+import { getHomePresenceCount, getPagePresenceSocketCount, registerPagePresenceSocket } from "./lib/pagePresence.js";
+import { startProcessMetrics } from "./lib/processMetrics.js";
 import { syncLatestYoutubeVideosForNotifications } from "./lib/repositories/youtubeVideoRepository.js";
 import { publishDueNotifications } from "./lib/repositories/notificationRepository.js";
 import { closeActiveStreamAudienceSessions, recordStreamAudienceSample } from "./lib/repositories/streamAudienceRepository.js";
@@ -204,4 +205,10 @@ server.listen(port, hostname, () => {
   startScheduledNotificationPublisher();
   startStreamAudienceSampler();
   startDirectoStatusPublisher();
+  startProcessMetrics({
+    server,
+    getNotificationSocketCount,
+    getPresenceSocketCount: getPagePresenceSocketCount,
+    getPresenceUserCount: getHomePresenceCount,
+  });
 });
