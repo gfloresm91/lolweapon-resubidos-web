@@ -273,6 +273,8 @@ Criterio de salida: HTTP normal y ambos WebSockets operativos, sin errores de si
 
 Objetivo: medir capacidad real, no estimarla por hardware.
 
+Estado al 30 de agosto de 2026: el pico público inicial de `/inicio` quedó certificado hasta 400 conexiones TLS simultáneas desde un generador externo. Los escalones de 50, 100, 200, 300 y 400 completaron sin fallos ni respuestas críticas; en 400, Nginx registró 402 respuestas `200`, promedio de 3,16 s, p95 de 5,36 s y máximo de 5,39 s. El proceso QA no se reinició, alcanzó aproximadamente 14,3% de un núcleo, 439 MiB RSS y mantuvo el retraso del event loop controlado. El escalón de 500 conservó cero `499/502/503/504` y Nginx terminó las solicitudes con p95 de 7,40 s, pero el generador agotó su timeout de 10 segundos en 3 de 500 solicitudes; por eso se considera estable con degradación y no una certificación limpia. PostgreSQL permaneció sin locks, transacciones idle, temporales ni deadlocks, con cache hit superior a 99,99%. Estas oleadas certifican entradas HTML concentradas, no usuarios sostenidos, ejecución JavaScript, WebSockets ni reproducciones autenticadas.
+
 1. Preparar un escenario con usuarios invitados, páginas HTML, APIs públicas y WebSockets persistentes.
 2. Usar datos de prueba y evitar mutaciones destructivas.
 3. Separar al menos dos escenarios: pico web invitado y reproducciones autenticadas con guardado cada 12 segundos.
