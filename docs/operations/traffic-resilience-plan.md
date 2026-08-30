@@ -224,7 +224,19 @@ Rollback: conservar temporalmente el helper anterior detrás de un commit revers
 
 Objetivo: conocer el límite antes de otro directo y detectar degradación antes de una caída.
 
-Estado al 29 de agosto de 2026: **en progreso**. El agente de DigitalOcean `3.18.14` está activo y producción, QA, Nginx y PostgreSQL se encontraron saludables; producción registró cero reinicios en el inventario inicial. Se implementó localmente la primera capa de métricas estructuradas del proceso Node, pendiente de desplegar y validar en QA antes de configurar umbrales y alertas.
+Estado al 30 de agosto de 2026: **en progreso**. El agente de DigitalOcean `3.18.14` está activo y producción, QA, Nginx y PostgreSQL se encontraron saludables. La primera capa de métricas estructuradas del proceso Node se desplegó en QA mediante `68c8836` (`feat(observability): add Node process metrics`) y quedó validada con cero reinicios. DigitalOcean tiene alertas activas para CPU agregada sobre 70% durante 5 minutos, memoria sobre 80% durante 5 minutos, disco sobre 80% durante 5 minutos y carga media de 5 minutos sobre 3 durante 5 minutos, todas limitadas al Droplet `kalaplex`.
+
+Línea base inicial de QA, tomada con intervalos de 60 segundos y el servicio prácticamente en reposo:
+
+- CPU del proceso: 0,52–0,60% de un núcleo.
+- RSS: 248,4–249,4 MiB; heap usado: 122,9–125,3 MiB.
+- Utilización del event loop: 0,25–0,39%.
+- Retraso del event loop: p95 de 20,19–20,55 ms, p99 de 20,68–21,33 ms y máximos aislados de 26,15–53,77 ms.
+- Conexiones observadas: 1 HTTP, 1 WebSocket de notificaciones y 0 WebSockets de presencia.
+- Host: carga `0.16, 0.11, 0.09`, 1,3 GiB usados de 7,8 GiB de RAM, 39 MiB de swap usados y 24 GiB usados de 232 GiB de disco.
+- systemd: servicio activo, `NRestarts=0`, memoria actual aproximada de 223 MiB y peak acumulado aproximado de 381 MiB.
+
+Estos valores describen reposo y no constituyen todavía límites de capacidad. Se usarán para comparar las mediciones bajo concurrencia de la Etapa 4.
 
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
