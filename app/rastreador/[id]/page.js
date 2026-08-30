@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { Toaster } from "sonner";
 
 import AppSidebar from "@/components/AppSidebar";
@@ -8,11 +8,13 @@ import AppSidebarShell from "@/components/AppSidebarShell";
 import DetailActivityButtons from "@/components/DetailActivityButtons";
 import DetailBackLink from "@/components/DetailBackLink";
 import DetailTopbarActions from "@/components/DetailTopbarActions";
+import LiveDetailRealtimeRefresh from "@/components/LiveDetailRealtimeRefresh";
 import OkruWatchPlayer from "@/components/OkruWatchPlayer";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
-import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { hasPublicAccessPermission } from "@/lib/publicAccessPolicy";
+import { getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses, getLiveWithNeighbors } from "@/lib/repositories/liveRepository";
 import { getLiveActivityForLive } from "@/lib/repositories/liveActivityRepository";
@@ -66,15 +68,10 @@ export default async function LiveDetailPage({ params }) {
   const decodedId = decodeURIComponent(id);
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const [currentUser, accessUser, isAdmin] = await Promise.all([
+  const [currentUser, isAdmin] = await Promise.all([
     getCurrentUserFromToken(token),
-    getAccessUserFromToken(token),
     validateAdminSessionToken(token),
   ]);
-
-  if (!can(accessUser, "tracker.view")) {
-    redirect(`/login?next=/rastreador/${encodeURIComponent(decodedId)}`);
-  }
 
   const [{ live, previousLive, nextLive }, initialActivity, liveStatuses] = await Promise.all([
     getLiveWithNeighbors(decodedId),
@@ -109,24 +106,25 @@ export default async function LiveDetailPage({ params }) {
   ].join("\n");
   const reportHref = `mailto:kalathraslolweaponvods@gmail.com?subject=${encodeURIComponent(reportSubject)}&body=${encodeURIComponent(reportBody)}`;
 
-  const canManageTracker = can(accessUser, "admin.tracker.view") && (
-    can(accessUser, "tracker.create") || can(accessUser, "tracker.update") || can(accessUser, "tracker.delete")
+  const canManageTracker = can(currentUser, "admin.tracker.view") && (
+    can(currentUser, "tracker.create") || can(currentUser, "tracker.update") || can(currentUser, "tracker.delete")
   );
-  const trackerFormVariant = can(accessUser, "tracker.form.full")
+  const trackerFormVariant = can(currentUser, "tracker.form.full")
     ? "full"
-    : can(accessUser, "tracker.form.compact")
+    : can(currentUser, "tracker.form.compact")
       ? "compact"
       : null;
-  const canEditTracker = can(accessUser, "tracker.update") && Boolean(trackerFormVariant);
-  const canManageAnimeTracking = can(accessUser, "admin.anime.tracking.view") && (
-    can(accessUser, "anime.tracking.create") || can(accessUser, "anime.tracking.update") || can(accessUser, "anime.tracking.delete")
+  const canEditTracker = can(currentUser, "tracker.update") && Boolean(trackerFormVariant);
+  const canManageAnimeTracking = can(currentUser, "admin.anime.tracking.view") && (
+    can(currentUser, "anime.tracking.create") || can(currentUser, "anime.tracking.update") || can(currentUser, "anime.tracking.delete")
   );
-  const canManageAnimeCompleted = can(accessUser, "admin.anime.completed.view") && (
-    can(accessUser, "anime.completed.create") || can(accessUser, "anime.completed.update") || can(accessUser, "anime.completed.delete")
+  const canManageAnimeCompleted = can(currentUser, "admin.anime.completed.view") && (
+    can(currentUser, "anime.completed.create") || can(currentUser, "anime.completed.update") || can(currentUser, "anime.completed.delete")
   );
 
   return (
     <>
+      <LiveDetailRealtimeRefresh liveId={live.id} />
       <Toaster position="top-right" richColors closeButton />
       <div className="bg-orb orb-1" aria-hidden="true" />
       <div className="bg-orb orb-2" aria-hidden="true" />
@@ -137,15 +135,15 @@ export default async function LiveDetailPage({ params }) {
           id="main-sidebar"
           activeView="tracker"
           isAdmin={isAdmin}
-          canManageUsers={can(accessUser, "users.read")}
-          canManageRoles={can(accessUser, "roles.read")}
+          canManageUsers={can(currentUser, "users.read")}
+          canManageRoles={can(currentUser, "roles.read")}
           canManageTracker={canManageTracker}
-          canManageTags={can(accessUser, "admin.tags.view")}
-          canManageSpaceDrum={can(accessUser, "admin.spacedrum.chapters.view")}
+          canManageTags={can(currentUser, "admin.tags.view")}
+          canManageSpaceDrum={can(currentUser, "admin.spacedrum.chapters.view")}
           canManageAnimeTracking={canManageAnimeTracking}
           canManageAnimeCompleted={canManageAnimeCompleted}
           isAuthenticated={isAuthenticated}
-          canAccess={(permission) => can(accessUser, permission)}
+          canAccess={(permission) => can(currentUser, permission) || hasPublicAccessPermission(permission)}
         />
 
         <div className="content-shell">
@@ -157,9 +155,9 @@ export default async function LiveDetailPage({ params }) {
 
             <DetailTopbarActions
               currentUser={currentUser}
-              canManageUsers={can(accessUser, "users.read")}
-              canViewNotifications={can(accessUser, "notifications.view")}
-              canViewAllNotifications={can(accessUser, "notifications.full.view")}
+              canManageUsers={can(currentUser, "users.read")}
+              canViewNotifications={can(currentUser, "notifications.view") || hasPublicAccessPermission("notifications.view")}
+              canViewAllNotifications={can(currentUser, "notifications.full.view")}
             />
           </header>
 
@@ -217,7 +215,7 @@ export default async function LiveDetailPage({ params }) {
                         initialActivity={initialActivity}
                         isAuthenticated={isAuthenticated}
                         canEdit={canEditTracker}
-                        canDelete={can(accessUser, "tracker.delete")}
+                        canDelete={can(currentUser, "tracker.delete")}
                         formVariant={trackerFormVariant}
                         statuses={liveStatuses}
                       />

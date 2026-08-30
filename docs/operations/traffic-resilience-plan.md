@@ -6,13 +6,16 @@ Este documento permite continuar, incluso con otro agente, el trabajo iniciado d
 
 Documento relacionado: [`docs/incidents/2026-08-21-traffic-collapse.md`](../incidents/2026-08-21-traffic-collapse.md). Ese postmortem es la fuente de evidencia, cronología y comandos de diagnóstico. Este archivo es la hoja de ruta de implementación.
 
-Estado al 22 de agosto de 2026:
+Estado actualizado al 29 de agosto de 2026:
 
 - El hotfix `v2.22.1` está en producción y estabilizó el incidente.
 - El Droplet fue ampliado a 4 vCPU y 8 GiB de RAM, con CPU compartida.
 - Producción continúa usando un solo proceso Node y PostgreSQL local en Docker.
-- YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico.
-- Existen optimizaciones adicionales en el worktree local que todavía deben pasar por QA, commit, despliegue y prueba de carga.
+- Las optimizaciones defensivas de la Etapa 1 llegaron a QA y producción; están contenidas en `main` y en el release `v2.25.1`.
+- `/directo` está aislado como HTML estático servido por Nginx, dispone de caché específica en Cloudflare para QA y producción y lleva varios días de uso real estable sin errores operativos reportados.
+- La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas. Esta prueba no certifica todavía toda la aplicación dinámica con 500 usuarios concurrentes sostenidos.
+- YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico; antes de reactivarlos se debe verificar el valor efectivo de ambos flags en producción.
+- El siguiente bloque de trabajo es retirar la autorización pública dependiente del rol `invitado` en PostgreSQL, y luego completar observabilidad/alertas antes de la prueba de carga dinámica.
 - No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
 
 ## Qué ocurrió
@@ -36,18 +39,21 @@ El resize dio margen de capacidad, pero no corrigió la causa: Node volvió a sa
 
 Después del hotfix, con unas 860 conexiones HTTPS y 177 usuarios deduplicados, Node bajó aproximadamente de 97 % a 23–32 % de un núcleo y no quedaron sesiones `idle in transaction`.
 
-## Optimizaciones locales pendientes de despliegue
+## Optimizaciones defensivas desplegadas
 
-Antes de iniciar una etapa, revisar `git status` y `git diff`; no asumir que estos cambios ya están en QA o producción.
+Estas optimizaciones se implementaron en `0cb5701` (`fix(performance): harden public traffic paths`), pasaron QA y están incluidas en `main`/`v2.25.1`:
 
 - Inicio entrega solo los diez directos recientes y obtiene el catálogo completo al entrar a Rastreador, Calendario, Mi lista o Mantenedor Rastreador.
+- El catálogo del Rastreador usa cobertura explícita, una lectura de proceso compartida durante 10 segundos y una única promesa en vuelo. Las mutaciones invalidan esa lectura y emiten `lives:update`; el cliente refresca únicamente si está viendo el catálogo y difiere la actualización en las demás pantallas. Foco y polling de dos minutos quedan como respaldo si se pierde el WebSocket.
 - `/api/youtube/videos` deja de sincronizar/escribir por visita, usa caché en proceso, promesa compartida, stale fallback y headers de caché pública.
 - `/api/twitch/status` permite caché pública breve.
 - Las notificaciones públicas usan un scope explícito, caché breve en proceso, promesa compartida e invalidación al emitir actualizaciones.
-- El rol invitado tiene caché y deduplicación breve para evitar una estampida de lecturas.
+- El rol invitado tiene caché y deduplicación breve para evitar una estampida de lecturas. Esta mitigación permanece activa, pero será reemplazada por acceso público definido en código en la Etapa 1.75.
 - Las respuestas privadas/autenticadas continúan sin caché pública.
 
-El último `npm run build` local terminó correctamente, pero debe repetirse antes de entregar el commit si el diff cambia.
+Esta invalidación en tiempo real es local al proceso actual, igual que los demás WebSockets y cachés en memoria. Antes de ejecutar varios workers o instancias se debe mover el evento y la invalidación a Redis/Valkey Pub/Sub o a otro coordinador compartido.
+
+Antes de continuar cualquier etapa se debe revisar `git status` y `git diff`; no confundir cambios locales con código desplegado.
 
 ## Flujo adicional de escritura: progreso de reproducción
 
@@ -83,7 +89,7 @@ La recomendación de no crear un cliente por solicitud es correcta. La aplicaci�
 
 ### Caché de permisos
 
-Es pertinente y fue central en el incidente. La inicialización repetida ya fue eliminada y el camino invitado tiene optimizaciones adicionales pendientes. Para usuarios autenticados puede evaluarse una caché de 30–120 segundos con invalidación al cambiar rol, permisos, estado o sesión.
+Es pertinente y fue central en el incidente. La inicialización repetida ya fue eliminada y el camino invitado dispone de caché breve. Sin embargo, una visita sin sesión todavía puede depender periódicamente de `PlatformRole` y sus permisos en PostgreSQL; la arquitectura objetivo elimina esa dependencia y define explícitamente en código qué superficies son públicas. Para usuarios autenticados puede evaluarse una caché de 30–120 segundos con invalidación al cambiar rol, permisos, estado o sesión.
 
 No cachear permisos durante 30 días sin invalidación confiable. Podría conservar accesos después de desactivar un usuario o revocar permisos.
 
@@ -139,7 +145,7 @@ No avanzar automáticamente por todas las etapas. Cada una tiene una decisión d
 
 Objetivo: desplegar y verificar las optimizaciones locales sin tocar aún producción ni agregar infraestructura.
 
-Estado: **completada en QA el 23 de agosto de 2026** con `0cb5701` (`fix(performance): harden public traffic paths`) y documentación `ec6cc40`. El build de producción terminó correctamente; los flujos invitados y autenticados pasaron el smoke test; QA respondió cinco veces con HTTP 200 en aproximadamente 18–70 ms; `resubidos-qa.service` quedó activo con cero reinicios; PostgreSQL mostró cero sesiones `idle in transaction`; no aparecieron errores propios de la aplicación. Se observaron un 404 externo de Amazon IVS y un `MaxListenersExceededWarning` del reproductor, registrados para revisión pero no bloqueantes para esta etapa.
+Estado: **completada en QA y producción**. Se implementó el 23 de agosto de 2026 con `0cb5701` (`fix(performance): harden public traffic paths`) y documentación `ec6cc40`; posteriormente llegó a `main` y está incluida en `v2.25.1`. El build de producción terminó correctamente; los flujos invitados y autenticados pasaron el smoke test; QA respondió cinco veces con HTTP 200 en aproximadamente 18–70 ms; `resubidos-qa.service` quedó activo con cero reinicios; PostgreSQL mostró cero sesiones `idle in transaction`; no aparecieron errores propios de la aplicación. Se observaron un 404 externo de Amazon IVS y un `MaxListenersExceededWarning` del reproductor, registrados para revisión pero no bloqueantes para esta etapa.
 
 1. Revisar el estado y diff local, cuidando cambios ajenos.
 2. Cambiar a `dev`, repetir `npm run build` si hubo modificaciones posteriores y crear el commit de rendimiento.
@@ -162,7 +168,7 @@ Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desple
 
 Objetivo: sacar el modo dual, destino de entrada masiva durante los directos, del camino dinámico de Inicio.
 
-Estado al 23 de agosto de 2026: **entrega estática base completada y certificada en QA; rediseño funcional pendiente de desplegar y validar en QA**. La base se sirve directamente por Nginx desde `/var/www/resubidos-qa/directo.html` y el workflow actualiza esa copia. Con Node QA detenido mantuvo HTTP 200 mientras `/inicio` devolvió 502. Cinco oleadas de 800 solicitudes TLS nuevas entregaron 4.000/4.000 respuestas HTTP 200, cero errores y p95 de 1,56 s; servicios y recursos quedaron saludables. Localmente, el rediseño agrega intercambio/tamaño de players, chat móvil sobre el segundo player, ayuda, información mediante snapshot estático y recuperación mínima de Twitch. Producción continúa pendiente.
+Estado al 29 de agosto de 2026: **completada, certificada en QA y desplegada en producción**. QA sirve `/var/www/resubidos-qa/directo.html` y producción `/var/www/resubidos/directo.html`; los workflows actualizan las copias. Con Node QA detenido, `/directo` mantuvo HTTP 200 mientras `/inicio` devolvió 502. Cinco oleadas de 800 solicitudes TLS nuevas entregaron 4.000/4.000 respuestas HTTP 200, cero errores y p95 de 1,56 s; servicios y recursos quedaron saludables. Cloudflare tiene reglas de caché limitadas a `/directo` y `/directo-status.json` en ambos ambientes. Después del despliegue, `/directo` lleva varios días funcionando correctamente bajo uso real y no se han reportado caídas ni errores operativos.
 
 Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/directo-static.md).
 
@@ -177,6 +183,42 @@ Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/dir
 9. Repetir configuración y verificación en producción mediante release normal.
 
 Criterio de salida: `/directo` funciona aunque Next QA esté detenido, los embeds y chat mantienen su funcionalidad y el pico de solicitudes no genera trabajo en Node/PostgreSQL.
+
+Resultado: **cumplido** para la entrega propia de `/directo`. La capacidad y políticas internas de reproducción de Twitch/VK pertenecen a los proveedores y se evalúan por separado de la resiliencia del origen.
+
+### Etapa 1.75: retirar el rol invitado dependiente de PostgreSQL
+
+Objetivo: hacer que una solicitud sin sesión nunca necesite leer roles o permisos desde PostgreSQL para decidir si una superficie pública puede mostrarse.
+
+Estado: **implementada localmente; pendiente de QA**. El inventario y la política quedaron documentados el 29 de agosto de 2026. Los validadores privados exigen sesión, las superficies públicas usan una política inmutable en código, web y móvil dejaron de resolver un rol invitado, el mantenedor ya no lo ofrece y existe una migración defensiva para retirarlo de PostgreSQL. El build y el smoke test anónimo local pasaron; falta desplegar y comprobar consultas/roles en QA antes de cerrar la etapa.
+
+Política y matriz inicial: [`docs/architecture/public-access-policy.md`](../architecture/public-access-policy.md).
+
+Decisión de arquitectura:
+
+- Las rutas, páginas y lecturas realmente públicas se declaran explícitamente en código; no se habilitan mediante asignaciones de permisos al rol `invitado` en la base de datos.
+- Las rutas privadas resuelven primero una sesión válida y después permisos configurables del usuario autenticado. Sin sesión deben responder o redirigir como no autorizadas, sin consultar un rol público persistido.
+- Puede mantenerse un contexto sintético e inmutable de visitante sin sesión para props/UI (`isAuthenticated: false`, estado local y mensajes), pero no un `PlatformRole` administrable ni una lectura de permisos desde PostgreSQL.
+- La campana invitada obtiene únicamente notificaciones con `audience: all`, por regla de código, y conserva leído/descartado en `localStorage`; no necesita `notifications.view` desde BD.
+- Las Tier Lists públicas permiten interacción local por regla de ruta/código; guardar o mutar continúa exigiendo sesión y permisos.
+- Inicio, Rastreador y su detalle, Viendo, Terminados, RTFM, Novedades, Changelog, Tier Lists, login/registro y `/directo` conservan el acceso que históricamente tenía `invitado`, ahora mediante una lista explícita en código. No asumir que todo GET es público.
+- La app móvil debe distinguir endpoints públicos de endpoints con bearer token sin caer a un rol cargado desde PostgreSQL.
+
+Implementación prevista:
+
+1. Inventariar todas las llamadas a `getPublicAccessUser()`, `getAccessUserFromToken()` y validadores que aceptan fallback invitado.
+2. Clasificar cada ruta como pública, autenticada o autenticada con permiso.
+3. Crear una política pública inmutable en código y helpers separados para acceso público y autorización autenticada.
+4. Migrar notificaciones públicas, Tier Lists, RTFM/Novedades/Changelog y APIs móviles públicas a esa política.
+5. Retirar el fallback a `getPublicAccessUser()` de validadores de permisos privados.
+6. Eliminar el rol `invitado` del mantenedor, seeds/asignaciones y base de datos mediante una migración versionada, solo después de retirar todas sus dependencias.
+7. Conservar compatibilidad visual donde componentes actualmente usan la cadena `invitado`, reemplazándola gradualmente por `isAuthenticated` o un contexto sintético no persistido.
+8. Probar acceso directo y navegación interna como visitante, usuario común y administración; verificar que cero consultas a `PlatformRole`/`PlatformRolePermission` provengan de tráfico sin sesión.
+9. Ejecutar una prueba concurrente de rutas públicas antes de continuar con la certificación dinámica general.
+
+Criterio de salida: las solicitudes sin sesión no consultan roles/permisos en PostgreSQL, las superficies públicas acordadas siguen disponibles, las rutas privadas continúan protegidas y el rol `invitado` ya no existe como configuración persistida.
+
+Rollback: conservar temporalmente el helper anterior detrás de un commit reversible hasta completar QA; si una superficie pública queda inaccesible, revertir mediante un commit nuevo sin restaurar la inicialización por solicitud.
 
 ### Etapa 2: observabilidad y alertas
 

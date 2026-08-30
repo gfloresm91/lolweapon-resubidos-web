@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { BookOpen, Plus, Radio, Zap } from "lucide-react";
@@ -55,6 +55,11 @@ const CARD_DENSITY_STORAGE_KEY = "kala_card_density";
 const CARD_DENSITY_VERSION_KEY = "kala_card_density_version";
 const CURRENT_CARD_DENSITY_VERSION = "3";
 const TABLE_VIEW_MEDIA_QUERY = "(min-width: 768px)";
+const LIVE_CATALOG_COMPLETE_TTL_MS = 5 * 60 * 1000;
+const LIVE_CATALOG_FALLBACK_INTERVAL_MS = 2 * 60 * 1000;
+const LIVE_CATALOG_DISCONNECTED_REFRESH_AGE_MS = 60 * 1000;
+const LIVE_CATALOG_REALTIME_JITTER_MS = 3000;
+const LIVE_CATALOG_VIEWS = new Set(["tracker", "trackerCalendar", "myList", "platformTracker"]);
 
 function normalizeCardDensity(value) {
   return value === "comfortable" || value === "compact" || value === "table" ? value : "comfortable";
@@ -374,7 +379,7 @@ function wasDiscoveryToastShown(key) {
 export default function HomePage({
   activeView = "home",
   initialLives = EMPTY_LIST,
-  initialLivesAreComplete = true,
+  initialLivesCoverage = "none",
   initialLiveStatuses = LIVE_STATUS_OPTIONS,
   initialAnimeLibrary = EMPTY_LIST,
   initialAnimeCalendar = null,
@@ -493,7 +498,11 @@ export default function HomePage({
   const isAuthenticated = Boolean(currentUser?.id);
   const searchParams = useSearchParams();
   const [lives, setLives] = useState(initialLives);
-  const [livesAreComplete, setLivesAreComplete] = useState(initialLivesAreComplete);
+  const [livesCoverage, setLivesCoverage] = useState(initialLivesCoverage);
+  const [livesAreStale, setLivesAreStale] = useState(false);
+  const [livesLoadedAt, setLivesLoadedAt] = useState(() => initialLivesCoverage === "complete" ? Date.now() : 0);
+  const [isLiveCatalogLoading, setIsLiveCatalogLoading] = useState(false);
+  const [liveCatalogError, setLiveCatalogError] = useState("");
   const [liveStatuses, setLiveStatuses] = useState(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
   const [animeLibrary, setAnimeLibrary] = useState(initialAnimeLibrary);
   const [animeActivity, setAnimeActivity] = useState(initialAnimeActivity || {});
@@ -584,11 +593,66 @@ export default function HomePage({
   const didRestoreTrackerRef = useRef(false);
   const didSyncInitialViewRef = useRef(false);
   const skipVisibleResetRef = useRef({ tracker: false, myList: false });
+  const liveCatalogRequestRef = useRef(null);
+  const liveCatalogRefreshTimerRef = useRef(null);
+  const liveCatalogStateRef = useRef({ coverage: initialLivesCoverage, stale: false, loadedAt: initialLivesCoverage === "complete" ? Date.now() : 0 });
+  const currentViewRef = useRef(currentView);
+  const realtimeConnectedRef = useRef(false);
+  const hasRealtimeConnectedRef = useRef(false);
+
+  currentViewRef.current = currentView;
+  liveCatalogStateRef.current = { coverage: livesCoverage, stale: livesAreStale, loadedAt: livesLoadedAt };
+
+  const loadLiveCatalog = useCallback(({ showError = true, jitterMs = 0 } = {}) => {
+    if (liveCatalogRequestRef.current) {
+      return liveCatalogRequestRef.current;
+    }
+
+    const request = (async () => {
+      setIsLiveCatalogLoading(true);
+      setLiveCatalogError("");
+
+      if (jitterMs > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, jitterMs));
+      }
+
+      const response = await fetch("/api/lives", { cache: "no-store" });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !Array.isArray(data?.lives)) {
+        throw new Error(data?.error || "No se pudieron cargar los directos.");
+      }
+
+      setLives(data.lives);
+      setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
+      setLivesCoverage("complete");
+      setLivesAreStale(false);
+      setLivesLoadedAt(Date.now());
+      return data.lives;
+    })()
+      .catch((error) => {
+        const message = error?.message || "No se pudieron cargar los directos.";
+        setLiveCatalogError(message);
+        if (showError) toast.error(message);
+        return null;
+      })
+      .finally(() => {
+        if (liveCatalogRequestRef.current === request) {
+          liveCatalogRequestRef.current = null;
+        }
+        setIsLiveCatalogLoading(false);
+      });
+
+    liveCatalogRequestRef.current = request;
+    return request;
+  }, []);
 
   useEffect(() => {
     setLives(initialLives);
-    setLivesAreComplete(initialLivesAreComplete);
-  }, [initialLives, initialLivesAreComplete]);
+    setLivesCoverage(initialLivesCoverage);
+    setLivesAreStale(false);
+    setLivesLoadedAt(initialLivesCoverage === "complete" ? Date.now() : 0);
+  }, [initialLives, initialLivesCoverage]);
 
   useEffect(() => {
     setLiveStatuses(initialLiveStatuses.length ? initialLiveStatuses : LIVE_STATUS_OPTIONS);
@@ -1003,38 +1067,106 @@ export default function HomePage({
   }, [currentView]);
 
   useEffect(() => {
-    const needsHomeLives = currentView === "home" && !lives.length;
-    const needsCompleteTrackerLives = ["tracker", "trackerCalendar", "myList", "platformTracker"].includes(currentView) && !livesAreComplete;
-
-    if (!needsHomeLives && !needsCompleteTrackerLives) {
+    if (currentView === "home") {
+      if (livesCoverage === "none") {
+        void loadLiveCatalog({ showError: false });
+      }
       return undefined;
     }
 
-    let isMounted = true;
+    if (!LIVE_CATALOG_VIEWS.has(currentView)) {
+      return undefined;
+    }
 
-    async function loadLives() {
-      try {
-        const response = await fetch("/api/lives", { cache: "no-store" });
-        const data = await response.json();
+    const isExpired = livesCoverage === "complete"
+      && Date.now() - livesLoadedAt >= LIVE_CATALOG_COMPLETE_TTL_MS;
 
-        if (isMounted && response.ok) {
-          setLives(data.lives || []);
-          setLiveStatuses(data.statuses || LIVE_STATUS_OPTIONS);
-          setLivesAreComplete(true);
+    if (livesCoverage !== "complete" || livesAreStale || isExpired) {
+      void loadLiveCatalog();
+    }
+
+    return undefined;
+  }, [currentView, livesCoverage, livesLoadedAt, loadLiveCatalog]);
+
+  useEffect(() => {
+    function scheduleRealtimeRefresh() {
+      if (!LIVE_CATALOG_VIEWS.has(currentViewRef.current) || document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (liveCatalogRefreshTimerRef.current) {
+        window.clearTimeout(liveCatalogRefreshTimerRef.current);
+      }
+
+      const jitterMs = Math.round(Math.random() * LIVE_CATALOG_REALTIME_JITTER_MS);
+      liveCatalogRefreshTimerRef.current = window.setTimeout(() => {
+        liveCatalogRefreshTimerRef.current = null;
+        if (LIVE_CATALOG_VIEWS.has(currentViewRef.current)) {
+          void loadLiveCatalog({ showError: false });
         }
-      } catch {
-        if (isMounted && currentView !== "home") {
-          toast.error("No se pudieron cargar los directos.");
+      }, jitterMs);
+    }
+
+    function handleLiveCatalogUpdate() {
+      setLivesAreStale(true);
+      scheduleRealtimeRefresh();
+    }
+
+    function handleRealtimeState(event) {
+      const connected = Boolean(event.detail?.connected);
+      const wasConnected = realtimeConnectedRef.current;
+      realtimeConnectedRef.current = connected;
+
+      if (connected) {
+        if (hasRealtimeConnectedRef.current && !wasConnected) {
+          setLivesAreStale(true);
+          scheduleRealtimeRefresh();
         }
+        hasRealtimeConnectedRef.current = true;
       }
     }
 
-    loadLives();
+    window.addEventListener("kala:lives:update", handleLiveCatalogUpdate);
+    window.addEventListener("kala:realtime-state", handleRealtimeState);
 
     return () => {
-      isMounted = false;
+      window.removeEventListener("kala:lives:update", handleLiveCatalogUpdate);
+      window.removeEventListener("kala:realtime-state", handleRealtimeState);
+      if (liveCatalogRefreshTimerRef.current) {
+        window.clearTimeout(liveCatalogRefreshTimerRef.current);
+        liveCatalogRefreshTimerRef.current = null;
+      }
     };
-  }, [currentView, lives.length, livesAreComplete]);
+  }, [loadLiveCatalog]);
+
+  useEffect(() => {
+    function refreshDisconnectedCatalog() {
+      if (document.visibilityState !== "visible" || !LIVE_CATALOG_VIEWS.has(currentViewRef.current)) {
+        return;
+      }
+
+      const state = liveCatalogStateRef.current;
+      const ageMs = state.loadedAt ? Date.now() - state.loadedAt : Number.POSITIVE_INFINITY;
+      const needsRefresh = state.coverage !== "complete"
+        || state.stale
+        || ageMs >= LIVE_CATALOG_COMPLETE_TTL_MS
+        || (!realtimeConnectedRef.current && ageMs >= LIVE_CATALOG_DISCONNECTED_REFRESH_AGE_MS);
+
+      if (needsRefresh) {
+        void loadLiveCatalog({ showError: false, jitterMs: Math.round(Math.random() * 1000) });
+      }
+    }
+
+    const intervalId = window.setInterval(refreshDisconnectedCatalog, LIVE_CATALOG_FALLBACK_INTERVAL_MS);
+    window.addEventListener("focus", refreshDisconnectedCatalog);
+    document.addEventListener("visibilitychange", refreshDisconnectedCatalog);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshDisconnectedCatalog);
+      document.removeEventListener("visibilitychange", refreshDisconnectedCatalog);
+    };
+  }, [loadLiveCatalog]);
 
   useEffect(() => {
     if (!["tracker", "trackerCalendar", "myList"].includes(currentView) || !isAuthenticated) {
@@ -1891,7 +2023,7 @@ export default function HomePage({
             <>
               <div className="results-meta">
                 <span>Mostrando {visibleLives.length} de {filteredLives.length} resultados</span>
-                {isPending ? <span className="tracker-loading-strip">Actualizando resultados...</span> : null}
+                {isPending || isLiveCatalogLoading ? <span className="tracker-loading-strip">Actualizando resultados...</span> : null}
                 <div className="density-toggle" aria-label="Densidad de tarjetas">
                   <button
                     type="button"
@@ -2011,7 +2143,11 @@ export default function HomePage({
               <div className="empty-state">
               <div className="empty-state-icon">VOD</div>
               <div className="empty-state-text">
-                {currentView === "myList"
+                {isLiveCatalogLoading
+                  ? "Cargando directos..."
+                  : liveCatalogError
+                    ? liveCatalogError
+                    : currentView === "myList"
                   ? "Aún no tienes directos en esta vista."
                   : "No hay resultados con esos filtros."}
               </div>
@@ -2024,6 +2160,11 @@ export default function HomePage({
                 type="button"
                 className="empty-state-action"
                 onClick={() => {
+                  if (liveCatalogError) {
+                    void loadLiveCatalog();
+                    return;
+                  }
+
                   if (currentView === "myList" && personalCounts.saved + personalCounts.watched === 0) {
                     selectView("tracker");
                     return;
@@ -2034,7 +2175,11 @@ export default function HomePage({
                   setPersonalFilter(currentView === "myList" ? "saved" : "all");
                 }}
               >
-                {currentView === "myList" && personalCounts.saved + personalCounts.watched === 0 ? "Explorar rastreador" : "Limpiar filtros"}
+                {liveCatalogError
+                  ? "Reintentar"
+                  : currentView === "myList" && personalCounts.saved + personalCounts.watched === 0
+                    ? "Explorar rastreador"
+                    : "Limpiar filtros"}
               </button>
             </div>
           )}
@@ -2079,11 +2224,11 @@ export default function HomePage({
             ) : null}
 
             {currentView === "animeTierListAnimes" && hasPermission("anime.tierlist.animes.view") ? (
-              <AnimeTierListAnimesPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
+              <AnimeTierListAnimesPage isAuthenticated={isAuthenticated} role={currentUser?.role || "visitante"} />
             ) : null}
 
             {currentView === "animeTierListOpenings" && hasPermission("anime.tierlist.openings.view") ? (
-              <AnimeTierListOpeningsPage isAuthenticated={isAuthenticated} role={currentUser?.role || "invitado"} />
+              <AnimeTierListOpeningsPage isAuthenticated={isAuthenticated} role={currentUser?.role || "visitante"} />
             ) : null}
 
             {currentView === "animeLibraryCompleted" ? (

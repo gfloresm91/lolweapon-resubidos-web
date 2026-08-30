@@ -2,7 +2,7 @@
 
 import AnimeTierListBoard from "@/components/AnimeTierListBoard";
 
-export default function AnimeTierListAnimesPage({ isAuthenticated = false, role = "invitado" }) {
+export default function AnimeTierListAnimesPage({ isAuthenticated = false, role = "visitante" }) {
   return (
     <AnimeTierListBoard
       kind="animes"

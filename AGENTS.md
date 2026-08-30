@@ -227,7 +227,7 @@ npm run db:restore
 - Usuario/login es único.
 - Alias es visible públicamente y no necesariamente único.
 - Mensajes de login deben evitar filtrar información sensible: para credenciales incorrectas usar mensaje genérico.
-- Usuarios no autenticados se tratan como rol `invitado`.
+- Usuarios no autenticados se tratan como visitantes sin rol persistido. Las superficies públicas se declaran en código; las privadas exigen sesión antes de evaluar permisos.
 - Apps nativas (Lolweapon+) no usan `PlatformSession`/cookie: ver `Features Sensibles` → `Auth Móvil (Lolweapon+)`.
 
 ## Administración Y Auditoría
@@ -278,7 +278,7 @@ npm run db:restore
 - Dos tableros drag & drop (`AnimeTierListEntry` para animes, `AnimeTierListTheme` para openings/endings) completamente independientes de `SeasonalAnime`/Calendario — solo comparten la dimensión `AnimeSeason`. No reutilizar el sync del calendario para poblarlos.
 - Animes se sincroniza directo desde la query nativa de temporada de AniList (sin AnimeSchedule). Openings/Endings se sincroniza desde AnimeThemes.moe (`findAnimeByExternalSite(site: ANILIST, id: [...])`) y depende de que Animes ya esté sincronizado para esa temporada.
 - Selección de video por tema: prioriza la entry sin spoiler/nsfw y, dentro de ella, la mayor resolución (empate: fuente `BD` sobre `WEB`). Si solo hay entries con spoiler se guarda igual y se marca `isSpoiler`, oculto por defecto en el front.
-- A diferencia del Calendario, los permisos `anime.tierlist.animes.view`/`anime.tierlist.openings.view` sí se asignan por defecto al rol `invitado`: los invitados pueden armar el tablero libremente, pero las mutaciones (`POST /api/anime-tier-list`) exigen sesión — sin eso no se guarda.
+- A diferencia del Calendario, las Tier Lists se declaran públicas en código: los visitantes pueden armar el tablero libremente, pero las mutaciones (`POST /api/anime-tier-list`) exigen sesión — sin eso no se guarda.
 - Ambos mantenedores admin (`admin.anime.tierlist.animes.*`, `admin.anime.tierlist.openings.*`) tienen CRUD completo (crear, editar, soft-delete vía `deletedAt`, restaurar), a diferencia del Calendario que solo permite editar overrides.
 - Si un admin oculta o elimina un anime/tema ya rankeado por algún usuario, la colocación se mantiene en el tablero guardado de ese usuario (marcada como oculta), pero deja de ofrecerse a usuarios nuevos.
 - Tiers son personalizables por usuario (nombre, color, orden) y se autoguardan con debounce — no hay botón de guardar explícito.

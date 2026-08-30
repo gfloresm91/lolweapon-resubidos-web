@@ -16,10 +16,6 @@ export async function GET(request, { params }) {
   }
 
   const user = await getMobileAccessUser(request);
-  if (!canAny(user, ["tracker.view", "tracker.calendar.view"])) {
-    return jsonError("No autorizado", { status: 401 });
-  }
-
   const live = await getLiveById(liveId);
   if (!live) {
     return jsonError("No encontrado.", { status: 404 });

@@ -1,9 +1,9 @@
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
-import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { withPublicAccessPermissions } from "@/lib/publicAccessPolicy";
+import { getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can, listPlatformPermissions, listPlatformRoles, listPlatformUsers } from "@/lib/repositories/platformUserRepository";
 import { readRecentLives } from "@/lib/repositories/liveRepository";
 import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
@@ -13,19 +13,14 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const [currentUser, accessUser, isAdmin, lives] = await Promise.all([
+  const [currentUser, isAdmin, lives] = await Promise.all([
     getCurrentUserFromToken(token),
-    getAccessUserFromToken(token),
     validateAdminSessionToken(token),
     readRecentLives({ limit: 10 }),
   ]);
 
-  if (!can(accessUser, "home.view")) {
-    redirect("/login");
-  }
-
   const userId = currentUser?.id;
-  const canViewAdmin = can(accessUser, "admin.tracker.view") || can(accessUser, "admin.tags.view") || can(accessUser, "users.read") || can(accessUser, "roles.read");
+  const canViewAdmin = can(currentUser, "admin.tracker.view") || can(currentUser, "admin.tags.view") || can(currentUser, "users.read") || can(currentUser, "roles.read");
 
   const [animeActivity, platformUsers, platformRoles, platformPermissions] = await Promise.all([
     userId ? getAnimeActivityMapForUser(userId) : Promise.resolve({}),
@@ -47,12 +42,12 @@ export default async function Page() {
     <HomePage
       activeView="home"
       initialLives={lives}
-      initialLivesAreComplete={false}
+      initialLivesCoverage="partial"
       twitchLogin={twitchLogin}
       youtubeChannelUrl={youtubeChannelUrl}
       isAdmin={isAdmin}
       currentUser={currentUser}
-      accessPermissions={accessUser?.permissions || []}
+      accessPermissions={withPublicAccessPermissions(currentUser?.permissions)}
       initialAnimeActivity={animeActivity}
       initialPlatformUsers={platformUsers}
       initialPlatformRoles={platformRoles}

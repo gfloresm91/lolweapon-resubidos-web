@@ -30,17 +30,7 @@ function getAnimeSection(anime) {
 export async function GET(request) {
   try {
     const token = request.cookies.get(SESSION_COOKIE)?.value;
-    const [currentUser, canViewAnime] = await Promise.all([
-      getCurrentUserFromToken(token),
-      validateAnyPermissionSessionToken(token, [
-      "anime.tracking.view",
-      "anime.completed.view",
-      ]),
-    ]);
-
-    if (!canViewAnime) {
-      return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
-    }
+    const currentUser = await getCurrentUserFromToken(token);
 
     const includeHidden = await validateAnyPermissionSessionToken(token, [
       "anime.tracking.update",

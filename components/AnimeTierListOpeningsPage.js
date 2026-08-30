@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import AnimeTierListBoard from "@/components/AnimeTierListBoard";
 
-export default function AnimeTierListOpeningsPage({ isAuthenticated = false, role = "invitado" }) {
+export default function AnimeTierListOpeningsPage({ isAuthenticated = false, role = "visitante" }) {
   const [kind, setKind] = useState("op");
 
   return (

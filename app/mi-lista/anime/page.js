@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
-import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { getAnimeActivityMapForUser } from "@/lib/repositories/animeActivityRepository";
 import { getAnimeLibrary } from "@/lib/repositories/animeLibraryRepository";
 import { getStreamerRatingMap, getUserRatingMap } from "@/lib/repositories/animeRatingRepository";
@@ -14,9 +14,8 @@ export const dynamic = "force-dynamic";
 export default async function MyAnimeListPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const [currentUser, accessUser, isAdmin] = await Promise.all([
+  const [currentUser, isAdmin] = await Promise.all([
     getCurrentUserFromToken(token),
-    getAccessUserFromToken(token),
     validateAdminSessionToken(token),
   ]);
 
@@ -24,7 +23,7 @@ export default async function MyAnimeListPage() {
     redirect("/login");
   }
 
-  if (!can(accessUser, "anime.tracking.view") && !can(accessUser, "anime.completed.view")) {
+  if (!can(currentUser, "anime.tracking.view") && !can(currentUser, "anime.completed.view")) {
     redirect("/login");
   }
 
@@ -45,7 +44,7 @@ export default async function MyAnimeListPage() {
       initialUserRatings={initialUserRatings}
       isAdmin={isAdmin}
       currentUser={currentUser}
-      accessPermissions={accessUser?.permissions || []}
+      accessPermissions={currentUser?.permissions || []}
     />
   );
 }

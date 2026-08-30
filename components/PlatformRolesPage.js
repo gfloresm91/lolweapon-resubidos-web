@@ -33,7 +33,7 @@ const ROLE_COLUMNS = [
   { key: "status", label: "Estado", sortable: true },
   { key: "actions", label: "Acciones" },
 ];
-const PROTECTED_ROLE_CODES = new Set(["dios", "invitado"]);
+const PROTECTED_ROLE_CODES = new Set(["dios"]);
 const RATING_WRITE_PERMISSION_CODE = "anime.rating.write";
 const STREAMER_RATING_PERMISSION_CODE = "anime.rating.streamer";
 const GOD_EXCLUDED_PERMISSION_CODES = new Set([STREAMER_RATING_PERMISSION_CODE]);
@@ -301,7 +301,6 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
   }, [groupedPermissions, permissionSearch, permissions, selectedGroup]);
   const selectedGroupPermissions = groupedPermissions[selectedGroup] || [];
   const isGod = normalizedRole.code === "dios";
-  const isGuest = normalizedRole.code === "invitado";
   const isPermissionChecked = (permission) => isGod
     ? !GOD_EXCLUDED_PERMISSION_CODES.has(permission.code)
     : draftPermissions.includes(permission.code);
@@ -445,7 +444,6 @@ function RoleModal({ role, permissions, isSaving, onCancel, onSubmit }) {
       )}
     >
         {isGod ? <p className="admin-modal-notice">El rol Dios es inmutable y siempre tiene todos los permisos.</p> : null}
-        {isGuest ? <p className="admin-modal-notice">El rol Invitado representa a quienes no han iniciado sesión y siempre debe permanecer activo.</p> : null}
         <div className="admin-modal-section">
           <h3>Identidad</h3>
           <div className="form-row">
