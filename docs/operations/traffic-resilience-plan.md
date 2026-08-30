@@ -238,6 +238,8 @@ Línea base inicial de QA, tomada con intervalos de 60 segundos y el servicio pr
 
 Estos valores describen reposo y no constituyen todavía límites de capacidad. Se usarán para comparar las mediciones bajo concurrencia de la Etapa 4.
 
+La observabilidad de Nginx quedó validada con un log JSON separado, sin IP, User-Agent ni query string, y un `stub_status` limitado a `127.0.0.1:8088`. La primera muestra de 15 minutos registró 607 entradas y cero errores críticos `499/502/503/504`. Producción mostró p50 HTTP de 6 ms, p95 de 127 ms y p99 de 364 ms; los cierres de WebSocket se separaron de estos percentiles mediante `connectionType`. El analizador versionado `scripts/summarize-nginx-observability.mjs` quedó validado en QA. La ejecución periódica se instala como un servicio `oneshot` de baja prioridad y un timer cada 15 minutos, documentados en `docs/operations/nginx-observability.md`.
+
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
 3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.
