@@ -64,7 +64,33 @@ function createHostSummary(host) {
     httpUpstreamTimesMs: [],
     criticalErrors: [],
     clientErrorCounts: new Map(),
+    trackedRoutes: new Map(),
   };
+}
+
+function normalizeTrackedRoute(path) {
+  if (/^\/api\/lives\/\d+\/playback$/.test(path || "")) {
+    return "/api/lives/:id/playback";
+  }
+  if (/^\/api\/mobile\/v1\/lives\/\d+\/playback$/.test(path || "")) {
+    return "/api/mobile/v1/lives/:id/playback";
+  }
+  return null;
+}
+
+function addTrackedRoute(summary, entry, requestTimeMs) {
+  const route = normalizeTrackedRoute(entry.path);
+  if (!route) return;
+  const key = `${entry.method || "UNKNOWN"} ${route}`;
+  const tracked = summary.trackedRoutes.get(key) || {
+    method: entry.method || "UNKNOWN",
+    route,
+    requestTimesMs: [],
+    statusCounts: {},
+  };
+  tracked.requestTimesMs.push(requestTimeMs);
+  tracked.statusCounts[entry.status] = (tracked.statusCounts[entry.status] || 0) + 1;
+  summary.trackedRoutes.set(key, tracked);
 }
 
 function numericUpstreamTime(value) {
@@ -111,6 +137,19 @@ function finalizeHost(summary, windowSeconds) {
       })
       .sort((left, right) => right.count - left.count)
       .slice(0, 10),
+    trackedRoutes: [...summary.trackedRoutes.values()].map((route) => ({
+      method: route.method,
+      route: route.route,
+      requests: route.requestTimesMs.length,
+      requestsPerSecond: round(route.requestTimesMs.length / windowSeconds, 4),
+      statusCounts: route.statusCounts,
+      latencyMs: {
+        average: round(average(route.requestTimesMs)),
+        p95: round(percentile(route.requestTimesMs, 95)),
+        p99: round(percentile(route.requestTimesMs, 99)),
+        maximum: round(Math.max(...route.requestTimesMs)),
+      },
+    })),
   };
 }
 
@@ -160,6 +199,7 @@ async function summarize({ file, minutes }) {
     summary.httpRequests += 1;
     const requestTime = Number(entry.requestTime);
     if (Number.isFinite(requestTime)) summary.httpRequestTimesMs.push(requestTime * 1000);
+    if (Number.isFinite(requestTime)) addTrackedRoute(summary, entry, requestTime * 1000);
 
     const upstreamTime = numericUpstreamTime(entry.upstreamResponseTime);
     if (upstreamTime !== null) summary.httpUpstreamTimesMs.push(upstreamTime * 1000);

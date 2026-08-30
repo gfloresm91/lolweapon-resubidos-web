@@ -242,6 +242,8 @@ La observabilidad de Nginx quedó validada con un log JSON separado, sin IP, Use
 
 El inventario inicial de PostgreSQL 16.13 confirmó una instancia compartida por producción y QA, bases pequeñas de 23 MiB y 18 MiB, cero temporales, cero deadlocks, cero esperas por locks y cache hit superior a 99,99%. Los pools liberaron conexiones idle según el timeout de 30 segundos. Como `pg_stat_statements` no está instalado, `track_io_timing` está apagado y habilitarlos exigiría intervenir la instancia compartida, se eligió un recolector externo de snapshots agregados. `scripts/summarize-postgres-observability.mjs` calcula deltas por base cada 15 minutos sin registrar SQL ni credenciales; su instalación root-owned y timer están documentados en `docs/operations/postgres-observability.md`.
 
+La primera ventana con deltas registró 0,694 transacciones/s en producción y 0,085 en QA, sin temporales, deadlocks, locks ni actividad superior a un segundo. Para aislar el costo del progreso de reproducción, el resumen Nginx normaliza las rutas web y móvil de playback y el snapshot PostgreSQL incorpora deltas globales de WAL. Esta instrumentación mide el costo antes de cambiar la frecuencia de guardado.
+
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
 3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.

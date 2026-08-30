@@ -6,6 +6,8 @@ Capturar cada 15 minutos métricas agregadas de la instancia PostgreSQL comparti
 
 La solución no requiere `pg_stat_statements`, `track_io_timing`, cambios de configuración ni reiniciar PostgreSQL. La primera ejecución crea la línea base; desde la segunda calcula transacciones y bloques por segundo, además de temporales y deadlocks del intervalo.
 
+El snapshot incluye también `pg_stat_wal`: bytes y registros WAL, full-page images y saturaciones de buffers por intervalo. WAL es global a la instancia compartida; debe correlacionarse con las tasas separadas por base y con `trackedRoutes` de Nginx, no atribuirse directamente a un solo ambiente.
+
 ## Instalación en QA
 
 El servicio necesita acceso a Docker. Para no ejecutar como root un archivo modificable desde el checkout, primero se instala una copia propiedad de root:

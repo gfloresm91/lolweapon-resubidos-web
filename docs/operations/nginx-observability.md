@@ -4,6 +4,8 @@
 
 Resumir cada 15 minutos el tráfico recibido por Nginx sin añadir trabajo al proceso web de Next.js. El resumen separa hosts y excluye los WebSockets cerrados de los percentiles de latencia HTTP.
 
+`trackedRoutes` mide por separado las rutas web y móvil de persistencia de reproducción. Los IDs se normalizan como `:id`, evitando cardinalidad por directo.
+
 ## Requisitos del servidor
 
 - `/var/log/nginx/observability.log` debe usar JSON válido y contener `connectionType`.

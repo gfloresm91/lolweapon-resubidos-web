@@ -50,8 +50,18 @@ SELECT json_build_object(
       WHERE datname IS NOT NULL
         AND state = 'active'
         AND pid <> pg_backend_pid()
-        AND query_start < now() - interval '1 second'
+      AND query_start < now() - interval '1 second'
     )
+  ),
+  'wal', (
+    SELECT json_build_object(
+      'walRecords', wal_records,
+      'walFpi', wal_fpi,
+      'walBytes', wal_bytes,
+      'walBuffersFull', wal_buffers_full,
+      'statsReset', stats_reset
+    )
+    FROM pg_stat_wal
   )
 )::text;
 `;
@@ -145,6 +155,14 @@ function buildSummary(snapshot, previous) {
   const elapsedSeconds = (currentTime - previousTime) / 1000;
   const validInterval = Number.isFinite(elapsedSeconds) && elapsedSeconds > 0;
   const previousByName = new Map((previous?.databases || []).map((database) => [database.name, database]));
+  const walCounters = ["walRecords", "walFpi", "walBytes", "walBuffersFull"];
+  const walReset = !validInterval || !previous?.wal || walCounters.some(
+    (counter) => Number(snapshot.wal[counter]) < Number(previous.wal[counter]),
+  );
+  const walDelta = Object.fromEntries(walCounters.map((counter) => [
+    counter,
+    walReset ? null : Number(snapshot.wal[counter]) - Number(previous.wal[counter]),
+  ]));
 
   return {
     type: "postgres_observability_summary",
@@ -152,6 +170,17 @@ function buildSummary(snapshot, previous) {
     postgresStartedAt: snapshot.postgresStartedAt,
     intervalSeconds: validInterval ? round(elapsedSeconds) : null,
     activity: snapshot.activity,
+    wal: {
+      ...snapshot.wal,
+      interval: {
+        baselineOnly: walReset,
+        records: walDelta.walRecords,
+        fullPageImages: walDelta.walFpi,
+        bytes: walDelta.walBytes,
+        bytesPerSecond: walReset ? null : round(walDelta.walBytes / elapsedSeconds),
+        buffersFull: walDelta.walBuffersFull,
+      },
+    },
     databases: snapshot.databases.map((database) => buildDatabaseSummary(
       database,
       validInterval ? previousByName.get(database.name) : null,
