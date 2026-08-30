@@ -6,7 +6,7 @@ Este documento permite continuar, incluso con otro agente, el trabajo iniciado d
 
 Documento relacionado: [`docs/incidents/2026-08-21-traffic-collapse.md`](../incidents/2026-08-21-traffic-collapse.md). Ese postmortem es la fuente de evidencia, cronología y comandos de diagnóstico. Este archivo es la hoja de ruta de implementación.
 
-Estado actualizado al 29 de agosto de 2026:
+Estado actualizado al 30 de agosto de 2026:
 
 - El hotfix `v2.22.1` está en producción y estabilizó el incidente.
 - El Droplet fue ampliado a 4 vCPU y 8 GiB de RAM, con CPU compartida.
@@ -14,8 +14,8 @@ Estado actualizado al 29 de agosto de 2026:
 - Las optimizaciones defensivas de la Etapa 1 llegaron a QA y producción; están contenidas en `main` y en el release `v2.25.1`.
 - `/directo` está aislado como HTML estático servido por Nginx, dispone de caché específica en Cloudflare para QA y producción y lleva varios días de uso real estable sin errores operativos reportados.
 - La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas. Esta prueba no certifica todavía toda la aplicación dinámica con 500 usuarios concurrentes sostenidos.
-- YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico; antes de reactivarlos se debe verificar el valor efectivo de ambos flags en producción.
-- La autorización pública ya no depende del rol `invitado` en PostgreSQL; la Etapa 1.75 quedó certificada en QA. El siguiente bloque es completar observabilidad/alertas antes de la prueba de carga dinámica.
+- YouTube y analítica de audiencia quedaron reactivados conjuntamente en QA después de completar pruebas aisladas y una validación sostenida con 500 visitantes. La habilitación en producción continúa sujeta al release y monitoreo de la Etapa 6.
+- La autorización pública ya no depende del rol `invitado` en PostgreSQL; la Etapa 1.75 quedó certificada en QA. La observabilidad, la prueba de carga representativa y la reactivación controlada de funciones también quedaron completadas en QA; el siguiente bloque es el release productivo de la Etapa 6.
 - No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
 
 ## Qué ocurrió
@@ -308,6 +308,16 @@ Criterio de salida: informe con configuración, commit probado, resultados, grá
 ### Etapa 5: reactivación controlada de funciones
 
 Objetivo: recuperar funciones desactivadas sin mezclar variables.
+
+Estado al 30 de agosto de 2026: completada en QA. La línea base con ambos flags apagados mantuvo Node alrededor de 0,54–0,58% de un núcleo, RSS de 242–245 MiB, event-loop p95 cercano a 20 ms y cero reinicios. PostgreSQL QA permaneció sin locks, actividad prolongada, temporales ni deadlocks.
+
+YouTube se habilitó de forma aislada con una sincronización cada 900 segundos y analítica de audiencia apagada. La ejecución inicial creó y notificó un elemento sin errores. Bajo 500 visitantes sostenidos, el generador completó 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets; Nginx midió p95 de 37 ms y p99 de 114 ms. Node alcanzó aproximadamente 25,09% de un núcleo durante la rampa, mantuvo event-loop p95 cercano a 22 ms y no se reinició. PostgreSQL no registró locks, actividad prolongada, temporales ni deadlocks. YouTube queda aprobado individualmente en QA.
+
+Después se apagó YouTube y se habilitó analítica de audiencia de forma aislada con muestreo cada 60 segundos. Una prueba equivalente completó 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets; Nginx midió p95 de 46 ms, p99 de 92 ms y máximo de 172 ms. Node alcanzó aproximadamente 20,64% de un núcleo, mantuvo event-loop p95 alrededor de 24 ms, recuperó la memoria después de la carga y no se reinició. PostgreSQL QA promedió aproximadamente 4,32 transacciones/s, sin locks, actividad prolongada, temporales ni deadlocks. Analítica de audiencia queda aprobada individualmente en QA.
+
+Finalmente se activaron ambos flags y se repitió el escenario completo. El generador volvió a completar 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets sin errores. Nginx observó 1.510 respuestas `200` y 1.001 upgrades `101`, con p95 de 34 ms, p99 de 63 ms y máximo de 511 ms. Node alcanzó aproximadamente 17,18% de un núcleo y 458 MiB RSS durante la rampa; con 500 usuarios conectados se mantuvo alrededor de 1,08–1,40% de un núcleo, con event-loop p95 cercano a 21–22 ms. La memoria corriente volvió a aproximadamente 251 MiB, el peak acumulado de systemd permaneció cerca de 534 MiB y no hubo reinicios. PostgreSQL QA promedió aproximadamente 6,36 transacciones/s, con cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks.
+
+Decisión: mantener `YOUTUBE_NOTIFICATION_SYNC_ENABLED=true` y `STREAM_AUDIENCE_ANALYTICS_ENABLED=true` en QA. Ambas funciones tienen evidencia individual y conjunta sin degradación material para el patrón certificado de 500 visitantes. Su activación en producción debe hacerse mediante la Etapa 6, con rollback por flag y observación posterior al despliegue.
 
 1. Establecer una línea base con ambos flags apagados.
 2. Reactivar YouTube fuera de un pico, reiniciar producción y observar al menos 15–30 minutos.
