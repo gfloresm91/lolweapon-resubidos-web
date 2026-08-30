@@ -240,6 +240,8 @@ Estos valores describen reposo y no constituyen todavía límites de capacidad. 
 
 La observabilidad de Nginx quedó validada con un log JSON separado, sin IP, User-Agent ni query string, y un `stub_status` limitado a `127.0.0.1:8088`. La primera muestra de 15 minutos registró 607 entradas y cero errores críticos `499/502/503/504`. Producción mostró p50 HTTP de 6 ms, p95 de 127 ms y p99 de 364 ms; los cierres de WebSocket se separaron de estos percentiles mediante `connectionType`. El analizador versionado `scripts/summarize-nginx-observability.mjs` quedó validado en QA. La ejecución periódica se instala como un servicio `oneshot` de baja prioridad y un timer cada 15 minutos, documentados en `docs/operations/nginx-observability.md`.
 
+El inventario inicial de PostgreSQL 16.13 confirmó una instancia compartida por producción y QA, bases pequeñas de 23 MiB y 18 MiB, cero temporales, cero deadlocks, cero esperas por locks y cache hit superior a 99,99%. Los pools liberaron conexiones idle según el timeout de 30 segundos. Como `pg_stat_statements` no está instalado, `track_io_timing` está apagado y habilitarlos exigiría intervenir la instancia compartida, se eligió un recolector externo de snapshots agregados. `scripts/summarize-postgres-observability.mjs` calcula deltas por base cada 15 minutos sin registrar SQL ni credenciales; su instalación root-owned y timer están documentados en `docs/operations/postgres-observability.md`.
+
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
 3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.

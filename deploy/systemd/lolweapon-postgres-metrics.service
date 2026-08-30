@@ -1,0 +1,20 @@
+[Unit]
+Description=Lolweapon PostgreSQL observability summary
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env node /usr/local/lib/lolweapon-observability/summarize-postgres-observability.mjs --state-file /var/lib/lolweapon-observability/postgres-state.json
+StateDirectory=lolweapon-observability
+StateDirectoryMode=0700
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+SyslogIdentifier=lolweapon-postgres-metrics
+StandardOutput=journal
+StandardError=journal

@@ -26,6 +26,7 @@
     "db:reset-sequences": "node scripts/reset-postgres-sequences.mjs",
     "enrich:anime": "node scripts/enrich-anime-metadata.mjs",
     "metrics:nginx": "node scripts/summarize-nginx-observability.mjs",
+    "metrics:postgres": "node scripts/summarize-postgres-observability.mjs",
     "start": "NODE_ENV=production node server.mjs",
     "lint": "next lint"
   },
