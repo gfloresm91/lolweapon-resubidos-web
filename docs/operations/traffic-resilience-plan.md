@@ -244,6 +244,8 @@ El inventario inicial de PostgreSQL 16.13 confirmó una instancia compartida por
 
 La primera ventana con deltas registró 0,694 transacciones/s en producción y 0,085 en QA, sin temporales, deadlocks, locks ni actividad superior a un segundo. Para aislar el costo del progreso de reproducción, el resumen Nginx normaliza las rutas web y móvil de playback y el snapshot PostgreSQL incorpora deltas globales de WAL. Esta instrumentación mide el costo antes de cambiar la frecuencia de guardado.
 
+La prueba controlada de reproducción en QA registró 16 guardados web, todos `200`, con promedio de 18,44 ms y p95/p99 de 28 ms; no produjo locks, temporales ni deadlocks. El intervalo global compartido generó aproximadamente 739 bytes/s de WAL, cifra que incluye producción y por eso no se atribuye exclusivamente al playback. A partir de esta evidencia, la sincronización web cambió de 5 a 12 segundos reproducidos, conservó guardados por pausa, visibilidad, salida y finalización, añadió `keepalive` y deduplicó posiciones sin cambios. Esto reduce en aproximadamente 58% las escrituras periódicas antes de la prueba concurrente.
+
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
 3. Agregar métricas por proceso Node: CPU, RSS/heap, reinicios y event-loop lag.

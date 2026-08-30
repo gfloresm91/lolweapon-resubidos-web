@@ -536,7 +536,7 @@ Sistema independiente de `PlatformSession`, para apps nativas. Bearer tokens opa
 - Las rutas `/api/mobile/v1/lives/*` resuelven el usuario mediante bearer token, pero aplican los mismos permisos configurables que el frontend web.
 - La edición requiere `tracker.update` junto con `tracker.form.full` o `tracker.form.compact`; el permiso de actualización por sí solo no habilita el formulario.
 - `PlatformMobilePushToken` guarda direcciones FCM activas por instalación. Firebase se inicializa exclusivamente en servidor desde `FIREBASE_SERVICE_ACCOUNT_JSON`; `PlatformNotification.pushedAt` funciona como claim para no duplicar el envío push.
-- `PlatformUserLivePlayback` mantiene la posición por usuario, directo y parte. El player web y `/mobile-embed/watch/[id]` escriben sobre esa misma persistencia mediante sus endpoints respectivos.
+- `PlatformUserLivePlayback` mantiene la posición por usuario, directo y parte. El player web y `/mobile-embed/watch/[id]` escriben sobre esa misma persistencia mediante sus endpoints respectivos. La web sincroniza cada 12 segundos reproducidos y también al pausar, ocultar o abandonar la página y completar una parte; evita duplicar una posición sin cambios y usa `keepalive` para el último guardado durante la salida.
 - El manifest `public/lolweapon-plus/latest.json` anuncia la versión descargable; el APK se publica fuera de Git para evitar versionar binarios.
 
 ---

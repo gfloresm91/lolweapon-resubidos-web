@@ -9,6 +9,7 @@ const PieroVideoPlayer = dynamic(() => import("@/components/PieroVideoPlayer"), 
 
 const AUTO_ADVANCE_SECONDS = 7;
 const PROGRESS_EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000;
+const SERVER_PROGRESS_INTERVAL_SECONDS = 12;
 
 function getOkruEmbedUrl(href) {
   try {
@@ -400,6 +401,7 @@ export default function OkruWatchPlayer({
     const duration = videoRef.current?.duration;
     fetch(`/api/lives/${dbLiveId}/playback`, {
       method: "POST",
+      keepalive: true,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         source: "piero",
@@ -464,20 +466,24 @@ export default function OkruWatchPlayer({
     tryPieroAutoplay(player);
   }
 
-  function handlePieroTimeUpdate(currentTime, duration) {
+  function handlePieroTimeUpdate(currentTime) {
     // WebKit puede emitir `stalled` aunque la reproducción siga avanzando y
     // no siempre vuelve a emitir `playing`. El progreso real invalida el aviso.
     if (Number.isFinite(currentTime) && currentTime > lastPlaybackActivityRef.current + 0.05) {
       lastPlaybackActivityRef.current = currentTime;
       clearPieroLoadingState();
     }
-    if (!Number.isFinite(currentTime) || currentTime - progressSaveRef.current < 5) return;
+    if (
+      !Number.isFinite(currentTime)
+      || Math.abs(currentTime - progressSaveRef.current) < SERVER_PROGRESS_INTERVAL_SECONDS
+    ) return;
 
-    savePieroProgress(currentTime, duration);
+    savePieroProgress(currentTime);
   }
 
   function savePieroProgress(currentTime) {
     if (!Number.isFinite(currentTime) || completedPartRef.current || !hasRestoredProgressRef.current) return;
+    if (Math.floor(currentTime) === Math.floor(progressSaveRef.current)) return;
     progressSaveRef.current = currentTime;
     if (isAuthenticated) {
       syncPlaybackToServer(currentTime, false);
