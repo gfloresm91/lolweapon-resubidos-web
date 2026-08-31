@@ -37,5 +37,9 @@ export default defineConfig({
       name: "multistream-responsive",
       testMatch: "**/multistream-responsive.spec.js",
     },
+    {
+      name: "tracker-catalog-refresh",
+      testMatch: "**/tracker-catalog-refresh.spec.js",
+    },
   ],
 });

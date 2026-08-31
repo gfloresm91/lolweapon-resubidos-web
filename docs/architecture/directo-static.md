@@ -146,6 +146,16 @@ Certificación completada el 23 de agosto de 2026:
 - Después de la carga: load average 0,41/0,34/0,18, aproximadamente 6,3 GiB de memoria disponible, 28 MiB de swap en uso sin crecimiento observado y cero errores recientes de Nginx.
 - La comprobación posterior del origen respondió `200` en aproximadamente 6 ms.
 
+## Resultado en producción
+
+Estado observado al 29 de agosto de 2026:
+
+- La página estática, el snapshot y la configuración Nginx están desplegados en producción.
+- Cloudflare dispone de una Cache Rule limitada al hostname productivo y a `/directo`/`/directo-status.json`, respetando los TTL del origen.
+- `/directo` ha sido utilizado durante varios días reales de emisión sin caídas ni errores operativos reportados.
+- Esta evidencia real complementa la prueba sintética de QA y confirma que el aislamiento evita trasladar el pico habitual del modo dual a Node/PostgreSQL.
+- Sigue pendiente certificar con carga sostenida las rutas dinámicas de la plataforma y el flujo autenticado de guardado de progreso; esa prueba no debe darse por cubierta por el éxito de `/directo`.
+
 Esta certificación cubre la entrega del HTML estático, no la capacidad de VK/Twitch ni el resto de la plataforma dinámica. Los iframes descargan su contenido directamente desde los proveedores.
 
 ## Rollback

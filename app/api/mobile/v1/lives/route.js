@@ -4,16 +4,12 @@ import { canAny } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses, readLives } from "@/lib/repositories/liveRepository";
 import { getMobileAccessUser } from "@/lib/mobileAuth";
 
-// Mismo gate de permisos que app/api/lives/route.js (versión web), solo que resuelto vía Bearer en
-// vez de cookie de sesión - invitados caen a getPublicAccessUser(), igual que la web.
+// La consulta del rastreador es pública, igual que su equivalente web. El bearer es opcional y
+// solo habilita capacidades personales o administrativas en el objeto de permisos.
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   const user = await getMobileAccessUser(request);
-
-  if (!canAny(user, ["tracker.view", "tracker.calendar.view"])) {
-    return NextResponse.json({ success: false, error: "No autorizado" }, { status: 401 });
-  }
 
   const [lives, statuses] = await Promise.all([readLives(), getLiveStatuses()]);
 
@@ -28,11 +24,14 @@ export async function GET(request) {
     formVariant,
   };
 
-  // Cache-Control explícito: "force-dynamic" evita el cacheo de Next.js en build/SSR, pero no manda
-  // por sí solo un header que impida a un proxy/CDN intermedio (o al propio cliente) cachear esta
-  // respuesta - esta lista cambia seguido (ediciones desde el admin), nunca debería servirse stale.
+  // El catálogo es público y comparte una caché CDN muy breve para absorber ráfagas de clientes
+  // después de una invalidación en tiempo real. Las capacidades del usuario son pequeñas señales
+  // derivadas del bearer, por lo que una respuesta autenticada no debe compartirse públicamente.
+  const cacheControl = user?.id
+    ? "private, no-store"
+    : "public, max-age=0, s-maxage=10, stale-while-revalidate=20";
   return NextResponse.json(
     { success: true, lives, statuses, permissions },
-    { headers: { "Cache-Control": "no-store" } },
+    { headers: { "Cache-Control": cacheControl } },
   );
 }

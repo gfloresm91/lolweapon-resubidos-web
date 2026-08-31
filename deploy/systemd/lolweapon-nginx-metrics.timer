@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Lolweapon Nginx observability summary every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+AccuracySec=30s
+RandomizedDelaySec=30s
+Persistent=true
+Unit=lolweapon-nginx-metrics.service
+
+[Install]
+WantedBy=timers.target

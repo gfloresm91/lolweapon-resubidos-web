@@ -104,7 +104,7 @@ const roleLegend = [
   { term: "TW_VIP", description: "VIP de Twitch; pendiente de autorización." },
   { term: "YT_Miembro", description: "Miembro de YouTube; pendiente de autorización." },
   { term: "Público", description: "Cuenta registrada sin beneficios activos." },
-  { term: "Invitado", description: "Usuario sin sesión." },
+  { term: "Visitante", description: "Persona que navega sin sesión; su acceso público se define en código." },
   { term: "Streamer", description: "Rol especial interno." },
 ];
 
@@ -228,14 +228,14 @@ const navigationTree = [
 ];
 
 function getAuthenticatedRoles(roles) {
-  return roles.filter((role) => role.isActive && role.code !== "invitado");
+  return roles.filter((role) => role.isActive && role.code !== "visitante");
 }
 
 function getAccessRoles(item, roles) {
   const activeRoles = roles.filter((role) => role.isActive);
 
   if (item.guestOnly) {
-    return activeRoles.filter((role) => role.code === "invitado");
+    return activeRoles.filter((role) => role.code === "visitante");
   }
 
   if (item.publicAccess) {
@@ -265,7 +265,7 @@ function getRoleGroup(role) {
   const code = String(role.code || "").toLowerCase();
   const label = String(role.label || "").toLowerCase();
 
-  if (["invitado", "publico"].includes(code)) return "Base";
+  if (["visitante", "publico"].includes(code)) return "Base";
   if (["dios", "admin", "moderador"].includes(code)) return "Staff";
   if (code.includes("tier") || code.includes("vip") || code.includes("miembro")) return "Comunidad";
   if (code.includes("streamer") || label.includes("streamer") || label.includes("kala")) return "Especial";
@@ -287,7 +287,7 @@ function groupRolesByType(roles) {
 }
 
 function getCurrentRoleCode(currentUser) {
-  return currentUser?.role || "invitado";
+  return currentUser?.role || "visitante";
 }
 
 function getCurrentRoleLabel(currentUser, roles) {

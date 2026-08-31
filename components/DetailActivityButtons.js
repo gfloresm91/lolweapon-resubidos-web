@@ -90,7 +90,9 @@ export default function DetailActivityButtons({
 
       setEditingLive(null);
       toast.success("Directo actualizado.");
-      router.refresh();
+      window.dispatchEvent(new CustomEvent("kala:live-detail:refresh", {
+        detail: { action: "updated", liveId },
+      }));
     } catch (error) {
       toast.error(error?.message || "No se pudo guardar el directo.");
     } finally {

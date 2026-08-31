@@ -6,13 +6,16 @@ Este documento permite continuar, incluso con otro agente, el trabajo iniciado d
 
 Documento relacionado: [`docs/incidents/2026-08-21-traffic-collapse.md`](../incidents/2026-08-21-traffic-collapse.md). Ese postmortem es la fuente de evidencia, cronología y comandos de diagnóstico. Este archivo es la hoja de ruta de implementación.
 
-Estado al 22 de agosto de 2026:
+Estado actualizado al 30 de agosto de 2026:
 
 - El hotfix `v2.22.1` está en producción y estabilizó el incidente.
 - El Droplet fue ampliado a 4 vCPU y 8 GiB de RAM, con CPU compartida.
 - Producción continúa usando un solo proceso Node y PostgreSQL local en Docker.
-- YouTube y analítica de audiencia permanecían desactivados al cerrar el diagnóstico.
-- Existen optimizaciones adicionales en el worktree local que todavía deben pasar por QA, commit, despliegue y prueba de carga.
+- Las optimizaciones defensivas de la Etapa 1 llegaron a QA y producción; están contenidas en `main` y en el release `v2.25.1`.
+- `/directo` está aislado como HTML estático servido por Nginx, dispone de caché específica en Cloudflare para QA y producción y lleva varios días de uso real estable sin errores operativos reportados.
+- La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas. Esta prueba no certifica todavía toda la aplicación dinámica con 500 usuarios concurrentes sostenidos.
+- YouTube y analítica de audiencia quedaron reactivados conjuntamente en QA después de completar pruebas aisladas y una validación sostenida con 500 visitantes. La habilitación en producción continúa sujeta al release y monitoreo de la Etapa 6.
+- La autorización pública ya no depende del rol `invitado` en PostgreSQL; la Etapa 1.75 quedó certificada en QA. La observabilidad, la prueba de carga representativa y la reactivación controlada de funciones también quedaron completadas en QA; el siguiente bloque es el release productivo de la Etapa 6.
 - No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
 
 ## Qué ocurrió
@@ -36,18 +39,21 @@ El resize dio margen de capacidad, pero no corrigió la causa: Node volvió a sa
 
 Después del hotfix, con unas 860 conexiones HTTPS y 177 usuarios deduplicados, Node bajó aproximadamente de 97 % a 23–32 % de un núcleo y no quedaron sesiones `idle in transaction`.
 
-## Optimizaciones locales pendientes de despliegue
+## Optimizaciones defensivas desplegadas
 
-Antes de iniciar una etapa, revisar `git status` y `git diff`; no asumir que estos cambios ya están en QA o producción.
+Estas optimizaciones se implementaron en `0cb5701` (`fix(performance): harden public traffic paths`), pasaron QA y están incluidas en `main`/`v2.25.1`:
 
 - Inicio entrega solo los diez directos recientes y obtiene el catálogo completo al entrar a Rastreador, Calendario, Mi lista o Mantenedor Rastreador.
+- El catálogo del Rastreador usa cobertura explícita, una lectura de proceso compartida durante 10 segundos y una única promesa en vuelo. Las mutaciones invalidan esa lectura y emiten `lives:update`; el cliente refresca únicamente si está viendo el catálogo y difiere la actualización en las demás pantallas. Foco y polling de dos minutos quedan como respaldo si se pierde el WebSocket.
 - `/api/youtube/videos` deja de sincronizar/escribir por visita, usa caché en proceso, promesa compartida, stale fallback y headers de caché pública.
 - `/api/twitch/status` permite caché pública breve.
 - Las notificaciones públicas usan un scope explícito, caché breve en proceso, promesa compartida e invalidación al emitir actualizaciones.
-- El rol invitado tiene caché y deduplicación breve para evitar una estampida de lecturas.
+- El rol invitado tiene caché y deduplicación breve para evitar una estampida de lecturas. Esta mitigación permanece activa, pero será reemplazada por acceso público definido en código en la Etapa 1.75.
 - Las respuestas privadas/autenticadas continúan sin caché pública.
 
-El último `npm run build` local terminó correctamente, pero debe repetirse antes de entregar el commit si el diff cambia.
+Esta invalidación en tiempo real es local al proceso actual, igual que los demás WebSockets y cachés en memoria. Antes de ejecutar varios workers o instancias se debe mover el evento y la invalidación a Redis/Valkey Pub/Sub o a otro coordinador compartido.
+
+Antes de continuar cualquier etapa se debe revisar `git status` y `git diff`; no confundir cambios locales con código desplegado.
 
 ## Flujo adicional de escritura: progreso de reproducción
 
@@ -83,7 +89,7 @@ La recomendación de no crear un cliente por solicitud es correcta. La aplicaci�
 
 ### Caché de permisos
 
-Es pertinente y fue central en el incidente. La inicialización repetida ya fue eliminada y el camino invitado tiene optimizaciones adicionales pendientes. Para usuarios autenticados puede evaluarse una caché de 30–120 segundos con invalidación al cambiar rol, permisos, estado o sesión.
+Es pertinente y fue central en el incidente. La inicialización repetida ya fue eliminada y el camino invitado dispone de caché breve. Sin embargo, una visita sin sesión todavía puede depender periódicamente de `PlatformRole` y sus permisos en PostgreSQL; la arquitectura objetivo elimina esa dependencia y define explícitamente en código qué superficies son públicas. Para usuarios autenticados puede evaluarse una caché de 30–120 segundos con invalidación al cambiar rol, permisos, estado o sesión.
 
 No cachear permisos durante 30 días sin invalidación confiable. Podría conservar accesos después de desactivar un usuario o revocar permisos.
 
@@ -139,7 +145,7 @@ No avanzar automáticamente por todas las etapas. Cada una tiene una decisión d
 
 Objetivo: desplegar y verificar las optimizaciones locales sin tocar aún producción ni agregar infraestructura.
 
-Estado: **completada en QA el 23 de agosto de 2026** con `0cb5701` (`fix(performance): harden public traffic paths`) y documentación `ec6cc40`. El build de producción terminó correctamente; los flujos invitados y autenticados pasaron el smoke test; QA respondió cinco veces con HTTP 200 en aproximadamente 18–70 ms; `resubidos-qa.service` quedó activo con cero reinicios; PostgreSQL mostró cero sesiones `idle in transaction`; no aparecieron errores propios de la aplicación. Se observaron un 404 externo de Amazon IVS y un `MaxListenersExceededWarning` del reproductor, registrados para revisión pero no bloqueantes para esta etapa.
+Estado: **completada en QA y producción**. Se implementó el 23 de agosto de 2026 con `0cb5701` (`fix(performance): harden public traffic paths`) y documentación `ec6cc40`; posteriormente llegó a `main` y está incluida en `v2.25.1`. El build de producción terminó correctamente; los flujos invitados y autenticados pasaron el smoke test; QA respondió cinco veces con HTTP 200 en aproximadamente 18–70 ms; `resubidos-qa.service` quedó activo con cero reinicios; PostgreSQL mostró cero sesiones `idle in transaction`; no aparecieron errores propios de la aplicación. Se observaron un 404 externo de Amazon IVS y un `MaxListenersExceededWarning` del reproductor, registrados para revisión pero no bloqueantes para esta etapa.
 
 1. Revisar el estado y diff local, cuidando cambios ajenos.
 2. Cambiar a `dev`, repetir `npm run build` si hubo modificaciones posteriores y crear el commit de rendimiento.
@@ -162,7 +168,7 @@ Rollback: revertir el commit mediante un commit nuevo en `dev` y volver a desple
 
 Objetivo: sacar el modo dual, destino de entrada masiva durante los directos, del camino dinámico de Inicio.
 
-Estado al 23 de agosto de 2026: **entrega estática base completada y certificada en QA; rediseño funcional pendiente de desplegar y validar en QA**. La base se sirve directamente por Nginx desde `/var/www/resubidos-qa/directo.html` y el workflow actualiza esa copia. Con Node QA detenido mantuvo HTTP 200 mientras `/inicio` devolvió 502. Cinco oleadas de 800 solicitudes TLS nuevas entregaron 4.000/4.000 respuestas HTTP 200, cero errores y p95 de 1,56 s; servicios y recursos quedaron saludables. Localmente, el rediseño agrega intercambio/tamaño de players, chat móvil sobre el segundo player, ayuda, información mediante snapshot estático y recuperación mínima de Twitch. Producción continúa pendiente.
+Estado al 29 de agosto de 2026: **completada, certificada en QA y desplegada en producción**. QA sirve `/var/www/resubidos-qa/directo.html` y producción `/var/www/resubidos/directo.html`; los workflows actualizan las copias. Con Node QA detenido, `/directo` mantuvo HTTP 200 mientras `/inicio` devolvió 502. Cinco oleadas de 800 solicitudes TLS nuevas entregaron 4.000/4.000 respuestas HTTP 200, cero errores y p95 de 1,56 s; servicios y recursos quedaron saludables. Cloudflare tiene reglas de caché limitadas a `/directo` y `/directo-status.json` en ambos ambientes. Después del despliegue, `/directo` lleva varios días funcionando correctamente bajo uso real y no se han reportado caídas ni errores operativos.
 
 Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/directo-static.md).
 
@@ -178,9 +184,67 @@ Decisión y diseño: [`docs/architecture/directo-static.md`](../architecture/dir
 
 Criterio de salida: `/directo` funciona aunque Next QA esté detenido, los embeds y chat mantienen su funcionalidad y el pico de solicitudes no genera trabajo en Node/PostgreSQL.
 
+Resultado: **cumplido** para la entrega propia de `/directo`. La capacidad y políticas internas de reproducción de Twitch/VK pertenecen a los proveedores y se evalúan por separado de la resiliencia del origen.
+
+### Etapa 1.75: retirar el rol invitado dependiente de PostgreSQL
+
+Objetivo: hacer que una solicitud sin sesión nunca necesite leer roles o permisos desde PostgreSQL para decidir si una superficie pública puede mostrarse.
+
+Estado al 29 de agosto de 2026: **completada y certificada en QA** mediante `0b0306b` (`fix(performance): decouple public access and refresh tracker data`). Los validadores privados exigen sesión, las superficies públicas usan una política inmutable en código, web y móvil dejaron de resolver un rol invitado y el mantenedor ya no lo ofrece. El smoke test local y la validación funcional en QA pasaron. `resubidos-qa.service` quedó activo con el commit esperado; la migración retiró `invitado` de `PlatformRole` y se verificaron cero usuarios con `roleId` nulo. El paso a producción queda reservado para el release posterior a las etapas de certificación acordadas.
+
+Política y matriz inicial: [`docs/architecture/public-access-policy.md`](../architecture/public-access-policy.md).
+
+Decisión de arquitectura:
+
+- Las rutas, páginas y lecturas realmente públicas se declaran explícitamente en código; no se habilitan mediante asignaciones de permisos al rol `invitado` en la base de datos.
+- Las rutas privadas resuelven primero una sesión válida y después permisos configurables del usuario autenticado. Sin sesión deben responder o redirigir como no autorizadas, sin consultar un rol público persistido.
+- Puede mantenerse un contexto sintético e inmutable de visitante sin sesión para props/UI (`isAuthenticated: false`, estado local y mensajes), pero no un `PlatformRole` administrable ni una lectura de permisos desde PostgreSQL.
+- La campana invitada obtiene únicamente notificaciones con `audience: all`, por regla de código, y conserva leído/descartado en `localStorage`; no necesita `notifications.view` desde BD.
+- Las Tier Lists públicas permiten interacción local por regla de ruta/código; guardar o mutar continúa exigiendo sesión y permisos.
+- Inicio, Rastreador y su detalle, Viendo, Terminados, RTFM, Novedades, Changelog, Tier Lists, login/registro y `/directo` conservan el acceso que históricamente tenía `invitado`, ahora mediante una lista explícita en código. No asumir que todo GET es público.
+- La app móvil debe distinguir endpoints públicos de endpoints con bearer token sin caer a un rol cargado desde PostgreSQL.
+
+Implementación prevista:
+
+1. Inventariar todas las llamadas a `getPublicAccessUser()`, `getAccessUserFromToken()` y validadores que aceptan fallback invitado.
+2. Clasificar cada ruta como pública, autenticada o autenticada con permiso.
+3. Crear una política pública inmutable en código y helpers separados para acceso público y autorización autenticada.
+4. Migrar notificaciones públicas, Tier Lists, RTFM/Novedades/Changelog y APIs móviles públicas a esa política.
+5. Retirar el fallback a `getPublicAccessUser()` de validadores de permisos privados.
+6. Eliminar el rol `invitado` del mantenedor, seeds/asignaciones y base de datos mediante una migración versionada, solo después de retirar todas sus dependencias.
+7. Conservar compatibilidad visual donde componentes actualmente usan la cadena `invitado`, reemplazándola gradualmente por `isAuthenticated` o un contexto sintético no persistido.
+8. Probar acceso directo y navegación interna como visitante, usuario común y administración; verificar que cero consultas a `PlatformRole`/`PlatformRolePermission` provengan de tráfico sin sesión.
+9. Ejecutar una prueba concurrente de rutas públicas antes de continuar con la certificación dinámica general.
+
+Criterio de salida: las solicitudes sin sesión no consultan roles/permisos en PostgreSQL, las superficies públicas acordadas siguen disponibles, las rutas privadas continúan protegidas y el rol `invitado` ya no existe como configuración persistida.
+
+Rollback: conservar temporalmente el helper anterior detrás de un commit reversible hasta completar QA; si una superficie pública queda inaccesible, revertir mediante un commit nuevo sin restaurar la inicialización por solicitud.
+
 ### Etapa 2: observabilidad y alertas
 
 Objetivo: conocer el límite antes de otro directo y detectar degradación antes de una caída.
+
+Estado al 30 de agosto de 2026: **en progreso**. El agente de DigitalOcean `3.18.14` está activo y producción, QA, Nginx y PostgreSQL se encontraron saludables. La primera capa de métricas estructuradas del proceso Node se desplegó en QA mediante `68c8836` (`feat(observability): add Node process metrics`) y quedó validada con cero reinicios. DigitalOcean tiene alertas activas para CPU agregada sobre 70% durante 5 minutos, memoria sobre 80% durante 5 minutos, disco sobre 80% durante 5 minutos y carga media de 5 minutos sobre 3 durante 5 minutos, todas limitadas al Droplet `kalaplex`.
+
+Línea base inicial de QA, tomada con intervalos de 60 segundos y el servicio prácticamente en reposo:
+
+- CPU del proceso: 0,52–0,60% de un núcleo.
+- RSS: 248,4–249,4 MiB; heap usado: 122,9–125,3 MiB.
+- Utilización del event loop: 0,25–0,39%.
+- Retraso del event loop: p95 de 20,19–20,55 ms, p99 de 20,68–21,33 ms y máximos aislados de 26,15–53,77 ms.
+- Conexiones observadas: 1 HTTP, 1 WebSocket de notificaciones y 0 WebSockets de presencia.
+- Host: carga `0.16, 0.11, 0.09`, 1,3 GiB usados de 7,8 GiB de RAM, 39 MiB de swap usados y 24 GiB usados de 232 GiB de disco.
+- systemd: servicio activo, `NRestarts=0`, memoria actual aproximada de 223 MiB y peak acumulado aproximado de 381 MiB.
+
+Estos valores describen reposo y no constituyen todavía límites de capacidad. Se usarán para comparar las mediciones bajo concurrencia de la Etapa 4.
+
+La observabilidad de Nginx quedó validada con un log JSON separado, sin IP, User-Agent ni query string, y un `stub_status` limitado a `127.0.0.1:8088`. La primera muestra de 15 minutos registró 607 entradas y cero errores críticos `499/502/503/504`. Producción mostró p50 HTTP de 6 ms, p95 de 127 ms y p99 de 364 ms; los cierres de WebSocket se separaron de estos percentiles mediante `connectionType`. El analizador versionado `scripts/summarize-nginx-observability.mjs` quedó validado en QA. La ejecución periódica se instala como un servicio `oneshot` de baja prioridad y un timer cada 15 minutos, documentados en `docs/operations/nginx-observability.md`.
+
+El inventario inicial de PostgreSQL 16.13 confirmó una instancia compartida por producción y QA, bases pequeñas de 23 MiB y 18 MiB, cero temporales, cero deadlocks, cero esperas por locks y cache hit superior a 99,99%. Los pools liberaron conexiones idle según el timeout de 30 segundos. Como `pg_stat_statements` no está instalado, `track_io_timing` está apagado y habilitarlos exigiría intervenir la instancia compartida, se eligió un recolector externo de snapshots agregados. `scripts/summarize-postgres-observability.mjs` calcula deltas por base cada 15 minutos sin registrar SQL ni credenciales; su instalación root-owned y timer están documentados en `docs/operations/postgres-observability.md`.
+
+La primera ventana con deltas registró 0,694 transacciones/s en producción y 0,085 en QA, sin temporales, deadlocks, locks ni actividad superior a un segundo. Para aislar el costo del progreso de reproducción, el resumen Nginx normaliza las rutas web y móvil de playback y el snapshot PostgreSQL incorpora deltas globales de WAL. Esta instrumentación mide el costo antes de cambiar la frecuencia de guardado.
+
+La prueba controlada de reproducción en QA registró 16 guardados web, todos `200`, con promedio de 18,44 ms y p95/p99 de 28 ms; no produjo locks, temporales ni deadlocks. El intervalo global compartido generó aproximadamente 739 bytes/s de WAL, cifra que incluye producción y por eso no se atribuye exclusivamente al playback. A partir de esta evidencia, la sincronización web cambió de 5 a 12 segundos reproducidos, conservó guardados por pausa, visibilidad, salida y finalización, añadió `keepalive` y deduplicó posiciones sin cambios. Esto reduce en aproximadamente 58% las escrituras periódicas antes de la prueba concurrente.
 
 1. Activar o validar DigitalOcean Monitoring Agent.
 2. Crear alertas de CPU agregada, memoria, swap y disco.
@@ -209,6 +273,26 @@ Criterio de salida: HTTP normal y ambos WebSockets operativos, sin errores de si
 
 Objetivo: medir capacidad real, no estimarla por hardware.
 
+Estado al 30 de agosto de 2026: el pico público inicial de `/inicio` quedó certificado hasta 400 conexiones TLS simultáneas desde un generador externo. Los escalones de 50, 100, 200, 300 y 400 completaron sin fallos ni respuestas críticas; en 400, Nginx registró 402 respuestas `200`, promedio de 3,16 s, p95 de 5,36 s y máximo de 5,39 s. El proceso QA no se reinició, alcanzó aproximadamente 14,3% de un núcleo, 439 MiB RSS y mantuvo el retraso del event loop controlado. El escalón de 500 conservó cero `499/502/503/504` y Nginx terminó las solicitudes con p95 de 7,40 s, pero el generador agotó su timeout de 10 segundos en 3 de 500 solicitudes; por eso se considera estable con degradación y no una certificación limpia. PostgreSQL permaneció sin locks, transacciones idle, temporales ni deadlocks, con cache hit superior a 99,99%. Estas oleadas certifican entradas HTML concentradas, no usuarios sostenidos, ejecución JavaScript, WebSockets ni reproducciones autenticadas.
+
+El escenario público sostenido se ejecuta desde una máquina externa con `npm run load:public -- --users 50 --duration 300 --ramp 60`. Cada visitante carga `/inicio`, las APIs públicas de notificaciones y YouTube, abre WebSockets de notificaciones y presencia, envía el `join` y heartbeat de presencia con la cadencia real y permanece conectado durante la duración configurada. El script rechaza destinos que no parezcan QA salvo que se entregue explícitamente `--allow-non-qa`, opción que no debe usarse sin autorización para probar otro ambiente.
+
+El primer escalón sostenido de 50 visitantes completó 150/150 solicitudes HTTP `200` y 100/100 conexiones WebSocket sin errores. La presencia efectiva llegó a 50 usuarios después de los 15 segundos de calificación y volvió a cero al cerrar el escenario. Nginx registró p95 HTTP de 118 ms y máximo de 300 ms en QA. Durante la rampa Node alcanzó aproximadamente 7% de un núcleo; en estado estable se mantuvo alrededor de 0,55–1,46%, con event-loop p95 cercano a 20–21 ms. El RSS subió desde aproximadamente 260 MiB hasta 287 MiB y volvió a unos 261 MiB después del cierre; no hubo reinicios. PostgreSQL QA registró 0,46 transacciones/s, una conexión, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks. El WAL global compartido promedió aproximadamente 1,65 KiB/s y no se atribuye exclusivamente a QA.
+
+El escalón sostenido de 100 visitantes completó 300/300 solicitudes HTTP `200` y 200/200 conexiones WebSocket sin errores; la presencia llegó a 100 y volvió a cero después de la gracia de cierre. Nginx observó 310 respuestas HTTP `200` y 200 upgrades `101`, con p95 HTTP de 40 ms y máximo de 123 ms. Node alcanzó aproximadamente 7% de un núcleo durante la rampa y se mantuvo alrededor de 0,6–0,8% en estado estable, con event-loop p95 cercano a 20–21 ms. El RSS se mantuvo alrededor de 259 MiB y luego volvió a unos 232 MiB; no hubo reinicios. PostgreSQL QA registró aproximadamente 1,02 transacciones/s, una conexión, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks.
+
+El escalón sostenido de 200 visitantes completó 600/600 solicitudes HTTP `200` y 400/400 conexiones WebSocket sin errores; la presencia llegó a 200 y volvió a cero. Nginx observó 609 respuestas HTTP `200` y 400 upgrades `101`, con p95 HTTP de 37 ms y máximo de 156 ms. Node alcanzó aproximadamente 15,82% de un núcleo y 383 MiB RSS durante la rampa; en estado estable bajó a aproximadamente 0,63–2,61% y 264–265 MiB, con event-loop p95 cercano a 21–22 ms. Después del cierre, el RSS volvió a unos 238 MiB y no hubo reinicios. PostgreSQL QA registró aproximadamente 0,085 transacciones/s, una conexión, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks.
+
+El objetivo sostenido de 500 visitantes públicos quedó certificado con una rampa de 120 segundos y cinco minutos de permanencia por visitante. El generador completó 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 conexiones WebSocket sin errores; la presencia llegó a 500 y luego volvió a cero. Nginx observó 1.510 respuestas HTTP `200` y 1.000 upgrades `101`, con p95 HTTP de 36 ms y máximo de 127 ms. Node alcanzó aproximadamente 18,05% de un núcleo y 433 MiB RSS durante la rampa; en estado estable bajó a aproximadamente 0,51–1,39% y 271–273 MiB, con event-loop p95 cercano a 21–22 ms y máximo aislado de 74 ms. Después del cierre, el RSS volvió a unos 250 MiB; el peak de systemd quedó en aproximadamente 475 MiB y no hubo reinicios. PostgreSQL QA registró aproximadamente 0,078 transacciones/s, una conexión, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks. Esta evidencia satisface el objetivo público sostenido de 500 visitantes para el patrón probado; la certificación de reproducciones autenticadas continúa separada.
+
+La prueba autenticada usa `load:playback:fixture` para crear usuarios y sesiones efímeros únicamente cuando el nombre de `DATABASE_URL` termina en `_qa`. Los tokens sin hash se guardan fuera del repositorio en un fixture `/tmp` con permisos `0600`; `load:playback` lo consume desde el generador externo y reproduce el intervalo real de 12 segundos. La acción `cleanup` valida tanto los IDs como el prefijo único de la corrida antes de eliminar los usuarios, y las sesiones y progresos asociados desaparecen por cascada. El fixture debe limpiarse después de cada serie aunque la prueba se interrumpa.
+
+La persistencia autenticada quedó certificada en escalones de 50, 100, 200 y 500 reproducciones, con 25 guardados por usuario y rampas de 60 segundos hasta 200 y 120 segundos para 500. Todos los escalones completaron sin errores: 1.250, 2.500, 5.000 y 12.500 respuestas `200`, respectivamente. En el objetivo de 500, Nginx registró exactamente 12.500 escrituras a 20,83 solicitudes/s promedio sobre la ventana, con latencia promedio de 19,53 ms, p95 de 37 ms, p99 de 55 ms y máximo de 196 ms. El generador externo observó p95 de 303 ms, p99 de 378 ms y máximo de 1,01 s incluyendo red, TLS y proxy.
+
+Durante las 500 reproducciones Node alcanzó aproximadamente 38,35% de un núcleo, utilización del event loop de 33,7%, retraso p95 cercano a 23 ms y máximo aislado inferior a 60 ms. El RSS se mantuvo alrededor de 417–430 MiB durante la carga; systemd conservó un peak acumulado aproximado de 534 MiB y no registró reinicios. PostgreSQL QA procesó aproximadamente 188 transacciones/s con una sola conexión observada, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks. El WAL global compartido promedió aproximadamente 7 KiB/s; su delta total fue cercano a 3,3 MiB en 458 segundos. Esta evidencia satisface el objetivo de 500 reproducciones autenticadas concurrentes para el patrón de sincronización distribuido cada 12 segundos; no representa el peor caso artificial donde todos los clientes escriben en el mismo instante.
+
+El peor caso artificial se ensayó aparte con 500 usuarios enviando un único guardado simultáneo. Las 500 solicitudes terminaron en `200`, sin timeouts ni errores críticos. El generador observó p50 de 3,38 s, p95 de 4,99 s y máximo de 5,14 s; Nginx midió promedio de 1,71 s, p95 de 2,72 s y máximo de 2,76 s. PostgreSQL promedió aproximadamente 29,88 transacciones/s sobre la ventana, sin locks, actividad prolongada, temporales ni deadlocks. Node no se reinició y recuperó su memoria, pero registró un retraso máximo aislado del event loop de aproximadamente 1,03 s aunque su p95 permaneció cerca de 21 ms. El pulso queda clasificado como tolerado con degradación transitoria; el cliente debe conservar la distribución natural de ticks y no sincronizar deliberadamente todos los guardados.
+
 1. Preparar un escenario con usuarios invitados, páginas HTML, APIs públicas y WebSockets persistentes.
 2. Usar datos de prueba y evitar mutaciones destructivas.
 3. Separar al menos dos escenarios: pico web invitado y reproducciones autenticadas con guardado cada 12 segundos.
@@ -224,6 +308,16 @@ Criterio de salida: informe con configuración, commit probado, resultados, grá
 ### Etapa 5: reactivación controlada de funciones
 
 Objetivo: recuperar funciones desactivadas sin mezclar variables.
+
+Estado al 30 de agosto de 2026: completada en QA. La línea base con ambos flags apagados mantuvo Node alrededor de 0,54–0,58% de un núcleo, RSS de 242–245 MiB, event-loop p95 cercano a 20 ms y cero reinicios. PostgreSQL QA permaneció sin locks, actividad prolongada, temporales ni deadlocks.
+
+YouTube se habilitó de forma aislada con una sincronización cada 900 segundos y analítica de audiencia apagada. La ejecución inicial creó y notificó un elemento sin errores. Bajo 500 visitantes sostenidos, el generador completó 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets; Nginx midió p95 de 37 ms y p99 de 114 ms. Node alcanzó aproximadamente 25,09% de un núcleo durante la rampa, mantuvo event-loop p95 cercano a 22 ms y no se reinició. PostgreSQL no registró locks, actividad prolongada, temporales ni deadlocks. YouTube queda aprobado individualmente en QA.
+
+Después se apagó YouTube y se habilitó analítica de audiencia de forma aislada con muestreo cada 60 segundos. Una prueba equivalente completó 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets; Nginx midió p95 de 46 ms, p99 de 92 ms y máximo de 172 ms. Node alcanzó aproximadamente 20,64% de un núcleo, mantuvo event-loop p95 alrededor de 24 ms, recuperó la memoria después de la carga y no se reinició. PostgreSQL QA promedió aproximadamente 4,32 transacciones/s, sin locks, actividad prolongada, temporales ni deadlocks. Analítica de audiencia queda aprobada individualmente en QA.
+
+Finalmente se activaron ambos flags y se repitió el escenario completo. El generador volvió a completar 1.500/1.500 solicitudes HTTP `200` y 1.000/1.000 WebSockets sin errores. Nginx observó 1.510 respuestas `200` y 1.001 upgrades `101`, con p95 de 34 ms, p99 de 63 ms y máximo de 511 ms. Node alcanzó aproximadamente 17,18% de un núcleo y 458 MiB RSS durante la rampa; con 500 usuarios conectados se mantuvo alrededor de 1,08–1,40% de un núcleo, con event-loop p95 cercano a 21–22 ms. La memoria corriente volvió a aproximadamente 251 MiB, el peak acumulado de systemd permaneció cerca de 534 MiB y no hubo reinicios. PostgreSQL QA promedió aproximadamente 6,36 transacciones/s, con cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks.
+
+Decisión: mantener `YOUTUBE_NOTIFICATION_SYNC_ENABLED=true` y `STREAM_AUDIENCE_ANALYTICS_ENABLED=true` en QA. Ambas funciones tienen evidencia individual y conjunta sin degradación material para el patrón certificado de 500 visitantes. Su activación en producción debe hacerse mediante la Etapa 6, con rollback por flag y observación posterior al despliegue.
 
 1. Establecer una línea base con ambos flags apagados.
 2. Reactivar YouTube fuera de un pico, reiniciar producción y observar al menos 15–30 minutos.

@@ -49,7 +49,6 @@ const FALLBACK_ROLES = [
   { code: "tw-vip", label: "TW_VIP", canAdmin: false },
   { code: "yt-miembro", label: "YT_Miembro", canAdmin: false },
   { code: "publico", label: "Público", canAdmin: false },
-  { code: "invitado", label: "Invitado", canAdmin: false },
 ];
 
 const TABLE_COLUMNS = [
@@ -707,12 +706,8 @@ export default function PlatformUsersPage({ initialUsers = [], initialRoles = FA
     return user?.role === "dios";
   }
 
-  function isGuestUser(user) {
-    return user?.role === "invitado";
-  }
-
   function canRunInternalOperations(user) {
-    return canEditUser(user) && !isGodUser(user) && !isGuestUser(user);
+    return canEditUser(user) && !isGodUser(user);
   }
 
   function toggleSort(key) {

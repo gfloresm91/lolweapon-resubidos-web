@@ -1,6 +1,6 @@
 {
   "name": "lolweapon-resubidos-web",
-  "version": "2.25.1",
+  "version": "2.26.0",
   "private": true,
   "type": "module",
   "description": "Web de resubidos para el streamer/youtuber Lolweapon",
@@ -25,6 +25,11 @@
     "db:restore": "bash scripts/restore-postgres.sh",
     "db:reset-sequences": "node scripts/reset-postgres-sequences.mjs",
     "enrich:anime": "node scripts/enrich-anime-metadata.mjs",
+    "metrics:nginx": "node scripts/summarize-nginx-observability.mjs",
+    "metrics:postgres": "node scripts/summarize-postgres-observability.mjs",
+    "load:public": "node scripts/load-test-public-visitors.mjs",
+    "load:playback": "node scripts/load-test-playback.mjs",
+    "load:playback:fixture": "node --env-file=.env scripts/manage-playback-load-fixture.mjs",
     "start": "NODE_ENV=production node server.mjs",
     "lint": "next lint"
   },

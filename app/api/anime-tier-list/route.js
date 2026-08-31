@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { SESSION_COOKIE } from "@/lib/auth";
 import { jsonError, jsonUnsupportedAction, readJsonRequest } from "@/lib/http";
 import {
   getAnimeTierListBoard,
@@ -24,7 +25,7 @@ import {
 } from "@/lib/repositories/animeTierListEntryRepository";
 import { can } from "@/lib/repositories/platformUserRepository";
 import { createAuditLog } from "@/lib/repositories/auditLogRepository";
-import { ensurePermissionAuthorized } from "@/lib/serverAuth";
+import { ensurePermissionAuthorized, getCurrentUserFromToken } from "@/lib/serverAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -40,16 +41,16 @@ export async function GET(request) {
   const kind = searchParams.get("kind");
   if (!VALID_KINDS.has(kind)) return jsonError("Tablero inválido.");
 
-  const authorization = await ensurePermissionAuthorized(request, permissionForKind(kind));
-  if (authorization.response) return authorization.response;
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const user = await getCurrentUserFromToken(token);
 
   const board = await getAnimeTierListBoard({
     kind,
     seasonId: searchParams.get("seasonId"),
-    userId: authorization.user?.id || null,
+    userId: user?.id || null,
   });
 
-  const canManageThemes = kind !== "animes" && can(authorization.user, MANAGE_THEMES_PERMISSION);
+  const canManageThemes = kind !== "animes" && can(user, MANAGE_THEMES_PERMISSION);
   const entriesWithoutTheme = canManageThemes && board.season
     ? await getEntriesWithoutThemeForSeason(board.season.id, kind)
     : [];

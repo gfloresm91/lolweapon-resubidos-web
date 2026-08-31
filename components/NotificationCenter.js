@@ -283,6 +283,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
 
       socket.addEventListener("open", () => {
         reconnectAttemptRef.current = 0;
+        window.dispatchEvent(new CustomEvent("kala:realtime-state", { detail: { connected: true } }));
       });
 
       socket.addEventListener("message", (event) => {
@@ -297,10 +298,17 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
         if (payload?.type === "notifications:update") {
           loadNotifications();
         }
+
+        if (payload?.type === "lives:update") {
+          window.dispatchEvent(new CustomEvent("kala:lives:update", { detail: payload }));
+        }
       });
 
       socket.addEventListener("close", () => {
-        if (socketRef.current === socket) socketRef.current = null;
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+          window.dispatchEvent(new CustomEvent("kala:realtime-state", { detail: { connected: false } }));
+        }
         scheduleReconnect();
       });
       socket.addEventListener("error", () => {
@@ -315,6 +323,7 @@ export default function NotificationCenter({ user = null, canViewAll = false, on
       clearReconnectTimer();
       socketRef.current?.close();
       socketRef.current = null;
+      window.dispatchEvent(new CustomEvent("kala:realtime-state", { detail: { connected: false } }));
     };
   }, [isAuthenticated]);
 

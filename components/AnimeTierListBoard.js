@@ -573,7 +573,7 @@ function TierColorModal({ tier, onClose, onChange }) {
   );
 }
 
-export default function AnimeTierListBoard({ kind, title, highlight, subtitle, isAuthenticated, viewToggle, role = "invitado" }) {
+export default function AnimeTierListBoard({ kind, title, highlight, subtitle, isAuthenticated, viewToggle, role = "visitante" }) {
   const [seasons, setSeasons] = useState([]);
   const [seasonId, setSeasonId] = useState("");
   const [roster, setRoster] = useState([]);
@@ -1998,7 +1998,7 @@ export default function AnimeTierListBoard({ kind, title, highlight, subtitle, i
         </div>
       ) : null}
 
-      {role === "invitado" || role === "publico" ? (
+      {!isAuthenticated || role === "publico" ? (
         <div className="rtfm-notice-panel">
           <div className="rtfm-notice is-info">
             <Info size={18} aria-hidden="true" />

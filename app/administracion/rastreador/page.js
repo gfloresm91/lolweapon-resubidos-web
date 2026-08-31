@@ -42,6 +42,7 @@ export default async function PlatformTrackerAdminPage() {
     <HomePage
       activeView="platformTracker"
       initialLives={lives}
+      initialLivesCoverage="complete"
       initialLiveStatuses={liveStatuses}
       isAdmin={true}
       currentUser={currentUser}

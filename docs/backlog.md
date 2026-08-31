@@ -4,6 +4,18 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 
 ## En progreso / Próximo
 
+### Resiliencia: acceso público sin rol invitado en PostgreSQL
+
+- **Objetivo:** eliminar el rol persistido `invitado` y evitar que una solicitud sin sesión consulte `PlatformRole`/`PlatformRolePermission` para decidir acceso público.
+- **Decisión:** las páginas y lecturas públicas se definen explícitamente en código. Las rutas privadas exigen sesión antes de evaluar permisos configurables. Puede existir un contexto sintético de visitante para UI, pero no debe depender de BD ni aparecer como rol administrable.
+- **Superficies que deben conservarse:** `/directo`, login/registro, RTFM, Novedades, Changelog, notificaciones `audience: all` en la campana y uso local de Tier Lists sin guardado. El inventario final debe confirmar todas las rutas antes de eliminar datos.
+- **Impactos conocidos:** `getPublicAccessUser()`, `getAccessUserFromToken()`, validadores de `lib/serverAuth.js`, fallback móvil, mantenedor de roles, RTFM, notificaciones públicas, Tier Lists, seeds y migraciones históricas.
+- **Seguridad:** no reemplazar el rol por una regla global que permita todos los GET. Cada superficie pública debe declararse; mutaciones, datos privados y persistencia continúan requiriendo sesión y permiso.
+- **Datos:** retirar asignaciones del rol y eliminarlo mediante una migración versionada solamente cuando el código ya no dependa de él.
+- **Verificación:** pruebas como visitante/autenticado/admin, navegación directa e interna, APIs móviles y medición que confirme cero lecturas de roles/permisos originadas por tráfico sin sesión.
+- **Estado:** implementado localmente el 29 de agosto de 2026; pendiente de migración y smoke test en QA antes de mover a completado.
+- **Plan detallado:** `docs/operations/traffic-resilience-plan.md`, Etapa 1.75.
+
 ### Feature: Auth móvil (Lolweapon+)
 
 - **Estado:** implementada e integrada en `main` (2026-08-18). La app móvil publicada se encuentra en la línea 1.2.0 y el manifest vive en `public/lolweapon-plus/latest.json`.

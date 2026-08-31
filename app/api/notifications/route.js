@@ -9,7 +9,7 @@ import {
   markNotificationUnread,
   restoreNotification,
 } from "@/lib/repositories/notificationRepository";
-import { getAccessUserFromToken, getCurrentUserFromToken } from "@/lib/serverAuth";
+import { getCurrentUserFromToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,6 @@ function listPublicNotifications({ user, limit }) {
 export async function GET(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const user = await getCurrentUserFromToken(token);
-  const accessUser = user || await getAccessUserFromToken(null);
   const { searchParams } = new URL(request.url);
   const isFullPage = searchParams.has("page") || searchParams.has("status") || searchParams.has("search") || searchParams.has("type");
 
@@ -61,7 +60,7 @@ export async function GET(request) {
     return NextResponse.json({ success: false, error: user ? "Permiso insuficiente" : "No autorizado" }, { status: user ? 403 : 401 });
   }
 
-  if (!isFullPage && !can(accessUser, "notifications.view")) {
+  if (!isFullPage && user?.id && !can(user, "notifications.view")) {
     return NextResponse.json({ success: false, error: "Permiso insuficiente" }, { status: 403 });
   }
 
@@ -71,8 +70,8 @@ export async function GET(request) {
     status: searchParams.get("status") || "all", page: searchParams.get("page") || 1, pageSize: searchParams.get("pageSize") || 10,
     sort: searchParams.get("sort") || "published", direction: searchParams.get("direction") || "desc",
   }) : isPublicRequest
-    ? await listPublicNotifications({ user: accessUser, limit: searchParams.get("limit") || 20 })
-    : await listNotifications({ user: user || accessUser, limit: searchParams.get("limit") || 20 });
+    ? await listPublicNotifications({ user: null, limit: searchParams.get("limit") || 20 })
+    : await listNotifications({ user, limit: searchParams.get("limit") || 20 });
 
   const response = NextResponse.json({ success: true, ...result });
 

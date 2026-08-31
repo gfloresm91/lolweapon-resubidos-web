@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import HomePage from "@/components/HomePage";
 import { SESSION_COOKIE } from "@/lib/auth";
-import { getAccessUserFromToken, getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
+import { getCurrentUserFromToken, validateAdminSessionToken } from "@/lib/serverAuth";
 import { can } from "@/lib/repositories/platformUserRepository";
 import { getLiveStatuses } from "@/lib/repositories/liveRepository";
 import {
@@ -25,16 +25,15 @@ export const metadata = {
 export default async function SpaceDrumRoutePage() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  const [currentUser, accessUser, isAdmin, spacedrum, liveStatuses] = await Promise.all([
+  const [currentUser, isAdmin, spacedrum, liveStatuses] = await Promise.all([
     getCurrentUserFromToken(token),
-    getAccessUserFromToken(token),
     validateAdminSessionToken(token),
     readSpaceDrumLibrary(),
     getLiveStatuses(),
   ]);
   const spaceDrumProgress = currentUser?.id ? await getSpaceDrumProgressForUser(currentUser.id) : {};
 
-  if (!can(accessUser, "spacedrum.view")) {
+  if (!can(currentUser, "spacedrum.view")) {
     if (!currentUser?.id) {
       redirect("/login?next=/spacedrum");
     }
@@ -51,7 +50,7 @@ export default async function SpaceDrumRoutePage() {
       initialSpaceDrumProgress={spaceDrumProgress}
       isAdmin={isAdmin}
       currentUser={currentUser}
-      accessPermissions={accessUser?.permissions || []}
+      accessPermissions={currentUser?.permissions || []}
     />
   );
 }

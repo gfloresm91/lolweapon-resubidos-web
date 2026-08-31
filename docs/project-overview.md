@@ -111,7 +111,7 @@ Dos tableros tipo tiermaker, independientes del Calendario de temporada (no comp
 - **Animes** (`/biblioteca-anime/tier-list/animes`): roster sincronizado directo desde la query nativa de temporada de AniList (`Page(media(season, seasonYear))`), sin AnimeSchedule.
 - **Openings/Endings** (`/biblioteca-anime/tier-list/openings`): un mismo URL con toggle interno OP/ED (dos tableros independientes). Sincronizado desde AnimeThemes.moe (`https://graphql.animethemes.moe/`, `findAnimeByExternalSite(site: ANILIST, id: [...])`) para los animes ya cargados en el Tier List de esa temporada — requiere sincronizar Animes primero. Cada tema resuelve un solo video: prioriza la entry sin spoiler/nsfw y, dentro de ella, la mayor resolución (empate: fuente `BD` sobre `WEB`). Si solo hay entries con spoiler, se guarda igual (`isSpoiler: true`) y el front lo oculta por defecto.
 
-Cada usuario autenticado arma y guarda su propio tablero por temporada y tipo (`PlatformUserAnimeTierList`), con filas personalizables (nombre, color, orden) y autosave con debounce. Invitados pueden armar el tablero libremente (permiso `anime.tierlist.*.view` asignado por defecto a `invitado`, a diferencia del Calendario), pero no se guarda hasta iniciar sesión. Un anime u opening ya rankeado que el admin oculte o elimine se mantiene en el tablero del usuario marcado como "oculto por administración", pero deja de ofrecerse a usuarios nuevos.
+Cada usuario autenticado arma y guarda su propio tablero por temporada y tipo (`PlatformUserAnimeTierList`), con filas personalizables (nombre, color, orden) y autosave con debounce. Los visitantes pueden armar el tablero libremente porque estas páginas y su lectura se declaran públicas en código, pero no se guarda hasta iniciar sesión. Un anime u opening ya rankeado que el admin oculte o elimine se mantiene en el tablero del usuario marcado como "oculto por administración", pero deja de ofrecerse a usuarios nuevos.
 
 Compartir: exportar el tablero como imagen (`html-to-image`, client-side) o publicar un link de solo lectura (`isPublic` + `shareToken` opaco) en `/biblioteca-anime/tier-list/compartido/[shareToken]` — página standalone sin el shell de `HomePage`, pensada para compartirse fuera del sitio.
 
@@ -218,7 +218,13 @@ Las notificaciones se guardan en `PlatformNotification` y el estado individual e
 
 El tiempo real usa WebSocket en `/api/notifications/ws`, servido por `server.mjs` en el mismo puerto de Next.js. Cuando se crea una notificación, el servidor emite `notifications:update` y el cliente refresca el panel. El polling queda exclusivamente como respaldo cuando el WebSocket no está conectado, con una cadencia de dos minutos; la reconexión usa backoff exponencial con jitter para evitar estampidas. El servidor envía ping cada 30 segundos y termina conexiones que no responden. La presencia concurrente de Inicio usa un canal independiente en `/api/presence/ws` para no mezclar sus mensajes con notificaciones o tickets.
 
-La inicialización idempotente de roles y permisos se comparte entre solicitudes y se ejecuta una sola vez por proceso. Nunca debe repetirse la secuencia completa de `upsert` por cada invitado o consulta de notificaciones. La campana obtiene lista y conteo de no leídas desde una sola lectura de notificaciones visibles.
+El mismo WebSocket transporta `lives:update` cuando cambia el catálogo del Rastreador. `HomePage` conserva un único catálogo con cobertura explícita (`none`, `partial` o `complete`): Inicio recibe solo una muestra, mientras Rastreador, Calendario, Mi lista y el mantenedor completan el catálogo al entrar. Una actualización marca los datos como obsoletos y, si una vista del catálogo está visible, dispara una consulta deduplicada con jitter; fuera de esas vistas la recarga se difiere hasta entrar. El foco y un intervalo de dos minutos actúan como respaldo cuando el WebSocket está desconectado. `/api/lives` y la lectura móvil anónima admiten caché CDN de 10 segundos; respuestas móviles autenticadas permanecen privadas y sin caché.
+
+El detalle `/rastreador/[id]` filtra `lives:update` por su `liveId` y usa `router.refresh()` únicamente para volver a ejecutar la consulta puntual de esa ficha; no descarga el catálogo completo. Los eventos masivos sin ID refrescan la ficha por precaución. Si la pestaña está oculta, la actualización se difiere hasta que vuelva a estar visible, y una reconexión del WebSocket recupera posibles cambios perdidos.
+
+La inicialización idempotente de roles y permisos se comparte entre solicitudes y se ejecuta una sola vez por proceso. El tráfico sin sesión no resuelve un rol persistido ni ejecuta esa inicialización. La campana pública consulta únicamente `audience: all`; la campana autenticada obtiene lista y conteo de no leídas desde una sola lectura de notificaciones visibles.
+
+`server.mjs` registra cada minuto una línea estructurada `Process metrics` en `journalctl` con CPU del proceso expresada como porcentaje de un núcleo, RSS/heap, utilización y latencias p50/p95/p99/máxima del event loop, conexiones HTTP, sockets de notificaciones/presencia y usuarios de Inicio deduplicados. Se activa por defecto con `NODE_ENV=production`; `PROCESS_METRICS_ENABLED=false` lo desactiva y `PROCESS_METRICS_INTERVAL_MS` ajusta la cadencia con un mínimo defensivo de 15 segundos. No expone un endpoint público ni incorpora una plataforma externa de métricas.
 
 `server.mjs` toma una muestra de audiencia cada minuto mientras el broadcaster oficial está online. Guarda únicamente agregados en PostgreSQL: presencia web concurrente y `viewer_count` oficial de Twitch, agrupados por `twitchStreamId`. Los fallos de Twitch o de persistencia se registran sin cerrar una sesión válida ni afectar Inicio. `STREAM_AUDIENCE_ANALYTICS_ENABLED=false` permite desactivar el agregador; con una fuente distinta de PostgreSQL queda desactivado automáticamente.
 
@@ -293,7 +299,8 @@ El lector muestra selector de idioma, capítulos, URLs compartibles por idioma/c
 | `tw-tier-1` | Tier 1 | — | Suscriptor Twitch Tier 1 |
 | `tw-vip` | VIP | — | VIP en Twitch |
 | `publico` | Público | — | Usuario registrado sin tier |
-| `invitado` | Invitado | — | Sin autenticación |
+
+Una persona sin sesión es un **visitante**, no un rol de `PlatformRole`. Inicio, Rastreador y su detalle, Viendo, Terminados, RTFM, Novedades, Changelog y las Tier Lists declaran su lectura pública en código. Las acciones personales o administrativas siguen exigiendo sesión y permisos. Los roles de la tabla se aplican exclusivamente a usuarios autenticados.
 
 La sincronización de rol Twitch ocurre automáticamente en cada login: moderador → `moderador`, Tier 3/2/1 → `tw-tier-3/2/1`, resto → `publico`. Por decisión operativa actual, los beneficios automáticos de la web solo consideran suscripciones pagadas de Twitch. Los roles `tw-vip` y `yt-miembro` no se pueden obtener ni entregar beneficios adicionales hasta que Kala autorice su activación (ja!).
 
@@ -425,7 +432,7 @@ La sincronización de rol Twitch ocurre automáticamente en cada login: moderado
 | `/api/mobile/v1/auth/oauth/exchange` | POST | Canjea el código de un solo uso por el par de tokens móviles |
 | `/api/mobile/v1/auth/oauth/complete-registration` | POST | Completa el alta de un `PlatformUser` nuevo vía OAuth desde `/mobile-auth/registro` |
 | `/api/mobile/v1/auth/oauth/complete-link` | POST | Completa la vinculación de un proveedor OAuth a una cuenta existente desde `/mobile-auth/vincular` |
-| `/api/mobile/v1/lives` | GET | Lista de directos para Lolweapon+ con permisos efectivos de guardado, notificación y edición; no usa caché |
+| `/api/mobile/v1/lives` | GET | Lista de directos para Lolweapon+; la respuesta anónima admite caché pública breve y la autenticada, que incluye permisos efectivos, es privada y no usa caché |
 | `/api/mobile/v1/lives/[id]` | GET | Detalle de un directo y permisos efectivos para la app móvil |
 | `/api/mobile/v1/lives/[id]/edit` | PUT | Edita un directo con bearer token; exige `tracker.update` y una variante `tracker.form.full` o `tracker.form.compact` |
 | `/api/mobile/v1/lives/[id]/notify` | POST | Envía la notificación manual de resubido desde Lolweapon+ con los mismos permisos que la web |
@@ -529,7 +536,7 @@ Sistema independiente de `PlatformSession`, para apps nativas. Bearer tokens opa
 - Las rutas `/api/mobile/v1/lives/*` resuelven el usuario mediante bearer token, pero aplican los mismos permisos configurables que el frontend web.
 - La edición requiere `tracker.update` junto con `tracker.form.full` o `tracker.form.compact`; el permiso de actualización por sí solo no habilita el formulario.
 - `PlatformMobilePushToken` guarda direcciones FCM activas por instalación. Firebase se inicializa exclusivamente en servidor desde `FIREBASE_SERVICE_ACCOUNT_JSON`; `PlatformNotification.pushedAt` funciona como claim para no duplicar el envío push.
-- `PlatformUserLivePlayback` mantiene la posición por usuario, directo y parte. El player web y `/mobile-embed/watch/[id]` escriben sobre esa misma persistencia mediante sus endpoints respectivos.
+- `PlatformUserLivePlayback` mantiene la posición por usuario, directo y parte. El player web y `/mobile-embed/watch/[id]` escriben sobre esa misma persistencia mediante sus endpoints respectivos. La web sincroniza cada 12 segundos reproducidos y también al pausar, ocultar o abandonar la página y completar una parte; evita duplicar una posición sin cambios y usa `keepalive` para el último guardado durante la salida.
 - El manifest `public/lolweapon-plus/latest.json` anuncia la versión descargable; el APK se publica fuera de Git para evitar versionar binarios.
 
 ---
