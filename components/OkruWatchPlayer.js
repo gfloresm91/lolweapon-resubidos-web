@@ -10,6 +10,7 @@ const PieroVideoPlayer = dynamic(() => import("@/components/PieroVideoPlayer"), 
 const AUTO_ADVANCE_SECONDS = 7;
 const PROGRESS_EXPIRATION_MS = 90 * 24 * 60 * 60 * 1000;
 const SERVER_PROGRESS_INTERVAL_SECONDS = 12;
+const COMPACT_LANDSCAPE_QUERY = "(orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse)";
 
 function getOkruEmbedUrl(href) {
   try {
@@ -62,11 +63,14 @@ function buildSafeFilename(title, partNumber) {
 function getSidecarSubtitleUrl(videoUrl) {
   try {
     const url = new URL(videoUrl);
-    if (!/\.mp4$/i.test(url.pathname)) return "";
-    url.pathname = url.pathname.replace(/\.mp4$/i, ".vtt");
-    url.search = "";
-    url.hash = "";
-    return url.toString();
+    const encodedFilename = url.pathname.split("/").pop();
+    if (!encodedFilename) return "";
+
+    const filename = decodeURIComponent(encodedFilename);
+    if (!/\.mp4$/i.test(filename)) return "";
+
+    const subtitleFilename = filename.replace(/\.mp4$/i, ".vtt");
+    return `https://drive.kala-vods.com/subs/${encodeURIComponent(subtitleFilename)}`;
   } catch {
     return "";
   }
@@ -146,6 +150,8 @@ export default function OkruWatchPlayer({
     return { [initialSource]: Number.isFinite(requestedPart) && requestedPart > 0 ? requestedPart - 1 : 0 };
   });
   const [isTheaterMode, setIsTheaterMode] = useState(false);
+  const [isCompactLandscape, setIsCompactLandscape] = useState(false);
+  const [isCompactLandscapeDismissed, setIsCompactLandscapeDismissed] = useState(false);
   const [isPlayerLoading, setIsPlayerLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Cargando parte...");
   const [playerError, setPlayerError] = useState(false);
@@ -171,6 +177,24 @@ export default function OkruWatchPlayer({
   const streamlinkCommand = activeLink ? `streamlink "${activeLink.href}" best -o "${downloadFilename}"` : "";
   const alternateSource = availableSources.find((source) => source.id !== activeSource?.id) || null;
   const hasNextPieroPart = activeSource?.id === "piero" && activeIndex < activeSource.links.length - 1;
+  const isLandscapeFocusMode = Boolean(
+    activeLink
+    && isCompactLandscape
+    && !isCompactLandscapeDismissed
+    && !isTheaterMode
+  );
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(COMPACT_LANDSCAPE_QUERY);
+    const updateCompactLandscape = () => {
+      setIsCompactLandscape(mediaQuery.matches);
+      if (!mediaQuery.matches) setIsCompactLandscapeDismissed(false);
+    };
+
+    updateCompactLandscape();
+    mediaQuery.addEventListener?.("change", updateCompactLandscape);
+    return () => mediaQuery.removeEventListener?.("change", updateCompactLandscape);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -283,6 +307,7 @@ export default function OkruWatchPlayer({
       return undefined;
     }
 
+    setLoadingMessage(activeSource?.id === "piero" ? "Conectando con Piero..." : "Cargando reproductor de OK.RU...");
     setIsPlayerLoading(true);
     setPlayerError(false);
     const fallbackTimeout = window.setTimeout(() => {
@@ -290,7 +315,7 @@ export default function OkruWatchPlayer({
     }, 8000);
 
     return () => window.clearTimeout(fallbackTimeout);
-  }, [activeLink, playerRetryKey]);
+  }, [activeLink, activeSource?.id, playerRetryKey]);
 
   useEffect(() => {
     if (nextPartCountdown === null) return undefined;
@@ -825,7 +850,9 @@ export default function OkruWatchPlayer({
   }
 
   return (
-    <div className={`watch-player-stage ${isTheaterMode ? "is-theater" : ""}`}>
+    <div
+      className={`watch-player-stage ${isTheaterMode ? "is-theater" : ""} ${isLandscapeFocusMode ? "is-landscape-focus" : ""}`}
+    >
       {isTheaterMode ? (
         <button type="button" className="watch-theater-exit" onClick={() => setIsTheaterMode(false)}>
           Salir modo teatro
@@ -837,8 +864,18 @@ export default function OkruWatchPlayer({
           <span>{activePartSummary}</span>
           <strong>{title || "Resubido"}</strong>
         </div>
-        <button type="button" className="watch-tool-button" onClick={() => setIsTheaterMode((current) => !current)}>
-          {isTheaterMode ? "Salir modo teatro" : "Modo teatro"}
+        <button
+          type="button"
+          className="watch-tool-button"
+          onClick={() => {
+            if (isLandscapeFocusMode) {
+              setIsCompactLandscapeDismissed(true);
+              return;
+            }
+            setIsTheaterMode((current) => !current);
+          }}
+        >
+          {isLandscapeFocusMode ? "Ver detalle" : isTheaterMode ? "Salir modo teatro" : "Modo teatro"}
         </button>
       </div>
 

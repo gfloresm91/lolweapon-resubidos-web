@@ -859,13 +859,13 @@ export default function HomePage({
     }
   }, [currentView, personalFilter]);
 
-  function redirectToLoginWithMessage(message) {
+  const redirectToLoginWithMessage = useCallback((message) => {
     setEditingLive(null);
     toast.error(message || "Tu sesión de admin ya no es válida. Vuelve a iniciar sesión.");
     window.location.href = "/login";
-  }
+  }, []);
 
-  function updateTrackerViewState(view, updater) {
+  const updateTrackerViewState = useCallback((view, updater) => {
     setTrackerViewStates((current) => {
       const previous = current[view] || DEFAULT_TRACKER_STATE;
       const next = typeof updater === "function" ? updater(previous) : updater;
@@ -883,23 +883,23 @@ export default function HomePage({
         },
       };
     });
-  }
+  }, []);
 
-  function updateCurrentTrackerState(updater) {
+  const updateCurrentTrackerState = useCallback((updater) => {
     updateTrackerViewState(currentView, updater);
-  }
+  }, [currentView, updateTrackerViewState]);
 
-  function setCurrentFilters(updater) {
+  const setCurrentFilters = useCallback((updater) => {
     updateCurrentTrackerState((previous) => ({
       filters: typeof updater === "function" ? updater(previous.filters) : updater,
     }));
-  }
+  }, [updateCurrentTrackerState]);
 
-  function setCurrentSelectedTag(updater) {
+  const setCurrentSelectedTag = useCallback((updater) => {
     updateCurrentTrackerState((previous) => ({
       selectedTag: typeof updater === "function" ? updater(previous.selectedTag) : updater,
     }));
-  }
+  }, [updateCurrentTrackerState]);
 
   function setCurrentVisibleCount(updater) {
     updateCurrentTrackerState((previous) => ({
@@ -1515,7 +1515,7 @@ export default function HomePage({
     }
   }
 
-  async function updateLiveActivity(liveId, patch) {
+  const updateLiveActivity = useCallback(async (liveId, patch) => {
     if (!isAuthenticated) {
       toast.error("Inicia sesión para usar tu lista personal.");
       window.location.href = "/login";
@@ -1576,13 +1576,47 @@ export default function HomePage({
       }));
       toast.error(error.message || "No se pudo guardar tu lista personal.");
     }
-  }
+  }, [isAuthenticated, liveActivity, redirectToLoginWithMessage]);
 
-  function requireLoginForTracker(message) {
+  const requireLoginForTracker = useCallback((message) => {
     toast(message, {
       action: { label: "Iniciar sesión", onClick: () => { window.location.href = "/login"; } },
     });
-  }
+  }, []);
+
+  const handleEditLive = useCallback((live) => {
+    setEditingLive(live);
+  }, []);
+
+  const handleNotifyLive = useCallback((live) => {
+    setPendingNotifyLive(live);
+  }, []);
+
+  const handleToggleSaved = useCallback((liveId, isSaved) => {
+    updateLiveActivity(liveId, { isSaved });
+  }, [updateLiveActivity]);
+
+  const handleToggleWatched = useCallback((liveId, isWatched) => {
+    updateLiveActivity(liveId, { isWatched });
+  }, [updateLiveActivity]);
+
+  const handleFilterTag = useCallback((tag) => {
+    startTransition(() => {
+      setCurrentSelectedTag(tag);
+    });
+  }, [setCurrentSelectedTag]);
+
+  const handleFilterYear = useCallback((year) => {
+    startTransition(() => {
+      setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
+    });
+  }, [setCurrentFilters]);
+
+  const handleFilterStatus = useCallback((status) => {
+    startTransition(() => {
+      setCurrentFilters((current) => ({ ...current, status: status || "all" }));
+    });
+  }, [setCurrentFilters]);
 
   function setPersonalTrackerFilter(nextFilter) {
     if (nextFilter !== "all" && !isAuthenticated) {
@@ -1595,13 +1629,27 @@ export default function HomePage({
     });
   }
 
-  function handleOpenLiveDetail(liveId) {
-    saveTrackerReturnState(liveId);
+  const handleOpenLiveDetail = useCallback((liveId) => {
+    try {
+      window.sessionStorage.setItem(
+        TRACKER_RETURN_STATE_KEY,
+        JSON.stringify({
+          filters,
+          selectedTag,
+          visibleCount,
+          liveId,
+          sourceView: currentView,
+          scrollY: window.scrollY,
+        }),
+      );
+    } catch {
+      // Session storage can be unavailable in strict browser modes.
+    }
 
     if (isAuthenticated && !liveActivity[liveId]?.isWatched) {
       updateLiveActivity(liveId, { isWatched: true });
     }
-  }
+  }, [currentView, filters, isAuthenticated, liveActivity, selectedTag, updateLiveActivity, visibleCount]);
 
   async function archiveCurrentTwitchLive() {
     if (!canCreateTracker) {
@@ -1771,24 +1819,6 @@ export default function HomePage({
     window.addEventListener("kala:navigation-request", handleNavigationRequest);
     return () => window.removeEventListener("kala:navigation-request", handleNavigationRequest);
   });
-
-  function saveTrackerReturnState(liveId) {
-    try {
-      window.sessionStorage.setItem(
-        TRACKER_RETURN_STATE_KEY,
-        JSON.stringify({
-          filters,
-          selectedTag,
-          visibleCount,
-          liveId,
-          sourceView: currentView,
-          scrollY: window.scrollY,
-        }),
-      );
-    } catch {
-      // Session storage can be unavailable in strict browser modes.
-    }
-  }
 
   return (
     <>
@@ -2071,26 +2101,14 @@ export default function HomePage({
                         activity={liveActivity[live.id]}
                         isAuthenticated={isAuthenticated}
                         searchTerm={deferredSearch}
-                        onEdit={() => setEditingLive(live)}
-                        onNotify={(l) => setPendingNotifyLive(l)}
+                        onEdit={handleEditLive}
+                        onNotify={handleNotifyLive}
                         onLoginRequired={requireLoginForTracker}
-                        onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
-                        onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
-                        onFilterTag={(tag) =>
-                          startTransition(() => {
-                            setCurrentSelectedTag(tag);
-                          })
-                        }
-                        onFilterYear={(year) =>
-                          startTransition(() => {
-                            setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
-                          })
-                        }
-                        onFilterStatus={(status) =>
-                          startTransition(() => {
-                            setCurrentFilters((current) => ({ ...current, status: status || "all" }));
-                          })
-                        }
+                        onToggleSaved={handleToggleSaved}
+                        onToggleWatched={handleToggleWatched}
+                        onFilterTag={handleFilterTag}
+                        onFilterYear={handleFilterYear}
+                        onFilterStatus={handleFilterStatus}
                         onOpenDetail={handleOpenLiveDetail}
                       />
                     ))}
@@ -2108,26 +2126,14 @@ export default function HomePage({
                       activity={liveActivity[live.id]}
                       isAuthenticated={isAuthenticated}
                       searchTerm={deferredSearch}
-                      onEdit={() => setEditingLive(live)}
-                      onNotify={(l) => setPendingNotifyLive(l)}
+                      onEdit={handleEditLive}
+                      onNotify={handleNotifyLive}
                       onLoginRequired={requireLoginForTracker}
-                      onToggleSaved={(liveId, isSaved) => updateLiveActivity(liveId, { isSaved })}
-                      onToggleWatched={(liveId, isWatched) => updateLiveActivity(liveId, { isWatched })}
-                      onFilterTag={(tag) =>
-                        startTransition(() => {
-                          setCurrentSelectedTag(tag);
-                        })
-                      }
-                      onFilterYear={(year) =>
-                        startTransition(() => {
-                          setCurrentFilters((current) => ({ ...current, year: year || "all", month: "all" }));
-                        })
-                      }
-                      onFilterStatus={(status) =>
-                        startTransition(() => {
-                          setCurrentFilters((current) => ({ ...current, status: status || "all" }));
-                        })
-                      }
+                      onToggleSaved={handleToggleSaved}
+                      onToggleWatched={handleToggleWatched}
+                      onFilterTag={handleFilterTag}
+                      onFilterYear={handleFilterYear}
+                      onFilterStatus={handleFilterStatus}
                       onOpenDetail={handleOpenLiveDetail}
                     />
                   ))}

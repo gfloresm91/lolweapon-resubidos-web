@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Controller, useForm } from "react-hook-form";
@@ -58,6 +58,25 @@ function fromDateInputValue(date) {
 
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function getFormValues(live) {
+  const source = live || emptyLive;
+
+  return {
+    title: source.title || "",
+    year: source.year || String(currentYear),
+    date: toDateInputValue(source.date),
+    status: source.status || DEFAULT_LIVE_STATUS_LABEL,
+    tags: Array.isArray(source.tags) ? source.tags : [],
+    additional_info: source.additional_info || "",
+    links: {
+      telegram: joinLines(source.links?.telegram),
+      okru: joinLines(source.links?.okru),
+      piero: joinLines(source.links?.piero),
+      patreon: joinLines(source.links?.patreon),
+    },
+  };
 }
 
 function TrackerTagsSelector({ value = [], tags = [], tagCounts = {}, onChange, error }) {
@@ -130,6 +149,37 @@ export default function TrackerMaintainerModal({
   tagCounts = {},
   onDelete = null,
 }) {
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <TrackerMaintainerModalContent
+      key={live?.id || "new"}
+      live={live}
+      onClose={onClose}
+      onSave={onSave}
+      isSaving={isSaving}
+      formVariant={formVariant}
+      statuses={statuses}
+      availableTags={availableTags}
+      tagCounts={tagCounts}
+      onDelete={onDelete}
+    />
+  );
+}
+
+function TrackerMaintainerModalContent({
+  live,
+  onClose,
+  onSave,
+  isSaving,
+  formVariant,
+  statuses,
+  availableTags,
+  tagCounts,
+  onDelete,
+}) {
   const isFullForm = formVariant === "full";
   const [imageFile, setImageFile] = useState(null);
   const [imageError, setImageError] = useState("");
@@ -175,55 +225,12 @@ export default function TrackerMaintainerModal({
   const {
     control,
     register,
-    reset,
     handleSubmit,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(isFullForm ? trackerLiveFormSchema : trackerLiveCompactFormSchema),
-    defaultValues: {
-      title: "",
-      year: String(currentYear),
-      date: "",
-      status: DEFAULT_LIVE_STATUS_LABEL,
-      tags: [],
-      additional_info: "",
-      links: {
-        telegram: "",
-        okru: "",
-        piero: "",
-        patreon: "",
-      },
-    },
+    defaultValues: getFormValues(live),
   });
-
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const source = live || emptyLive;
-    reset({
-      title: source.title || "",
-      year: source.year || String(currentYear),
-      date: toDateInputValue(source.date),
-      status: source.status || DEFAULT_LIVE_STATUS_LABEL,
-      tags: Array.isArray(source.tags) ? source.tags : [],
-      additional_info: source.additional_info || "",
-      links: {
-        telegram: joinLines(source.links?.telegram),
-        okru: joinLines(source.links?.okru),
-        piero: joinLines(source.links?.piero),
-        patreon: joinLines(source.links?.patreon),
-      },
-    });
-    setImageFile(null);
-    setImageError("");
-    setIsImageCleared(false);
-  }, [isOpen, live, reset]);
-
-  if (!isOpen) {
-    return null;
-  }
 
   function onSubmit(form) {
     const nextLinks = {

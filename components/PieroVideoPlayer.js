@@ -1,7 +1,6 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   AirPlayButton,
   Gesture,
@@ -10,6 +9,7 @@ import {
   MediaProvider,
   PlayButton,
   TextTrack,
+  hasTriggerEvent,
   useCaptionOptions,
   useMediaContext,
   useMediaRemote,
@@ -461,6 +461,102 @@ function PieroCastControl({ onRequest }) {
   );
 }
 
+function PieroTouchVolumeControl() {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef(null);
+  const muted = useMediaState("muted");
+  const volume = useMediaState("volume");
+  const remote = useMediaRemote();
+  const effectiveVolume = muted ? 0 : volume;
+
+  const getVideoElement = () => rootRef.current
+    ?.closest(".piero-media-player")
+    ?.querySelector("video");
+
+  const changeVolume = (nextVolume, trigger) => {
+    remote.changeVolume(nextVolume, trigger);
+    const video = getVideoElement();
+    if (!video) return;
+
+    video.volume = nextVolume;
+    if (nextVolume > 0) video.muted = false;
+  };
+
+  const toggleMuted = (trigger) => {
+    const shouldUnmute = muted || volume === 0;
+    if (shouldUnmute) remote.unmute(trigger);
+    else remote.mute(trigger);
+
+    const video = getVideoElement();
+    if (video) video.muted = !shouldUnmute;
+  };
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const closeOnOutsideInteraction = (event) => {
+      if (!rootRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideInteraction);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideInteraction);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={rootRef} className="piero-touch-volume-control">
+      <button
+        type="button"
+        className="plyr__controls__item plyr__control piero-touch-volume-trigger"
+        aria-label="Control de volumen"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        onClick={(event) => {
+          event.stopPropagation();
+          setIsOpen((current) => !current);
+        }}
+      >
+        {muted || volume === 0 ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+        <span className="plyr__tooltip">Volumen</span>
+      </button>
+      {isOpen ? (
+        <div className="piero-touch-volume-popover" role="dialog" aria-label="Control de volumen">
+          <strong>{Math.round(effectiveVolume * 100)}%</strong>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={effectiveVolume}
+            aria-label="Nivel de volumen"
+            onChange={(event) => {
+              const nextVolume = Number(event.target.value);
+              changeVolume(nextVolume, event.nativeEvent);
+            }}
+          />
+          <button
+            type="button"
+            className="piero-touch-volume-mute"
+            aria-label={muted || volume === 0 ? "Activar sonido" : "Silenciar"}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggleMuted(event.nativeEvent);
+            }}
+          >
+            {muted || volume === 0 ? <VolumeX aria-hidden="true" /> : <Volume2 aria-hidden="true" />}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function formatRemoteTime(totalSeconds) {
   const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
   const hours = Math.floor(seconds / 3600);
@@ -664,14 +760,11 @@ function PieroUnifiedSettings({
   onOpen,
   onOpenChange,
   onOpenSubtitleSettings,
-  portalTarget,
 }) {
-  const isFullscreen = useMediaState("fullscreen");
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState("root");
   const rootRef = useRef(null);
   const panelRef = useRef(null);
-  const lastTouchActivationRef = useRef(0);
   const hasReportedOpenStateRef = useRef(false);
   const captionOptions = useCaptionOptions({ off: "Desactivado" });
   const speedOptions = usePlaybackRateOptions({ rates: PLAYBACK_SPEEDS, normalLabel: "1×" });
@@ -827,15 +920,10 @@ function PieroUnifiedSettings({
         aria-label="Configuración"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
-        onPointerUp={(event) => {
-          if (event.pointerType !== "touch") return;
-          event.preventDefault();
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+        onClick={(event) => {
           event.stopPropagation();
-          lastTouchActivationRef.current = Date.now();
-          toggleSettings();
-        }}
-        onClick={() => {
-          if (Date.now() - lastTouchActivationRef.current < 600) return;
           toggleSettings();
         }}
       >
@@ -843,7 +931,7 @@ function PieroUnifiedSettings({
         <span className="plyr__tooltip">Configuración</span>
       </button>
 
-      {panel && !isFullscreen && portalTarget ? createPortal(panel, portalTarget) : panel}
+      {panel}
     </div>
   );
 }
@@ -928,6 +1016,7 @@ function PieroPlayerChrome({ title, shortcutsControl, subtitleSettingsControl, u
       speed={PLAYBACK_SPEEDS}
       translations={PIERO_PLAYER_TRANSLATIONS}
       slots={{
+        beforeCaptionsButton: <PieroTouchVolumeControl />,
         beforeSettings: (
           <>
             <PieroCastControl onRequest={onStartRemote} />
@@ -1660,7 +1749,6 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
         writePieroPreference("captions", enabled);
         applyCaptionsState(enabled);
       }}
-      portalTarget={playerElement}
       onOpenChange={keepControlsVisible}
       onOpen={() => {
         setIsShortcutsOpen(false);
@@ -1753,11 +1841,15 @@ const PieroVideoPlayer = forwardRef(function PieroVideoPlayer(
       onSeeking={showSeekFeedback}
       onRateChange={showRateToast}
       onVolumeChange={handleVolumeChange}
-      onPause={() => {
+      onPause={(event) => {
         showActionFeedback("pause");
+        const wasPauseRequested = hasTriggerEvent(event, "media-pause-request");
         if (
-          !isFullscreenRef.current
-          && Date.now() > fullscreenExitGraceUntilRef.current
+          wasPauseRequested
+          || (
+            !isFullscreenRef.current
+            && Date.now() > fullscreenExitGraceUntilRef.current
+          )
         ) fullscreenPlaybackIntentRef.current = false;
         if (remoteTransitionRef.current) return;
         onPause?.(playerRef.current);

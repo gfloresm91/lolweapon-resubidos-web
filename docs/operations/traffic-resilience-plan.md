@@ -6,16 +6,16 @@ Este documento permite continuar, incluso con otro agente, el trabajo iniciado d
 
 Documento relacionado: [`docs/incidents/2026-08-21-traffic-collapse.md`](../incidents/2026-08-21-traffic-collapse.md). Ese postmortem es la fuente de evidencia, cronología y comandos de diagnóstico. Este archivo es la hoja de ruta de implementación.
 
-Estado actualizado al 30 de agosto de 2026:
+Estado actualizado al 31 de agosto de 2026:
 
 - El hotfix `v2.22.1` está en producción y estabilizó el incidente.
 - El Droplet fue ampliado a 4 vCPU y 8 GiB de RAM, con CPU compartida.
 - Producción continúa usando un solo proceso Node y PostgreSQL local en Docker.
-- Las optimizaciones defensivas de la Etapa 1 llegaron a QA y producción; están contenidas en `main` y en el release `v2.25.1`.
+- Las optimizaciones defensivas, observabilidad y pruebas de resiliencia llegaron a QA y producción; están contenidas en `main` y en el release `v2.26.0`.
 - `/directo` está aislado como HTML estático servido por Nginx, dispone de caché específica en Cloudflare para QA y producción y lleva varios días de uso real estable sin errores operativos reportados.
-- La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas. Esta prueba no certifica todavía toda la aplicación dinámica con 500 usuarios concurrentes sostenidos.
-- YouTube y analítica de audiencia quedaron reactivados conjuntamente en QA después de completar pruebas aisladas y una validación sostenida con 500 visitantes. La habilitación en producción continúa sujeta al release y monitoreo de la Etapa 6.
-- La autorización pública ya no depende del rol `invitado` en PostgreSQL; la Etapa 1.75 quedó certificada en QA. La observabilidad, la prueba de carga representativa y la reactivación controlada de funciones también quedaron completadas en QA; el siguiente bloque es el release productivo de la Etapa 6.
+- La entrega estática de `/directo` fue certificada en QA con 4.000/4.000 respuestas HTTP 200 en oleadas de 800 solicitudes TLS nuevas; la aplicación dinámica se certificó después con escenarios sostenidos públicos y autenticados de 500 usuarios.
+- YouTube y analítica de audiencia quedaron reactivados conjuntamente en QA y producción después de completar pruebas aisladas, una validación sostenida con 500 visitantes en QA y observación controlada con tráfico real en producción.
+- La autorización pública ya no depende del rol `invitado` en PostgreSQL. Las Etapas 1.75 a 6 quedaron completadas; no se justifica activar la Etapa 7 mientras la capacidad certificada y las métricas productivas permanezcan dentro de los objetivos.
 - No se ha decidido instalar Redis/Valkey ni dividir la aplicación en microservicios. Esa decisión depende de mediciones.
 
 ## Qué ocurrió
@@ -330,6 +330,16 @@ Criterio de salida: cada función tiene evidencia independiente de su costo y un
 ### Etapa 6: release productivo y ensayo controlado
 
 Objetivo: llevar a producción solamente el conjunto certificado en QA.
+
+Estado al 31 de agosto de 2026: completada. El release `v2.26.0`, taggeado sobre `23130f7`, se integró en `main` y quedó desplegado en producción mediante el commit de merge `a6f62db`. GitHub Actions completó correctamente backup, instalación, generación de Prisma, build, migraciones y reinicio. La migración `20260829183000_remove_persisted_guest_role` figura aplicada en PostgreSQL y los smoke tests de Inicio, Rastreador, Changelog, APIs públicas y Viendo respondieron HTTP `200`.
+
+Las funciones se reactivaron por separado mediante sus flags productivos. YouTube se observó primero con analítica de audiencia apagada; su sincronización inicial creó y notificó un elemento sin errores y el servicio permaneció estable. Después se habilitó analítica de audiencia cada 60 segundos y ambas funciones quedaron activas conjuntamente.
+
+Durante la observación conjunta con tráfico real, Node se mantuvo normalmente alrededor de 0,87–1,61% de un núcleo, con RSS aproximado de 269–276 MiB y event-loop p95 cercano a 20–21 ms. systemd registró cero reinicios y memoria corriente cercana a 399 MiB; su peak acumulado de aproximadamente 1,12 GiB pertenece a ejecuciones anteriores y no representa el consumo estable de esta ventana. Para `resubidos.lolweapon.com`, Nginx observó 591 respuestas `200`, nueve upgrades `101`, p95 de 118 ms, p99 de 141 ms y máximo de 631 ms, sin errores críticos. Los `404` restantes correspondieron principalmente a escaneo automatizado de rutas inexistentes.
+
+PostgreSQL producción registró aproximadamente 1,31 transacciones/s, 13 conexiones, cache hit superior a 99,99% y cero locks, actividad prolongada, temporales o deadlocks. No se ejecutó carga artificial contra producción: la capacidad objetivo ya estaba certificada en QA y esta etapa usó smoke tests y tráfico real para reducir riesgo.
+
+Decisión: mantener `YOUTUBE_NOTIFICATION_SYNC_ENABLED=true` y `STREAM_AUDIENCE_ANALYTICS_ENABLED=true` en producción. El rollback continúa disponible de forma independiente por flag. La capacidad actual no presenta evidencia que justifique Redis/Valkey o múltiples procesos; reevaluar la Etapa 7 solo si aparecen los disparadores documentados.
 
 1. Integrar `dev` en `main` siguiendo el workflow del repositorio.
 2. Hacer bump de versión en `package.json` y `package-lock.json`.

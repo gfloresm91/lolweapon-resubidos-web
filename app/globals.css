@@ -10917,6 +10917,14 @@ body:has(.live-detail-page) .persistent-footer {
   max-height: calc(100dvh - var(--topbar-height) - var(--persistent-footer-height) - var(--modal-viewport-gap-total));
 }
 
+.modal-backdrop:has(.tracker-maintainer-modal) {
+  overflow: hidden;
+}
+
+.tracker-maintainer-modal {
+  overscroll-behavior: contain;
+}
+
 .modal-close-button {
   position: absolute;
   top: 1rem;
@@ -13231,6 +13239,75 @@ html:has(.watch-player-stage.is-theater) {
   animation: piero-cast-connecting 1.1s ease-in-out infinite alternate;
 }
 
+.piero-touch-volume-control {
+  position: relative;
+  display: none;
+}
+
+.piero-touch-volume-trigger {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+}
+
+.piero-touch-volume-trigger > svg,
+.piero-touch-volume-mute > svg {
+  width: var(--plyr-control-icon-size, 20px);
+  height: var(--plyr-control-icon-size, 20px);
+  fill: none;
+  stroke: currentColor;
+}
+
+.piero-touch-volume-trigger .plyr__tooltip {
+  display: none;
+}
+
+.piero-touch-volume-popover {
+  position: absolute;
+  right: 50%;
+  bottom: calc(100% + 0.55rem);
+  z-index: 45;
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  width: 52px;
+  padding: 0.45rem 0.35rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(18, 18, 18, 0.97);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  transform: translateX(50%);
+}
+
+.piero-touch-volume-popover strong {
+  color: #f8fafc;
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.piero-touch-volume-popover input[type="range"] {
+  width: 30px;
+  height: 76px;
+  margin: 0;
+  accent-color: #10b981;
+  cursor: pointer;
+  direction: rtl;
+  writing-mode: vertical-lr;
+}
+
+.piero-touch-volume-mute {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8fafc;
+  cursor: pointer;
+}
+
 @keyframes piero-cast-connecting {
   from { opacity: 0.45; }
   to { opacity: 1; }
@@ -15012,10 +15089,6 @@ html:has(.watch-player-stage.is-theater) {
     left: 0.55rem;
   }
 
-  .piero-media-player .plyr__control[data-plyr="pip"] {
-    display: none;
-  }
-
   .piero-media-player .plyr__volume .plyr__slider {
     display: none;
   }
@@ -15046,6 +15119,86 @@ html:has(.watch-player-stage.is-theater) {
 
   .watch-next-part-card {
     width: min(100%, 390px);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 780px) and (hover: none) and (pointer: coarse) {
+  .piero-media-player {
+    --plyr-control-spacing: 4px;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__control,
+  .piero-media-player .piero-unified-settings > .plyr__control {
+    flex: 0 0 auto;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__time {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .piero-media-player .plyr__control[data-plyr="pip"] {
+    display: inline-grid;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse),
+  (min-width: 600px) and (max-width: 900px) and (hover: none) and (pointer: coarse) {
+  .piero-media-player {
+    --plyr-control-spacing: 3px;
+    --plyr-control-icon-size: 18px;
+  }
+
+  .piero-media-player .plyr--video .plyr__controls {
+    gap: 2px;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__control,
+  .piero-media-player .piero-unified-settings > .plyr__control,
+  .piero-media-player .piero-touch-volume-trigger {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__time--current {
+    flex: 0 0 auto;
+    margin-right: 0;
+    white-space: nowrap;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__time--duration {
+    flex: 0 0 auto;
+    margin-right: auto;
+    white-space: nowrap;
+  }
+
+  .piero-media-player .plyr__controls > .plyr__volume {
+    display: none;
+  }
+
+  .piero-media-player .plyr__controls > .piero-cast-button,
+  .piero-media-player .plyr__controls > .piero-unified-settings,
+  .piero-media-player .plyr__controls > .piero-touch-volume-control {
+    flex: 0 0 38px;
+  }
+
+  .piero-media-player .plyr__controls > .piero-touch-volume-control {
+    display: flex;
+    order: initial;
+  }
+}
+
+@media (max-width: 599px) {
+  .piero-media-player .plyr__controls > [data-plyr="rewind"],
+  .piero-media-player .plyr__controls > [data-plyr="fast-forward"],
+  .piero-media-player .plyr__controls .plyr__volume,
+  .piero-media-player .plyr__controls > [data-plyr="pip"] {
+    display: none !important;
   }
 }
 
@@ -15096,9 +15249,18 @@ html:has(.watch-player-stage.is-theater) {
     padding: 0;
   }
 
+  .piero-media-player .plyr__controls > .plyr__control,
+  .piero-media-player .plyr__controls > .piero-unified-settings {
+    flex: 0 0 auto;
+  }
+
   .piero-media-player .plyr__time--current {
+    flex: 0 1 auto;
     min-width: 0;
+    max-width: 7.75rem;
+    overflow: hidden;
     padding: 0 0.25rem !important;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
@@ -15106,6 +15268,72 @@ html:has(.watch-player-stage.is-theater) {
     min-width: 0;
     padding: 0 0.25rem !important;
     white-space: nowrap;
+  }
+
+  @media (orientation: portrait) {
+    .piero-media-player .plyr--video .plyr__controls {
+      min-height: 104px;
+      padding: 3.9rem 0.35rem 0.3rem;
+    }
+
+    .piero-media-player .plyr__controls .plyr__progress__container {
+      right: 0.55rem;
+      bottom: 3.05rem;
+      left: 0.55rem;
+    }
+
+    .piero-media-player .plyr__controls > [data-plyr="captions"],
+    .piero-media-player .plyr__controls > .piero-cast-button,
+    .piero-media-player .plyr__controls > .piero-unified-settings {
+      position: absolute;
+      bottom: 3.55rem;
+      z-index: 2;
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+    }
+
+    .piero-media-player .plyr__controls > .piero-unified-settings {
+      right: 0.35rem;
+    }
+
+    .piero-media-player .plyr__controls > .piero-touch-volume-control {
+      display: flex;
+      flex: 0 0 40px;
+    }
+
+    .piero-media-player .piero-touch-volume-trigger {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .piero-media-player .piero-unified-settings > .plyr__control {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+    }
+
+    .piero-media-player .plyr__controls > .piero-cast-button {
+      right: 2.75rem;
+    }
+
+    .piero-media-player .plyr__controls > [data-plyr="captions"] {
+      right: 2.75rem;
+    }
+
+    .piero-media-player .plyr__controls:has(> .piero-cast-button)
+      > [data-plyr="captions"] {
+      right: 5.15rem;
+    }
+
+    .piero-media-player .plyr__controls > [data-plyr="fullscreen"] {
+      margin-left: 0;
+    }
   }
 
   .piero-mobile-sheet-backdrop {
@@ -15355,6 +15583,116 @@ html:has(.watch-player-stage.is-theater) {
 @media (max-width: 360px) {
   .piero-media-player .plyr__controls > [data-plyr="captions"] {
     display: none !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
+  html:has(.watch-player-stage.is-landscape-focus) {
+    overflow: hidden;
+  }
+
+  html:has(.watch-player-stage.is-landscape-focus) .sidebar,
+  html:has(.watch-player-stage.is-landscape-focus) .hamburger-button,
+  html:has(.watch-player-stage.is-landscape-focus) .topbar,
+  html:has(.watch-player-stage.is-landscape-focus) .persistent-footer {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .watch-player-stage.is-landscape-focus {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: block;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #000;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-mini-header {
+    position: absolute;
+    top: max(0.45rem, env(safe-area-inset-top));
+    right: max(0.55rem, env(safe-area-inset-right));
+    left: max(0.55rem, env(safe-area-inset-left));
+    z-index: 90;
+    min-height: 42px;
+    border-color: rgba(255, 255, 255, 0.14);
+    border-radius: 11px;
+    padding: 0.4rem 0.55rem;
+    background: rgba(8, 10, 15, 0.84);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-mini-header span {
+    font-size: 0.62rem;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-mini-header strong {
+    max-width: min(62vw, 560px);
+    overflow: hidden;
+    font-size: 0.76rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-tool-button {
+    min-height: 32px;
+    flex: 0 0 auto;
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-player-topline {
+    position: absolute;
+    top: calc(max(0.45rem, env(safe-area-inset-top)) + 50px);
+    left: max(0.55rem, env(safe-area-inset-left));
+    z-index: 90;
+    display: block;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-source-tabs {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(8, 10, 15, 0.82);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-source-tab {
+    min-height: 32px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.7rem;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-player-wrap {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    aspect-ratio: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .watch-player-stage.is-landscape-focus .piero-media-player [data-media-provider],
+  .watch-player-stage.is-landscape-focus .piero-media-player [data-media-provider] video {
+    width: 100%;
+    height: 100%;
+  }
+
+  .watch-player-stage.is-landscape-focus .piero-media-player [data-media-provider] video {
+    object-fit: contain;
+    object-position: center center;
+  }
+
+  .watch-player-stage.is-landscape-focus .watch-link-group {
+    display: none;
   }
 }
 

@@ -424,7 +424,7 @@ function LiveCard({
                 aria-label={`Editar ${live.title || "directo"}`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onEdit();
+                  onEdit?.(live);
                 }}
               >
                 <Edit3 size={15} />
