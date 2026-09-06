@@ -8062,8 +8062,15 @@ body:has(.live-detail-page) .persistent-footer {
   margin-bottom: 0.6rem;
 }
 
+/* La fila de fuentes absorbe el espacio libre y arrastra a los botones al
+   fondo de la card, para que ese bloque quede alineado entre todas las cards
+   de la fila. `links-container` no debe tener su propio `margin-top: auto`
+   (lo hereda de la base) o el hueco se repartiría entre fuentes y botones. */
 .lives-grid-comfortable .availability-row {
+  margin-top: auto;
   margin-bottom: 0.65rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .lives-grid-comfortable .links-container {
@@ -8071,6 +8078,7 @@ body:has(.live-detail-page) .persistent-footer {
   grid-template-columns: 38px 38px minmax(0, 1fr);
   align-items: stretch;
   gap: 0.4rem;
+  margin-top: 0;
 }
 
 .lives-grid-comfortable .links-container.has-admin-menu {
@@ -8366,16 +8374,31 @@ body:has(.live-detail-page) .persistent-footer {
 }
 
 .info-inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
   width: fit-content;
   border: 0;
   background: transparent;
-  color: var(--purple-light);
+  color: var(--text-secondary);
   cursor: pointer;
   font-family: var(--font-space-grotesk), sans-serif;
-  font-size: 0.76rem;
-  font-weight: 800;
-  margin-bottom: 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.55rem;
   padding: 0;
+  transition: color var(--t-fast);
+}
+
+.info-inline-toggle:hover,
+.info-inline-toggle:focus-visible {
+  color: #cdd6e3;
+  outline: none;
+}
+
+.info-inline-toggle svg {
+  opacity: 0.7;
 }
 
 .info-link {

@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, BellRing, Bell, CheckCircle2, CirclePlay, Edit3, FileText, ImageIcon, Link2, MoreVertical } from "lucide-react";
+import { Bookmark, BellRing, Bell, CheckCircle2, ChevronDown, ChevronUp, CirclePlay, Edit3, FileText, ImageIcon, Link2, MoreVertical } from "lucide-react";
 
 import Tooltip from "@/components/Tooltip";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
@@ -273,7 +273,14 @@ function LiveCard({
 }) {
   const router = useRouter();
   const [showInfo, setShowInfo] = useState(false);
-  const [isInfoTruncated, setIsInfoTruncated] = useState(false);
+  // Estimacion en SSR/primer render para que "Ver mas" salga sin esperar la
+  // medicion del useEffect (solo en comoda, que es donde se recorta a 2 lineas).
+  // El observer de abajo corrige el borde tras medir el DOM real.
+  const [isInfoTruncated, setIsInfoTruncated] = useState(
+    () =>
+      cardDensity === "comfortable" &&
+      String(live.additional_info || "").replace(/\s+/g, " ").trim().length > 110,
+  );
   const [showAllTags, setShowAllTags] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const adminMenuRef = useRef(null);
@@ -533,7 +540,8 @@ function LiveCard({
                 setShowInfo((current) => !current);
               }}
             >
-              {showInfo ? "Ver menos" : "Ver mas"}
+              <span>{showInfo ? "Ver menos" : "Ver mas"}</span>
+              {showInfo ? <ChevronUp size={13} aria-hidden="true" /> : <ChevronDown size={13} aria-hidden="true" />}
             </button> : null}
           </>
         ) : null}
