@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useDropzone } from "react-dropzone";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -22,7 +21,6 @@ import {
 } from "@/lib/trackerValidation";
 
 const currentYear = new Date().getFullYear();
-const TRACKER_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const emptyLive = {
   title: "",
   year: String(currentYear),
@@ -181,9 +179,6 @@ function TrackerMaintainerModalContent({
   onDelete,
 }) {
   const isFullForm = formVariant === "full";
-  const [imageFile, setImageFile] = useState(null);
-  const [imageError, setImageError] = useState("");
-  const [isImageCleared, setIsImageCleared] = useState(false);
   const yearOptions = useMemo(() => {
     const baseYears = Array.from({ length: 10 }, (_, index) => String(currentYear - index));
     const sourceYear = String(live?.year || "").trim();
@@ -193,35 +188,6 @@ function TrackerMaintainerModalContent({
     () => (statuses.length ? statuses : LIVE_STATUS_OPTIONS).map((status) => ({ value: status.label, label: status.label })),
     [statuses],
   );
-  const imageStatus = imageFile
-    ? `Nueva imagen: ${imageFile.name}`
-    : live?.image && !isImageCleared
-      ? "Miniatura actual"
-      : "Sin miniatura";
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    accept: {
-      "image/jpeg": [".jpg", ".jpeg"],
-      "image/png": [".png"],
-      "image/webp": [".webp"],
-    },
-    maxFiles: 1,
-    maxSize: TRACKER_IMAGE_MAX_BYTES,
-    noClick: true,
-    onDrop: (acceptedFiles) => {
-      if (acceptedFiles[0]) {
-        setImageFile(acceptedFiles[0]);
-        setImageError("");
-        setIsImageCleared(false);
-      }
-    },
-    onDropRejected: (rejections) => {
-      const code = rejections[0]?.errors?.[0]?.code;
-      setImageFile(null);
-      setImageError(code === "file-too-large"
-        ? "La miniatura no puede superar 2 MB."
-        : "La miniatura debe ser PNG, JPG o WebP.");
-    },
-  });
   const {
     control,
     register,
@@ -243,11 +209,10 @@ function TrackerMaintainerModalContent({
     onSave({
       ...live,
       ...form,
-      image: isFullForm ? (isImageCleared ? "" : live?.image || "") : live?.image || "",
+      image: live?.image || "",
       date: fromDateInputValue(form.date),
       additional_info: isFullForm ? form.additional_info : live?.additional_info || "",
       links: nextLinks,
-      imageFile: isFullForm ? imageFile : null,
     });
   }
 
@@ -379,41 +344,6 @@ function TrackerMaintainerModalContent({
           </div>
         ) : null}
       </section>
-
-      {isFullForm ? (
-        <section className="admin-modal-section">
-          <h3>Imagen</h3>
-          <div className="form-group-modal">
-            <label>Miniatura local</label>
-            <div
-              {...getRootProps({
-                className: `anime-image-dropzone ${isDragActive ? "is-active" : ""} ${imageError ? "is-error" : ""}`,
-              })}
-            >
-              <input {...getInputProps()} />
-              <strong>{isDragActive ? "Suelta la imagen aquí" : "Arrastra una imagen aquí"}</strong>
-              <span>PNG, JPG o WebP. Máximo 2 MB.</span>
-              <button type="button" className="btn-modal btn-modal-secondary" onClick={open}>
-                Seleccionar imagen
-              </button>
-            </div>
-            <div className="anime-image-uploader-footer">
-              <span>{imageStatus}</span>
-              {imageFile ? (
-                <button type="button" className="profile-avatar-clear" onClick={() => setImageFile(null)}>
-                  Quitar imagen
-                </button>
-              ) : live?.image && !isImageCleared ? (
-                <button type="button" className="profile-avatar-clear" onClick={() => setIsImageCleared(true)}>
-                  Quitar miniatura actual
-                </button>
-              ) : null}
-            </div>
-            {live?.image && !imageFile && !isImageCleared ? <div className="current-image-note">{live.image}</div> : null}
-            {imageError ? <span className="field-error">{imageError}</span> : null}
-          </div>
-        </section>
-      ) : null}
 
       <section className="admin-modal-section">
         <h3>Enlaces VOD</h3>

@@ -1,12 +1,183 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, BellRing, Bell, CheckCircle2, CirclePlay, Edit3, FileText, Link2 } from "lucide-react";
+import { Bookmark, BellRing, Bell, CheckCircle2, CirclePlay, Edit3, FileText, ImageIcon, Link2, MoreVertical } from "lucide-react";
 
 import Tooltip from "@/components/Tooltip";
 import { PENDING_LIVE_STATUS_LABEL } from "@/lib/animeDbMapping";
 import { getLiveStatusMeta } from "@/lib/liveStatusStyles";
+import { getLivePosterResources, PIERO_POSTER_BANNER_SIZES, PIERO_PREVIEW_FRAME_COUNT } from "@/lib/pieroPoster";
+
+const PREVIEW_INTENT_DELAY_MS = 450;
+const PREVIEW_FRAME_DURATION_MS = 800;
+let activePreviewStop = null;
+let visibilityListenerInstalled = false;
+
+function claimPreview(stop) {
+  activePreviewStop?.();
+  activePreviewStop = stop;
+
+  if (!visibilityListenerInstalled) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        activePreviewStop?.();
+        activePreviewStop = null;
+      }
+    });
+    visibilityListenerInstalled = true;
+  }
+}
+
+function releasePreview(stop) {
+  if (activePreviewStop === stop) activePreviewStop = null;
+}
+
+function LivePoster({ live, resources, onOpen, interactive = true }) {
+  const intentTimerRef = useRef(null);
+  const stopPreviewRef = useRef(null);
+  const posterImgRef = useRef(null);
+  const [posterUrl, setPosterUrl] = useState(resources?.posterUrl || "");
+  const [srcsetFailed, setSrcsetFailed] = useState(false);
+  const [previewActive, setPreviewActive] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const [previewUnavailable, setPreviewUnavailable] = useState(false);
+  const [previewFrame, setPreviewFrame] = useState(0);
+
+  useEffect(() => {
+    setPosterUrl(resources?.posterUrl || "");
+    setSrcsetFailed(false);
+    setPreviewActive(false);
+    setPreviewLoaded(false);
+    setPreviewUnavailable(false);
+    setPreviewFrame(0);
+  }, [resources?.posterUrl]);
+
+  useEffect(() => {
+    if (!previewActive || !previewLoaded) return undefined;
+    const interval = window.setInterval(() => {
+      setPreviewFrame((current) => (current + 1) % PIERO_PREVIEW_FRAME_COUNT);
+    }, PREVIEW_FRAME_DURATION_MS);
+    return () => window.clearInterval(interval);
+  }, [previewActive, previewLoaded]);
+
+  if (!stopPreviewRef.current) {
+    stopPreviewRef.current = () => {
+      window.clearTimeout(intentTimerRef.current);
+      setPreviewActive(false);
+      setPreviewFrame(0);
+    };
+  }
+
+  useEffect(() => () => {
+    releasePreview(stopPreviewRef.current);
+    window.clearTimeout(intentTimerRef.current);
+  }, []);
+
+  function beginPreview() {
+    if (
+      !interactive ||
+      !resources?.previewUrl ||
+      previewUnavailable ||
+      !window.matchMedia("(hover: hover) and (pointer: fine)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) return;
+    window.clearTimeout(intentTimerRef.current);
+    intentTimerRef.current = window.setTimeout(() => {
+      claimPreview(stopPreviewRef.current);
+      setPreviewFrame(0);
+      setPreviewActive(true);
+    }, PREVIEW_INTENT_DELAY_MS);
+  }
+
+  function stopPreview() {
+    releasePreview(stopPreviewRef.current);
+    stopPreviewRef.current();
+  }
+
+  // Banner de la card cómoda: srcset con descriptores `w` + `sizes`.
+  // Miniatura de tamaño fijo (tabla): srcset con descriptores de densidad.
+  const thumbSources = resources?.posterSources;
+  const posterSrcSet = interactive
+    ? resources?.posterSrcset
+    : thumbSources && thumbSources.length >= 3
+      ? `${thumbSources[0].url} 1x, ${thumbSources[1].url} 2x, ${thumbSources[2].url} 3x`
+      : undefined;
+  const posterSizes = interactive ? PIERO_POSTER_BANNER_SIZES : undefined;
+
+  function handlePosterError() {
+    // Un tamaño de la escalera puede faltar (set legado sin regenerar):
+    // reintenta una vez solo con el alias antes de caer al placeholder.
+    if (!srcsetFailed && posterSrcSet) {
+      setSrcsetFailed(true);
+      return;
+    }
+    setPosterUrl("");
+  }
+
+  function handlePosterLoad(event) {
+    // Un 404 cross-origin servido como HTML puede bloquearse por ORB y disparar
+    // `load` con una imagen vacía en vez de `error`; lo tratamos como fallo.
+    if (event.currentTarget.naturalWidth === 0) handlePosterError();
+  }
+
+  // El srcset puede haber fallado antes de la hidratación (sin disparar
+  // `onError` en React, p. ej. un 404 bloqueado por ORB): al montar,
+  // comprobamos el estado real del <img> y caemos al alias.
+  useEffect(() => {
+    const img = posterImgRef.current;
+    if (img && img.complete && img.naturalWidth === 0 && !srcsetFailed && posterSrcSet) {
+      setSrcsetFailed(true);
+    }
+  }, [srcsetFailed, posterSrcSet, posterUrl]);
+
+  return (
+    <button
+      type="button"
+      className="live-thumb"
+      aria-label={`Abrir ${live.title || "directo"}`}
+      onClick={onOpen}
+      onPointerEnter={beginPreview}
+      onPointerLeave={stopPreview}
+      onBlur={stopPreview}
+    >
+      {posterUrl ? (
+        <img
+          ref={posterImgRef}
+          className="live-thumb-poster"
+          src={posterUrl}
+          srcSet={!srcsetFailed ? posterSrcSet || undefined : undefined}
+          sizes={!srcsetFailed ? posterSizes : undefined}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={handlePosterLoad}
+          onError={handlePosterError}
+        />
+      ) : (
+        <span className="live-thumb-placeholder" aria-hidden="true">
+          <ImageIcon size={18} />
+          <span>Portada pendiente</span>
+        </span>
+      )}
+      {previewActive ? (
+        <img
+          className={`live-thumb-preview ${previewLoaded ? "is-loaded" : ""}`}
+          src={resources.previewUrl}
+          alt=""
+          decoding="async"
+          draggable="false"
+          style={{ "--live-preview-frame": previewFrame }}
+          onLoad={() => setPreviewLoaded(true)}
+          onError={() => {
+            setPreviewUnavailable(true);
+            stopPreview();
+          }}
+        />
+      ) : null}
+    </button>
+  );
+}
 
 function renderInfoText(text) {
   const parts = String(text || "").split(/(https?:\/\/[^\s]+)/g);
@@ -102,7 +273,11 @@ function LiveCard({
 }) {
   const router = useRouter();
   const [showInfo, setShowInfo] = useState(false);
+  const [isInfoTruncated, setIsInfoTruncated] = useState(false);
   const [showAllTags, setShowAllTags] = useState(false);
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const adminMenuRef = useRef(null);
+  const infoPreviewRef = useRef(null);
   const allTags = Array.isArray(live.tags) ? live.tags : [];
   const visibleTags = showAllTags ? allTags : allTags.slice(0, 4);
   const hiddenCount = Math.max(allTags.length - visibleTags.length, 0);
@@ -116,7 +291,8 @@ function LiveCard({
   const DetailIcon = hasPlayerLinks ? CirclePlay : hasAnyLinks ? Link2 : FileText;
   const detailPath = `/rastreador/${encodeURIComponent(live.id)}`;
   const infoPreview = String(live.additional_info || "").replace(/\s+/g, " ").trim();
-  const showThumbnail = false;
+  const posterResources = getLivePosterResources(live);
+  const showThumbnail = true;
   const isSaved = Boolean(activity?.isSaved);
   const isWatched = Boolean(activity?.isWatched);
   const actionIconCount = 2 + (canNotify ? 1 : 0) + (isAdmin ? 1 : 0);
@@ -124,6 +300,45 @@ function LiveCard({
   const compactHiddenCount = Math.max(allTags.length - compactTags.length, 0);
   const compactTitle = truncateCompactTitle(live.title);
   const statusMeta = getLiveStatusMeta(live.status);
+  const isComfortable = cardDensity === "comfortable";
+  const isTable = cardDensity === "table";
+  const hasAdminActions = canNotify || isAdmin;
+  const usesAdminMenu = isComfortable;
+  const renderedTags = isTable ? allTags : visibleTags;
+  const renderedHiddenCount = isTable ? 0 : hiddenCount;
+
+  useEffect(() => {
+    if (!showAdminMenu) return undefined;
+
+    function closeOnPointerDown(event) {
+      if (!adminMenuRef.current?.contains(event.target)) setShowAdminMenu(false);
+    }
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setShowAdminMenu(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [showAdminMenu]);
+
+  useEffect(() => {
+    const element = infoPreviewRef.current;
+    if (!element || showInfo) return undefined;
+
+    function updateTruncation() {
+      setIsInfoTruncated(element.scrollHeight > element.clientHeight + 1);
+    }
+
+    updateTruncation();
+    const observer = new ResizeObserver(updateTruncation);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [cardDensity, infoPreview, showInfo]);
 
   function openDetail() {
     onOpenDetail?.(live.id);
@@ -248,13 +463,38 @@ function LiveCard({
       data-live-id={live.id}
     >
       {showThumbnail ? (
-        <div className="live-thumb" aria-hidden="true">
-          <img src={live.image} alt="" loading="lazy" />
-        </div>
+        isComfortable ? (
+          <div className="live-poster-shell">
+            <LivePoster live={live} resources={posterResources} onOpen={openDetail} interactive />
+            <button
+              type="button"
+              className={`${statusMeta.badgeFullClassName} live-poster-status`}
+              onClick={(event) => {
+                event.stopPropagation();
+                onFilterStatus?.(live.status);
+              }}
+            >
+              <span className={statusMeta.dotClassName} aria-hidden="true" />
+              {live.status || PENDING_LIVE_STATUS_LABEL}
+            </button>
+            <button
+              type="button"
+              className="live-date-pill live-poster-date"
+              onClick={(event) => {
+                event.stopPropagation();
+                onFilterYear?.(live.year);
+              }}
+            >
+              {formatDisplayDate(live.date)}
+            </button>
+          </div>
+        ) : (
+          <LivePoster live={live} resources={posterResources} onOpen={openDetail} interactive={false} />
+        )
       ) : null}
 
       <div className="live-content">
-        <div className="live-meta">
+        {!isComfortable ? <div className="live-meta">
           <button
             type="button"
             className="live-date-pill"
@@ -276,16 +516,16 @@ function LiveCard({
             <span className={statusMeta.dotClassName} aria-hidden="true" />
             {live.status || PENDING_LIVE_STATUS_LABEL}
           </button>
-        </div>
+        </div> : null}
 
-        <h2 className="live-title">{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
+        <h2 className="live-title" title={live.title || "Sin titulo"}>{highlightText(live.title || "Sin titulo", searchTerm)}</h2>
 
         {live.additional_info ? (
           <>
-            <p className={`info-preview ${showInfo ? "is-expanded" : ""}`}>
+            <p ref={infoPreviewRef} className={`info-preview ${showInfo ? "is-expanded" : ""}`}>
               {showInfo ? renderInfoText(live.additional_info) : highlightText(infoPreview, searchTerm)}
             </p>
-            <button
+            {showInfo || isInfoTruncated ? <button
               type="button"
               className="info-inline-toggle"
               onClick={(event) => {
@@ -294,12 +534,12 @@ function LiveCard({
               }}
             >
               {showInfo ? "Ver menos" : "Ver mas"}
-            </button>
+            </button> : null}
           </>
         ) : null}
 
-        <div className="tags-container">
-          {visibleTags.map((tag) => (
+        <div className={`tags-container ${showAllTags ? "is-expanded" : ""}`}>
+          {renderedTags.map((tag) => (
             <button
               type="button"
               key={tag}
@@ -312,7 +552,12 @@ function LiveCard({
               {highlightText(tag, searchTerm)}
             </button>
           ))}
-          {hiddenCount ? (
+          {renderedHiddenCount ? (
+            isTable ? (
+              <Tooltip label={allTags.slice(2).join(", ")}>
+                <span className="tag-pill tag-pill-muted">+{renderedHiddenCount}</span>
+              </Tooltip>
+            ) : (
             <button
               type="button"
               className="tag-pill tag-pill-muted"
@@ -321,10 +566,11 @@ function LiveCard({
                 setShowAllTags(true);
               }}
             >
-              +{hiddenCount}
+              +{renderedHiddenCount}
             </button>
+            )
           ) : null}
-          {showAllTags && allTags.length > 4 ? (
+          {!isTable && showAllTags && allTags.length > 4 ? (
             <button
               type="button"
               className="tag-pill tag-pill-muted"
@@ -362,7 +608,7 @@ function LiveCard({
           {!hasAnyLinks ? <span className="availability-chip availability-chip-muted">Sin links</span> : null}
         </div>
 
-        <div className={`links-container has-${actionIconCount}-icon-actions`}>
+        <div className={`links-container has-${actionIconCount}-icon-actions ${usesAdminMenu && hasAdminActions ? "has-admin-menu" : ""}`}>
           <Tooltip label={isSaved ? "Quitar de guardados" : "Guardar para después"}>
             <button
               type="button"
@@ -401,7 +647,7 @@ function LiveCard({
               <span className="platform-personal-label">Visto</span>
             </button>
           </Tooltip>
-          {canNotify ? (
+          {canNotify && !usesAdminMenu ? (
             <Tooltip label={live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}>
               <button
                 type="button"
@@ -416,7 +662,7 @@ function LiveCard({
               </button>
             </Tooltip>
           ) : null}
-          {isAdmin ? (
+          {isAdmin && !usesAdminMenu ? (
             <Tooltip label="Editar directo">
               <button
                 type="button"
@@ -445,6 +691,57 @@ function LiveCard({
               <DetailIcon size={15} aria-hidden="true" />
             </button>
           </Tooltip>
+          {usesAdminMenu && hasAdminActions ? (
+            <div className="live-admin-menu" ref={adminMenuRef}>
+              <Tooltip label="Más acciones">
+                <button
+                  type="button"
+                  className={`platform-btn live-admin-menu-trigger ${showAdminMenu ? "is-active" : ""}`}
+                  aria-label={`Más acciones para ${live.title || "directo"}`}
+                  aria-haspopup="menu"
+                  aria-expanded={showAdminMenu}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setShowAdminMenu((current) => !current);
+                  }}
+                >
+                  <MoreVertical size={18} aria-hidden="true" />
+                </button>
+              </Tooltip>
+              {showAdminMenu ? (
+                <div className="live-admin-menu-popover" role="menu">
+                  {canNotify ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowAdminMenu(false);
+                        onNotify?.(live);
+                      }}
+                    >
+                      {live.notifiedAt ? <Bell size={16} /> : <BellRing size={16} />}
+                      <span>{live.notifiedAt ? "Reenviar notificación" : "Notificar resubido"}</span>
+                    </button>
+                  ) : null}
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowAdminMenu(false);
+                        onEdit?.(live);
+                      }}
+                    >
+                      <Edit3 size={16} />
+                      <span>Editar directo</span>
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </article>

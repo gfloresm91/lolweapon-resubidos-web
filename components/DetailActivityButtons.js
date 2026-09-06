@@ -47,23 +47,6 @@ export default function DetailActivityButtons({
     }
   }
 
-  async function uploadImage(file) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok || !data?.success) {
-      throw new Error(data?.error || "No se pudo subir la imagen.");
-    }
-
-    return data.path;
-  }
-
   async function persistLive(nextLive) {
     if (!canEdit || !nextLive?.id) {
       toast.error("No tienes permiso para editar directos.");
@@ -73,9 +56,7 @@ export default function DetailActivityButtons({
     setIsSaving(true);
 
     try {
-      const imagePath = nextLive.imageFile ? await uploadImage(nextLive.imageFile) : nextLive.image || "";
-      const payload = { ...nextLive, image: imagePath };
-      delete payload.imageFile;
+      const payload = { ...nextLive, image: nextLive.image || "" };
 
       const response = await fetch("/api/update", {
         method: "POST",

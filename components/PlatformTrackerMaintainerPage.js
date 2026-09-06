@@ -104,23 +104,6 @@ function getPlatformLabel(platform) {
   return labels[value] || platform;
 }
 
-async function uploadImage(file) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
-  const data = await response.json();
-
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || "No se pudo subir la imagen.");
-  }
-
-  return data.path;
-}
-
 export default function PlatformTrackerMaintainerPage({
   initialLives = [],
   initialStatuses = LIVE_STATUS_OPTIONS,
@@ -430,19 +413,11 @@ export default function PlatformTrackerMaintainerPage({
     setIsSaving(true);
 
     try {
-      let imagePath = nextLive.image || "";
-
-      if (nextLive.imageFile) {
-        imagePath = await uploadImage(nextLive.imageFile);
-      }
-
       const payload = {
         ...(nextLive || {}),
-        image: imagePath,
+        image: nextLive.image || "",
         id: nextLive.id || buildId(),
       };
-
-      delete payload.imageFile;
 
       const response = await fetch("/api/update", {
         method: "POST",
