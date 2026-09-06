@@ -4,7 +4,7 @@
 
 Este documento permite implementar o continuar, incluso con otra IA, la generación de portadas y previsualizaciones visuales para los resubidos del Rastreador. Describe las decisiones ya acordadas, la estructura de archivos en Piero, el script reutilizable, la integración web, las verificaciones y el rollback.
 
-Estado al 5 de septiembre de 2026 (cierre visual): **script, integración web y contrato visual aprobados; listo para commit y validación en QA; backfill masivo en Piero aún detenido; sin cambios en el downloader todavía.**
+Estado al 6 de septiembre de 2026: **contrato visual aprobado y validado en QA; backfill incremental en Piero COMPLETADO (1.638/1.641 sets en v2, 3 omisiones por MP4 de origen dañado/ausente); pendiente el hook en el downloader (Etapa 5, parte 2), el commit acotado y la Etapa 6.**
 
 ### Completado y verificado
 
@@ -18,7 +18,7 @@ Estado al 5 de septiembre de 2026 (cierre visual): **script, integración web y 
 
 **Integración web (local, rama `dev`, sin commitear).**
 - `lib/pieroPoster.js`: deriva de un link Piero `posterUrl` (alias), `posterSrcset` (descriptores `w`), `posterSources` (`[{width,url}]`), `previewUrl`, `manifestUrl`. Preserva origen y codificación. `lib/pieroPoster.test.mjs` (4) en verde.
-- `components/LiveCard.js`: `LivePoster` con prop `interactive` (true solo en cómoda). Cómoda = card estilo catálogo/YouTube con banner superior, fecha y estado superpuestos, título de dos líneas y administración en menú de tres puntos; tabla = miniatura estática con `srcSet` de densidad (`320w 1x, 640w 2x, 960w 3x`), sin hover; compacta = sin portada. Degradación por capas ante fallo del `<img>`: tamaño del srcset → alias → placeholder "VOD". No usa `live.image`.
+- `components/LiveCard.js`: `LivePoster` con prop `interactive` (true solo en cómoda). Cómoda = card estilo catálogo/YouTube con banner superior, fecha y estado superpuestos, título de dos líneas y administración en menú de tres puntos; tabla = miniatura estática con `srcSet` de densidad (`320w 1x, 640w 2x, 960w 3x`), sin hover; compacta = sin portada. Degradación por capas ante fallo del `<img>`: tamaño del srcset → alias → placeholder (icono + "Portada pendiente"). No usa `live.image`.
 - `components/HomePage.js`: se retiró `uploadImage` y el flujo de subida del `TrackerMaintainerModal`; se añadió `<span>Portada</span>` a `.lives-table-header`; se pasa `cardDensity={effectiveCardDensity}` a `LiveCard` **en las tres ramas** (la de tabla no lo hacía y el poster caía en modo cómodo con hover).
 - `components/TrackerMaintainerModal.js` / `PlatformTrackerMaintainerPage.js`: retirado el campo `Imagen` y su dropzone. Verificado por el usuario que ya no aparece.
 - `app/globals.css`: grid cómodo responsive de tres/dos/una columnas con cards de mínimo aproximado de 320–360 px, banner 16:9 y `object-fit: contain`; columna Portada de tabla sin cambios.
@@ -28,20 +28,34 @@ Estado al 5 de septiembre de 2026 (cierre visual): **script, integración web y 
 
 **Piero — muestra regenerada al formato nuevo.** Septiembre 2026 completo + ~8 MP4 de 2026/2025 que enlazan las cards visibles del Rastreador (incluidos nombres con emoji `🌀`, `+`, puntos `N.A.R.U.T.O.`, `______`). 0 errores. Sirven públicamente los 4 tamaños + alias + sprite + manifest v2.
 
-### Listo para QA / detenido operativamente
+### QA aprobado
 
-- **Backfill masivo detenido.** Hay 1.641 MP4: 774 sets legados con manifest v1, 12 sets nuevos con manifest v2 y 855 MP4 sin portada. Los sets legados siguen visibles vía alias y `--missing-only` los reconoce como incompletos porque no tienen la escalera multirresolución. La revisión visual ya cerró; se mantiene detenido hasta completar commit y smoke test en QA.
-- Las sesiones tmux `vod-posters-backfill` y `vod-posters-sweep` en Piero están **detenidas**; los scripts `run-vod-backfill.sh` / `run-vod-sweep.sh` quedan como referencia pero apuntan al bucle por años antiguo.
+El usuario validó el Rastreador en QA el 5–6 de septiembre de 2026 (cómodo/compacto/tabla, escritorio/tablet/móvil, hover, navegación directa e interna a `/rastreador`, carga progresiva, formulario sin campo de portada) y dio el visto bueno para avanzar a la operación real.
+
+### Backfill incremental — COMPLETADO (6 de septiembre de 2026, 01:35–04:41 UTC)
+
+- **Inventario al arrancar:** 1.641 MP4 bajo `/archive/drive`. `--dry-run --recursive --missing-only` → **PLAN=1581, OMIT=60** (los 60 = muestra ya en v2). Ejecutado desde la sesión tmux `vod-posters-backfill` con `/home/piero/tools/run-vod-backfill-incremental.sh` (por año, 2026 primero; `nice -n 15 ionice -c3`; `--missing-only`). Log: `/home/piero/tools/vod-posters-incremental.log`.
+- **Resultado por año** (`procesados` / `errores`): 2026 68/0 (54 omitidos, ya en v2) · 2019 152/0 · 2020 312/0 · 2021 168/0 · 2022 259/1 · 2023 222/2 · 2024 218/0 · 2025 179/0 (6 omitidos). Total **1.578 procesados OK, 3 errores**, ~3 h 6 min.
+- **Estado final:** 1.638 sets con la escalera v2 completa (`manifests = v2 = poster-1280 = 1.638`). **Cero manifiestos v1 restantes.** Sin locks ni temporales huérfanos. Disco: ~24 TB libres.
+- **3 omisiones, todas por el MP4 de origen (no por el generador):**
+  1. `2022/08 - AGOSTO/20220820_ANIMES DE SABADO! - MADE IN ABYSS OVERLORD OJISAN VAMPIRA KOMIIII (2-2).mp4` — 12,6 GB pero `moov atom not found` (grabación nunca finalizada). Necesita reparación/re-descarga del origen.
+  2. `2023/03 - MARZO/20230323_ESTE ES UN CANAL DE RESIDENT EVIL 4.mp4` — archivo de **0 bytes**. Necesita re-descarga del origen.
+  3. `2023/10 - OCTUBRE/20231006_VIENDO AMANECER EN JAPÓN - Parte 8.mp4` — falló al extraer 5 fotogramas durante el backfill y el archivo **ya no existe** (borrado/movido después). Sin acción.
+  Las cards de (1) y (2) muestran el placeholder "Portada pendiente" (comportamiento correcto). Regenerar con `generate-vod-posters.py "<ruta>"` cuando se repare el origen.
+- Nota: una primera sesión (`vod-posters-backfill-2026`) quedó sin log por un redirect mal colocado en el `tmux new-session`; se reemplazó por el runner con logging correcto. Los scripts previos `run-vod-backfill.sh` / `run-vod-sweep.sh` apuntan al bucle antiguo y quedan solo como referencia.
 
 ### Pendiente
 
-1. **Placeholder "VOD"**: hoy ocupa un 16:9 completo; muy alto en móvil. Decisión de diseño aparte (el usuario prioriza escritorio primero).
-2. **Backfill incremental** en Piero después del smoke test de QA: `generate-vod-posters.py /archive/drive --recursive --missing-only` en tmux, prioridad baja (`nice`/`ionice`). Actualiza los sets v1, genera los faltantes y omite los v2 completos; es reiniciable sin reprocesar trabajo terminado. Verificar el `Resumen:` y que no queden `ERROR`.
-3. **Aislar la feature** del repo web en su propia rama (hoy `dev` mezcla cambios ajenos: `HomePage`/`DetailActivityButtons` de otros trabajos, y varios `.xlsx` sueltos). El usuario hace git manualmente.
-4. **QA**: validación visual de cards, tabla y formulario en entorno QA; observación de red y rendimiento; navegación directa e interna a `/rastreador`; importación/exportación XLSX sin pérdida del dato legado.
-5. **Ampliar el piloto** a otros tipos de VOD (vertical, con rotación, cortos, corruptos).
-6. **Etapa 5 — automatización en el downloader (`kala-stream-downloader`)**: aún sin empezar. La transferencia del MP4 a Piero es un **rsync/cron externo** a ese repo; el hook (`ssh piero python3 /home/piero/tools/generate-vod-posters.py <ruta final>`) debe ir después de esa sincronización. Falta que el usuario indique dónde vive ese rsync/cron y en qué host.
-7. Decidir en un cambio separado si se retira `Live.image` del schema/JSON/Postgres y la columna `IMAGEN` del XLSX (requiere auditar su uso, ver más abajo).
+1. **Aislar la feature** del repo web en su propia rama y commit acotado (sin los `.xlsx` sueltos ni cambios ajenos como `DetailActivityButtons`). El usuario hace git manualmente.
+2. **Etapa 5, parte 2 — hook en `kala-stream-downloader`**: aún sin empezar. La transferencia del MP4 a Piero es un **rsync/cron externo** a ese repo; el hook (`ssh piero python3 /home/piero/tools/generate-vod-posters.py <ruta final>`) debe ir después de esa sincronización, solo con el MP4 final cerrado y estable, y un fallo de poster no debe borrar ni recodificar el MP4. Falta que el usuario indique dónde vive ese rsync/cron y en qué host.
+3. **Reprocesar las 2 omisiones** cuando se reparen los MP4 de origen (12,6 GB sin moov y el de 0 bytes en 2022/2023).
+4. **Etapa 6 — observación**: 404 de poster/preview durante una semana, peso transferido del Rastreador antes/después, ausencia de regresiones de scroll/parpadeo, comportamiento real en desktop y móvil.
+
+Pendientes secundarios (no bloquean la entrega):
+
+- **Placeholder de portada pendiente**: ya no es "VOD" plano sino icono + texto; revisar su altura en móvil.
+- Retirar en el futuro `Live.image` del schema/JSON/Postgres y la columna `IMAGEN` del XLSX (requiere auditar su uso, ver más abajo).
+- Storyboards/VTT para la barra del reproductor: feature distinta, diferida.
 
 Decisiones confirmadas:
 
@@ -310,7 +324,7 @@ Opciones requeridas:
 
 ### Idempotencia y concurrencia
 
-- Un set se considera completo solo si existen poster, sprite y manifest válidos.
+- Un set se considera completo solo si existen los cuatro posters de la escalera (`320/640/960/1280`), el alias, el sprite y el manifest, todos no vacíos. Un set legado v1 (un solo tamaño) cuenta como incompleto.
 - Si falta una pieza, `--missing-only` regenera el set completo para mantener consistencia.
 - Crear un lock por video dentro del directorio de salida. Si ya existe un proceso activo, omitir ese video con mensaje claro.
 - El lock debe limpiarse normalmente y poder detectarse como obsoleto mediante PID/edad.
@@ -449,16 +463,16 @@ Verificar MIME:
 
 No avanzar automáticamente a producción. Cada etapa debe registrar fecha, commit, entorno y resultado.
 
-Estado de las etapas al 5 de septiembre de 2026:
+Estado de las etapas al 6 de septiembre de 2026:
 
 | Etapa | Estado |
 |---|---|
 | 0 — inventario e infraestructura | **Completada.** |
-| 1 — script y pruebas locales | **Completada** e iterada a multi-resolución + fix de `%`. Tests en verde. |
+| 1 — script y pruebas locales | **Completada** e iterada a multi-resolución + `pad` para no-16:9 + fix de `%`. Tests en verde. |
 | 2 — piloto en Piero | **Completada** con la muestra al nuevo formato (septiembre 2026 + ~8 MP4). |
-| 3 — integración web sin hover | **Completada en local** (poster/fallback, retiro del campo Imagen, columna Portada de tabla). Falta commitear y QA. |
-| 4 — preview de card bajo demanda | **Completada en local** (hover con intención, una preview activa, gating por `hover/pointer/reduced-motion`). Falta QA en navegadores reales. |
-| 5 — backfill y automatización | **Pendiente.** Revisión visual cerrada; backfill incremental `--missing-only` listo para reanudarse después de QA. Hook en el downloader sin empezar. |
+| 3 — integración web sin hover | **Completada** y validada en QA por el usuario. Falta el commit acotado / rama propia. |
+| 4 — preview de card bajo demanda | **Completada** y validada en QA. |
+| 5 — backfill y automatización | **Parte 1 completada** (backfill incremental: 1.638/1.641 sets en v2, 3 omisiones por origen dañado). **Parte 2** (hook en el downloader) sin empezar. |
 | 6 — observación y cierre | **Pendiente.** |
 
 ### Etapa 0: inventario y validación de infraestructura
@@ -638,7 +652,7 @@ Estados adicionales:
 
 - `scripts/generate-vod-posters.py` + `scripts/tests/test_generate_vod_posters.py`
 - `lib/pieroPoster.js` + `lib/pieroPoster.test.mjs`
-- En Piero: `/home/piero/tools/generate-vod-posters.py` (copia operativa), `run-vod-backfill.sh`, `run-vod-sweep.sh` (referencia)
+- En Piero: `/home/piero/tools/generate-vod-posters.py` (copia operativa), `run-vod-backfill-incremental.sh` (runner del backfill en curso), `run-vod-backfill.sh` / `run-vod-sweep.sh` (bucle antiguo, solo referencia)
 
 ### Modificados (hechos)
 
