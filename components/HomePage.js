@@ -1334,32 +1334,6 @@ export default function HomePage({
     return () => observer.disconnect();
   }, [currentView, filteredLives.length, hasMoreLives]);
 
-  async function uploadImage(file) {
-    if (!canCreateTracker && !canUpdateTracker && !canCreateTrackingAnime && !canUpdateTrackingAnime && !canCreateCompletedAnime && !canUpdateCompletedAnime) {
-      throw new Error("No tienes permiso para subir imágenes.");
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await response.json();
-
-    if (response.status === 401) {
-      redirectToLoginWithMessage("No autorizado para subir imágenes. Vuelve a iniciar sesión.");
-      throw new Error("Sesion expirada");
-    }
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || "No se pudo subir la imagen");
-    }
-
-    return data.path;
-  }
-
   async function persistLive(nextLive) {
     if (nextLive?.id && !canUpdateTracker) {
       toast.error("No tienes permiso para editar directos.");
@@ -1374,18 +1348,10 @@ export default function HomePage({
     setIsSaving(true);
 
     try {
-      let imagePath = nextLive.image || "";
-
-      if (nextLive.imageFile) {
-        imagePath = await uploadImage(nextLive.imageFile);
-      }
-
       const payload = {
         ...(nextLive || {}),
-        image: imagePath,
+        image: nextLive.image || "",
       };
-
-      delete payload.imageFile;
       payload.id = payload.id || buildId();
 
       const response = await fetch("/api/update", {
@@ -2085,6 +2051,7 @@ export default function HomePage({
                   </div>
                   <div id="lives-grid" className="lives-grid lives-grid-compact lives-grid-table">
                     <div className="lives-table-header" role="row" aria-hidden="true">
+                      <span>Portada</span>
                       <span>Fecha</span>
                       <span>Título</span>
                       <span>Estado</span>
@@ -2096,6 +2063,7 @@ export default function HomePage({
                       <LiveCard
                         key={live.id}
                         live={live}
+                        cardDensity={effectiveCardDensity}
                         isAdmin={canUpdateTracker && Boolean(trackerFormVariant)}
                         canNotify={currentView === "tracker" && canNotifyTracker}
                         activity={liveActivity[live.id]}

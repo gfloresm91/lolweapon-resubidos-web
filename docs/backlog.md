@@ -161,8 +161,8 @@ Tareas pendientes, ideas y mejoras diferidas. Actualizar con cada sesión releva
 ### Piero/NAS — generar HLS, calidades, navegación y metadata visual
 
 - **Qué es:** generar en el NAS un `master.m3u8` con rendiciones adaptativas, pistas WebVTT de subtítulos y capítulos, sprites/VTT de miniaturas para la línea de tiempo y una imagen poster asociada a cada parte.
-- **Estado web:** `PieroVideoPlayer` ya encapsula la reproducción con Vidstack, menús, controles, gestos y estados preparados. Continúa recibiendo MP4 directo y ahora detecta de forma opcional un sidecar WebVTT con el mismo nombre base (`video.mp4` → `video.vtt`) para registrarlo como subtítulo en español, incluido el flujo de Google Cast. HLS, calidades, poster, miniaturas y capítulos siguen pendientes hasta disponer de URLs definitivas para validar el flujo completo.
-- **Pendiente operativo:** definir convención de carpetas/URLs, escalera de resoluciones y bitrates, política de conservación de MP4, extracción/generación de posters y miniaturas, formato de capítulos, generación de segmentos y publicación atómica en el NAS.
+- **Estado web:** `PieroVideoPlayer` ya encapsula la reproducción con Vidstack, menús, controles, gestos y estados preparados. Continúa recibiendo MP4 directo y detecta opcionalmente subtítulos centralizados. La generación de posters y previews cortas para cards está en implementación separada bajo `/archive/drive/posters/`; no equivale al storyboard/VTT denso del reproductor.
+- **Pendiente operativo:** definir escalera de resoluciones y bitrates, política de conservación de MP4, storyboard/VTT para la línea de tiempo, formato de capítulos, generación de segmentos y publicación atómica en el NAS. El poster de card ya no bloquea esta etapa.
 - **Motivo del diferimiento:** el usuario continuará publicando archivos manualmente y primero debe cerrar la automatización externa del NAS.
 
 ### Importación XLSX del Rastreador — creación de registros nuevos

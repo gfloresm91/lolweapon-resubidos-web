@@ -7851,6 +7851,10 @@ body:has(.live-detail-page) .persistent-footer {
     grid-template-columns: repeat(2, 1fr);
     gap: 1.25rem;
   }
+
+  .lives-grid-comfortable {
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  }
 }
 
 @media (max-width: 1520px) {
@@ -7912,20 +7916,249 @@ body:has(.live-detail-page) .persistent-footer {
 }
 
 .live-thumb {
-  flex: 0 0 132px;
+  flex: 0 0 190px;
   aspect-ratio: 16 / 9;
   align-self: flex-start;
+  position: relative;
   overflow: hidden;
+  padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
 }
 
-.live-thumb img {
+.live-thumb:focus-visible {
+  border-color: var(--green);
+  outline: 2px solid rgba(52, 211, 153, 0.3);
+  outline-offset: 2px;
+}
+
+.live-thumb-poster,
+.live-thumb-preview {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+}
+
+.live-thumb-preview {
+  inset: 0 auto 0 0;
+  z-index: 1;
+  width: 500%;
+  max-width: none;
+  opacity: 0;
+  object-fit: contain;
+  transform: translateX(calc(var(--live-preview-frame, 0) * -20%));
+  transition: opacity 120ms ease;
+}
+
+.live-thumb-preview.is-loaded {
+  opacity: 1;
+}
+
+.live-thumb-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.45rem;
+  background: #111722;
+  color: #718096;
+  font-family: var(--font-space-grotesk), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Portada por densidad ------------------------------------------------------ */
+
+/* Comoda (escritorio, tablet y movil): banner superior a todo el ancho.
+   La imagen sangra a los bordes de la tarjeta: quitamos el padding del
+   contenedor y lo trasladamos a .live-content para no depender del valor
+   exacto de padding en cada breakpoint. */
+.lives-grid-comfortable .live-card.has-thumb {
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.lives-grid-comfortable .live-card.has-thumb .live-content {
+  padding: 1.15rem 1rem 1rem;
+}
+
+.live-poster-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #080b10;
+}
+
+.lives-grid-comfortable .live-poster-shell .live-thumb {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  align-self: stretch;
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.status-badge.live-poster-status,
+.lives-grid-comfortable .live-date-pill.live-poster-date {
+  position: absolute;
+  z-index: 3;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: #080c12;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.72);
+}
+
+.live-poster-status {
+  top: 0.7rem;
+  right: 0.7rem;
+}
+
+.lives-grid-comfortable .live-date-pill.live-poster-date {
+  right: 0.7rem;
+  bottom: 0.7rem;
+  color: #fff;
+  font-weight: 900;
+}
+
+.lives-grid-comfortable .live-title {
+  display: -webkit-box;
+  min-height: 2.7em;
+  margin-bottom: 0.45rem;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+.lives-grid-comfortable .info-preview {
+  color: #a8b3c5;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.lives-grid-comfortable .info-inline-toggle {
+  margin-bottom: 0.5rem;
+}
+
+.lives-grid-comfortable .tags-container:not(.is-expanded) {
+  max-height: 3.25rem;
+  overflow: hidden;
+}
+
+.lives-grid-comfortable .tags-container {
+  margin-bottom: 0.6rem;
+}
+
+.lives-grid-comfortable .availability-row {
+  margin-bottom: 0.65rem;
+}
+
+.lives-grid-comfortable .links-container {
+  display: grid;
+  grid-template-columns: 38px 38px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.4rem;
+}
+
+.lives-grid-comfortable .links-container.has-admin-menu {
+  grid-template-columns: 38px 38px minmax(0, 1fr) 38px;
+}
+
+.lives-grid-comfortable .platform-personal,
+.lives-grid-comfortable .live-admin-menu-trigger {
+  width: 38px;
+  min-width: 0;
+  padding: 0;
+}
+
+.lives-grid-comfortable .platform-personal-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.live-admin-menu {
+  position: relative;
+  display: flex;
+}
+
+.lives-grid-comfortable .platform-btn.live-admin-menu-trigger {
+  justify-content: center;
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  color: #a8b3c5;
+  background: transparent;
+  box-shadow: none;
+}
+
+.lives-grid-comfortable .platform-btn.live-admin-menu-trigger:hover,
+.lives-grid-comfortable .platform-btn.live-admin-menu-trigger:focus-visible,
+.lives-grid-comfortable .platform-btn.live-admin-menu-trigger.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  outline: none;
+}
+
+.lives-grid-comfortable .platform-btn.live-admin-menu-trigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.5);
+}
+
+.live-admin-menu-popover {
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: calc(100% + 0.45rem);
+  display: grid;
+  width: max-content;
+  min-width: 190px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  padding: 0.35rem;
+  background: #151922;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.48);
+}
+
+.live-admin-menu-popover button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem;
+  background: transparent;
+  color: var(--text-main);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.live-admin-menu-popover button:hover,
+.live-admin-menu-popover button:focus-visible {
+  background: rgba(167, 139, 250, 0.14);
+  color: #fff;
+  outline: none;
 }
 
 .live-meta {
@@ -8615,6 +8848,96 @@ body:has(.live-detail-page) .persistent-footer {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Tabla: columna de portada estatica antes de Fecha. Estas reglas van despues
+   del bloque .lives-grid-compact para ganar por orden de fuente (misma
+   especificidad). */
+.lives-grid-table {
+  min-width: 1420px;
+}
+
+.lives-grid-table .lives-table-header,
+.lives-grid-table .live-card {
+  grid-template-columns:
+    minmax(96px, 0.4fr)
+    minmax(112px, 0.58fr)
+    minmax(240px, 1.75fr)
+    minmax(210px, 1.16fr)
+    minmax(170px, 0.98fr)
+    minmax(200px, 1.05fr)
+    minmax(236px, 0.92fr);
+}
+
+.lives-grid-table .lives-table-header {
+  z-index: 5;
+  background: #151922;
+  color: #aeb9cb;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.lives-grid-table .live-card {
+  min-height: 78px;
+}
+
+.lives-grid-table .live-card:hover,
+.lives-grid-table .live-card:focus-within {
+  background: #131923;
+  box-shadow: inset 3px 0 0 rgba(167, 139, 250, 0.62);
+}
+
+.lives-grid-table .live-thumb {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 132px;
+  align-self: start;
+  margin: 0;
+  border-radius: 0;
+}
+
+.lives-grid-table .live-thumb-placeholder {
+  gap: 0.18rem;
+  font-size: 0.6rem;
+}
+
+.lives-grid-table .live-thumb-placeholder span {
+  display: none;
+}
+
+.lives-grid-table .live-thumb-placeholder::after {
+  content: "VOD";
+}
+
+.lives-grid-table .live-date-pill {
+  grid-column: 2;
+}
+
+.lives-grid-table .live-title {
+  grid-column: 3;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.lives-grid-table .status-badge {
+  grid-column: 4;
+}
+
+.lives-grid-table .tags-container {
+  grid-column: 5;
+}
+
+.lives-grid-table .availability-row {
+  grid-column: 6;
+}
+
+.lives-grid-table .links-container {
+  grid-column: 7;
+  justify-content: flex-start;
+}
+
 
 .platform-btn {
   padding: 0.3rem 0.7rem;
@@ -18934,9 +19257,9 @@ a.empty-state-action {
   }
 
   .lives-grid-comfortable {
-    grid-template-columns: minmax(0, 1fr);
-    max-width: 640px;
-    margin-inline: auto;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    max-width: none;
+    margin-inline: 0;
   }
 
   .lives-grid-comfortable .live-card {
@@ -18947,24 +19270,19 @@ a.empty-state-action {
     font-size: 1.08rem;
   }
 
-  .lives-grid-comfortable .links-container {
-    display: grid;
-    grid-template-columns: repeat(2, 42px) minmax(160px, 1fr);
-    gap: 0.5rem;
-  }
-
+  .lives-grid-comfortable .links-container,
   .lives-grid-comfortable .links-container.has-3-icon-actions {
-    grid-template-columns: repeat(3, 42px) minmax(160px, 1fr);
+    grid-template-columns: 38px 38px minmax(0, 1fr);
   }
 
-  .lives-grid-comfortable .links-container.has-4-icon-actions {
-    grid-template-columns: repeat(4, 42px) minmax(160px, 1fr);
+  .lives-grid-comfortable .links-container.has-admin-menu,
+  .lives-grid-comfortable .links-container.has-3-icon-actions.has-admin-menu,
+  .lives-grid-comfortable .links-container.has-4-icon-actions.has-admin-menu {
+    grid-template-columns: 38px 38px minmax(0, 1fr) 38px;
   }
 
-  .lives-grid-comfortable .platform-personal,
-  .lives-grid-comfortable .platform-notify,
-  .lives-grid-comfortable .platform-edit {
-    width: 42px;
+  .lives-grid-comfortable .platform-personal {
+    width: 38px;
     min-width: 0;
     padding: 0;
   }
@@ -19723,10 +20041,16 @@ a.empty-state-action {
 
 }
 
+@media (min-width: 640px) and (max-width: 899px) {
+  .lives-grid-comfortable {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+}
+
 @media (max-width: 899px) {
   .lives-grid-comfortable .links-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(34px, 1fr));
+    grid-template-columns: 38px 38px minmax(0, 1fr);
     gap: 0.4rem;
     width: 100%;
   }
@@ -19743,13 +20067,8 @@ a.empty-state-action {
     grid-column: auto;
   }
 
-  .lives-grid-comfortable .platform-detail span {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+  .lives-grid-comfortable .links-container.has-admin-menu {
+    grid-template-columns: 38px 38px minmax(0, 1fr) 38px;
   }
 }
 
