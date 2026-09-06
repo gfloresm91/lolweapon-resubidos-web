@@ -46,8 +46,11 @@ El usuario validó el Rastreador en QA el 5–6 de septiembre de 2026 (cómodo/c
 
 ### Pendiente
 
-1. **Aislar la feature** del repo web en su propia rama y commit acotado (sin los `.xlsx` sueltos ni cambios ajenos como `DetailActivityButtons`). El usuario hace git manualmente.
-2. **Etapa 5, parte 2 — hook en `kala-stream-downloader`**: aún sin empezar. La transferencia del MP4 a Piero es un **rsync/cron externo** a ese repo; el hook (`ssh piero python3 /home/piero/tools/generate-vod-posters.py <ruta final>`) debe ir después de esa sincronización, solo con el MP4 final cerrado y estable, y un fallo de poster no debe borrar ni recodificar el MP4. Falta que el usuario indique dónde vive ese rsync/cron y en qué host.
+1. **Commit del estado del plan.** La feature web ya está commiteada y en `origin/dev` (`10f2ff3 feat(tracker): add generated VOD posters and previews`). Solo falta un commit de documentación con el resultado del backfill (cambios de este archivo). El usuario hace git manualmente.
+2. **Etapa 5, parte 2 — hook en `kala-stream-downloader`** (única tarea de código que queda):
+   - **Hoy la transferencia es manual** desde la Mac del usuario: `rsync -avhs --partial --partial-dir=.rsync-partial "~/Lives/Upload/<fecha>*.mp4" "piero:/archive/drive/<AÑO>/<MM - MES>/"`.
+   - **Transitorio (hecho, 6 de septiembre):** `kala-stream-downloader/upload-lives.sh <prefijo-fecha> [--missing-only|--force]` hace ese rsync **y** genera las portadas de los archivos transferidos (`ssh piero … generate-vod-posters.py "<ruta>" --missing-only --min-age-seconds 0`). Deduce la carpeta `AÑO/MM - MES` del nombre `YYYYMMDD_…`. Es la referencia para la integración final.
+   - **Pendiente:** integrarlo dentro del flujo del downloader, disparando la generación remota solo con el MP4 final cerrado y estable; un fallo de poster marca advertencia/reintento pero no borra ni recodifica el MP4.
 3. **Reprocesar las 2 omisiones** cuando se reparen los MP4 de origen (12,6 GB sin moov y el de 0 bytes en 2022/2023).
 4. **Etapa 6 — observación**: 404 de poster/preview durante una semana, peso transferido del Rastreador antes/después, ausencia de regresiones de scroll/parpadeo, comportamiento real en desktop y móvil.
 
